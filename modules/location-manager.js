@@ -9,6 +9,7 @@ export class LocationManager {
         this.nearestStopsMarkers = [];
         this.lastUserPos = null;
         this.lastUserPosSmoothed = null;
+        this._prevUserPosSmoothed = null;
         this.lastUserTime = null;
         this.lastUserSpeed = null;
         this.userCentered = false;
@@ -111,7 +112,7 @@ export class LocationManager {
             }
         }
 
-        // Save previous then current for bearing
+        // Save previous then current for bearing (raw)
         this._prevUserPos = this.lastUserPos ? { ...this.lastUserPos } : null;
         this.lastUserPos = { lat, lon };
         this.lastUserTime = now;
@@ -119,6 +120,7 @@ export class LocationManager {
 
         // Low-pass smoothing for display/camera
         const alpha = typeof speed === 'number' ? Math.min(0.45, Math.max(0.15, this._smoothAlphaBase + speed * 0.1)) : this._smoothAlphaBase;
+        const prevSmooth = this.lastUserPosSmoothed ? { ...this.lastUserPosSmoothed } : null;
         if (!this.lastUserPosSmoothed) {
             this.lastUserPosSmoothed = { lat, lon };
         } else {
@@ -127,16 +129,17 @@ export class LocationManager {
                 lon: this.lastUserPosSmoothed.lon * (1 - alpha) + lon * alpha,
             };
         }
+        this._prevUserPosSmoothed = prevSmooth;
 
-        // Update map marker with smoothed position
+        // Update user marker with smoothed position
         this.updateUserMarker(this.lastUserPosSmoothed.lat, this.lastUserPosSmoothed.lon);
-        this.updateMapView(this.lastUserPosSmoothed.lat, this.lastUserPosSmoothed.lon);
-        this.scheduleLiveUIUpdate();
 
         // Camera follow if locked + auto-tilt adaptif
+        let cameraLocked = false;
         try {
             const mapManager = window.transJakartaApp.modules.map;
             if (mapManager && mapManager.isCameraLock()) {
+                cameraLocked = true;
                 // Pitch adaptif berdasarkan kecepatan (m/s)
                 let pitch = 60;
                 if (typeof speed === 'number') {
@@ -148,9 +151,27 @@ export class LocationManager {
                 if (Math.abs(currentPitch - pitch) > 5) {
                     mapManager.getMap().setPitch(pitch);
                 }
-                mapManager.followUserCamera(this.lastUserPosSmoothed.lat, this.lastUserPosSmoothed.lon);
+                // Heading dari smoothed previous -> current
+                let headingDeg = NaN;
+                if (this._prevUserPosSmoothed) {
+                    const toRad = d => d * Math.PI / 180;
+                    const toDeg = r => r * 180 / Math.PI;
+                    const y = Math.sin(toRad(this.lastUserPosSmoothed.lon - this._prevUserPosSmoothed.lon)) * Math.cos(toRad(this.lastUserPosSmoothed.lat));
+                    const x = Math.cos(toRad(this._prevUserPosSmoothed.lat)) * Math.sin(toRad(this.lastUserPosSmoothed.lat)) - Math.sin(toRad(this._prevUserPosSmoothed.lat)) * Math.cos(toRad(this.lastUserPosSmoothed.lat)) * Math.cos(toRad(this.lastUserPosSmoothed.lon - this._prevUserPosSmoothed.lon));
+                    let brng = toDeg(Math.atan2(y, x));
+                    headingDeg = (brng + 360) % 360;
+                }
+                mapManager.followUserCamera(this.lastUserPosSmoothed.lat, this.lastUserPosSmoothed.lon, headingDeg);
             }
         } catch (e) {}
+
+        // Jika camera tidak lock, hanya recenter awal sekali
+        if (!cameraLocked) {
+            this.updateMapView(this.lastUserPosSmoothed.lat, this.lastUserPosSmoothed.lon);
+        }
+
+        // Debounced live UI update
+        this.scheduleLiveUIUpdate();
 
         // If pending nearest requested earlier, show now
         if (this._pendingNearest && this.lastUserPos) {
