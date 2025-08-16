@@ -331,6 +331,36 @@ export class UIManager {
                 console.debug('[nearestStopsBtn] fixed type=button on existing element');
             }
         }
+
+        // Camera Lock Button (kanan)
+        if (!document.getElementById('cameraLockBtn')) {
+            const btn = document.createElement('button');
+            btn.id = 'cameraLockBtn';
+            btn.type = 'button';
+            btn.className = 'btn btn-primary rounded-5 btn-sm position-absolute';
+            btn.style.right = '12px';
+            btn.style.top = '214px';
+            btn.style.zIndex = 1000;
+            btn.style.display = 'none';
+            btn.innerHTML = '<iconify-icon icon="mdi:compass" inline></iconify-icon> <span class="d-none d-md-inline">Lock</span>';
+            btn.onclick = (e) => {
+                e.preventDefault(); e.stopPropagation();
+                const mapManager = window.transJakartaApp.modules.map;
+                if (!mapManager) return;
+                mapManager.toggleCameraLock();
+                const locked = mapManager.isCameraLock();
+                if (locked) {
+                    btn.classList.remove('btn-primary');
+                    btn.classList.add('btn-success');
+                    btn.innerHTML = '<iconify-icon icon="mdi:compass" inline></iconify-icon> <span class="d-none d-md-inline">Locked</span>';
+                } else {
+                    btn.classList.remove('btn-success');
+                    btn.classList.add('btn-primary');
+                    btn.innerHTML = '<iconify-icon icon="mdi:compass" inline></iconify-icon> <span class="d-none d-md-inline">Lock</span>';
+                }
+            };
+            mapDiv.appendChild(btn);
+        }
     }
 
     // Update route dropdowns

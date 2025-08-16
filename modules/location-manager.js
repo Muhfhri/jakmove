@@ -62,21 +62,22 @@ export class LocationManager {
             navigator.geolocation.clearWatch(this.geoWatchId);
             this.geoWatchId = null;
         }
-
         if (this.userMarker) {
             const mapManager = window.transJakartaApp.modules.map;
             if (mapManager) {
                 mapManager.removeUserMarker();
+                // Hide lock button when live layanan off
+                const lockBtn = document.getElementById('cameraLockBtn');
+                if (lockBtn) lockBtn.style.display = 'none';
+                mapManager.setCameraLock(false);
             }
             this.userMarker = null;
         }
-
-        // Clear arrival timer
+        // Bersihkan timer arrival
         if (this.arrivalTimer) {
             clearTimeout(this.arrivalTimer);
             this.arrivalTimer = null;
         }
-
         this.lastArrivedStopId = null;
         this.arrivalStop = null;
         this.userCentered = false;
@@ -105,6 +106,8 @@ export class LocationManager {
             }
         }
 
+        // Save previous then current for bearing
+        this._prevUserPos = this.lastUserPos ? { ...this.lastUserPos } : null;
         this.lastUserPos = { lat, lon };
         this.lastUserTime = now;
         this.lastUserSpeed = speed;
@@ -113,6 +116,14 @@ export class LocationManager {
         this.updateUserMarker(lat, lon);
         this.updateMapView(lat, lon);
         this.updateUserRouteInfo(lat, lon);
+
+        // Camera follow if locked
+        try {
+            const mapManager = window.transJakartaApp.modules.map;
+            if (mapManager && mapManager.isCameraLock()) {
+                mapManager.followUserCamera(lat, lon);
+            }
+        } catch (e) {}
 
         // If pending nearest requested earlier, show now
         if (this._pendingNearest && this.lastUserPos) {
@@ -535,6 +546,9 @@ export class LocationManager {
         if (!stop || !routeId) return;
         this.selectedRouteIdForUser = routeId;
         this.selectedCurrentStopForUser = stop;
+        // Show lock button when live layanan active
+        const lockBtn = document.getElementById('cameraLockBtn');
+        if (lockBtn) lockBtn.style.display = '';
         if (this.lastUserPos && this.userMarker) {
             this.showUserRouteInfo(this.lastUserPos.lat, this.lastUserPos.lon, stop, routeId);
         }

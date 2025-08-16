@@ -12,6 +12,7 @@ export class MapManager {
         this.featurePopup = null;
         this.userPopup = null;
         this._activeRouteData = null; // Simpan data rute aktif
+        this._cameraLock = false; // camera follow user
     }
 
     init() {
@@ -668,6 +669,44 @@ export class MapManager {
         if (this._currentPopup) this._currentPopup.remove();
         this._currentPopup = this.featurePopup.setLngLat([lng, lat]).setHTML(html).addTo(this.map);
         return this._currentPopup;
+    }
+
+    setCameraLock(enabled) {
+        this._cameraLock = !!enabled;
+        if (!this.map) return;
+        if (this._cameraLock) {
+            // Set initial 3D pitch for better perspective
+            this.map.setPitch(60);
+        } else {
+            // Optionally relax pitch when unlocked
+            this.map.setPitch(0);
+        }
+    }
+
+    toggleCameraLock() { this.setCameraLock(!this._cameraLock); }
+    isCameraLock() { return !!this._cameraLock; }
+
+    _followBearingFrom(lat1, lon1, lat2, lon2) {
+        const toRad = d => d * Math.PI / 180;
+        const y = Math.sin(toRad(lon2 - lon1)) * Math.cos(toRad(lat2));
+        const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) - Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(toRad(lon2 - lon1));
+        let brng = Math.atan2(y, x) * 180 / Math.PI;
+        return (brng + 360) % 360;
+    }
+
+    followUserCamera(lat, lon, headingDeg, zoom = 17) {
+        if (!this.map || !this._cameraLock) return;
+        let bearing = typeof headingDeg === 'number' && !isNaN(headingDeg) ? headingDeg : this.map.getBearing();
+        // If no heading provided, try compute from last two user positions via LocationManager
+        try {
+            const loc = window.transJakartaApp?.modules?.location;
+            const last = loc?.lastUserPos;
+            const prev = loc?._prevUserPos;
+            if ((!headingDeg || isNaN(headingDeg)) && last && prev) {
+                bearing = this._followBearingFrom(prev.lat, prev.lon, lat, lon);
+            }
+        } catch (e) {}
+        this.map.easeTo({ center: [lon, lat], zoom, bearing, pitch: Math.max(this.map.getPitch(), 60), duration: 600, easing: t => t });
     }
 } 
  
