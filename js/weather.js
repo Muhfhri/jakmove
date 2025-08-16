@@ -5,27 +5,18 @@ const WEATHER_API_URL = `https://api.openweathermap.org/data/2.5/weather?id=${JA
 
 // Weather icons mapping for OpenWeather API
 const weatherIcons = {
-    '01d': '☀️', // Clear sky day
-    '01n': '🌙', // Clear sky night
-    '02d': '⛅', // Few clouds day
-    '02n': '☁️', // Few clouds night
-    '03d': '☁️', // Scattered clouds
-    '03n': '☁️', // Scattered clouds
-    '04d': '☁️', // Broken clouds
-    '04n': '☁️', // Broken clouds
-    '09d': '🌧️', // Shower rain
-    '09n': '🌧️', // Shower rain
-    '10d': '🌦️', // Rain day
-    '10n': '🌧️', // Rain night
-    '11d': '⛈️', // Thunderstorm
-    '11n': '⛈️', // Thunderstorm
-    '13d': '🌨️', // Snow
-    '13n': '🌨️', // Snow
-    '50d': '🌫️', // Mist
-    '50n': '🌫️'  // Mist
+    '01d': '☀️', '01n': '🌙',
+    '02d': '⛅', '02n': '☁️',
+    '03d': '☁️', '03n': '☁️',
+    '04d': '☁️', '04n': '☁️',
+    '09d': '🌧️', '09n': '🌧️',
+    '10d': '🌦️', '10n': '🌧️',
+    '11d': '⛈️', '11n': '⛈️',
+    '13d': '🌨️', '13n': '🌨️',
+    '50d': '🌫️', '50n': '🌫️'
 };
 
-// Weather descriptions in Indonesian
+// (Optional) English -> Indonesian descriptions (fallback only)
 const weatherDescriptions = {
     'clear sky': 'Cerah',
     'few clouds': 'Berawan Sebagian',
@@ -48,51 +39,34 @@ const weatherDescriptions = {
 
 // Function to capitalize first letter of each word
 function capitalizeWords(str) {
-    return str.replace(/\b\w/g, function(char) {
-        return char.toUpperCase();
-    });
+    if (!str || typeof str !== 'string') return '';
+    return str.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
 // Function to get real weather data from OpenWeather API
 async function getWeatherData() {
     try {
-        const response = await fetch(WEATHER_API_URL);
+        const response = await fetch(WEATHER_API_URL, { cache: 'no-store' });
         if (!response.ok) {
             throw new Error(`Weather API request failed: ${response.status}`);
         }
-        
         const data = await response.json();
-        console.log('Weather API Response:', data);
-        
         updateWeatherDisplay(data);
-        
-        // Store weather data in localStorage for caching
-        localStorage.setItem('weatherData', JSON.stringify({
-            data: data,
-            timestamp: Date.now()
-        }));
-        
+        localStorage.setItem('weatherData', JSON.stringify({ data, timestamp: Date.now() }));
     } catch (error) {
         console.error('Error fetching weather data:', error);
-        
-        // Try to load cached data
         const cachedData = localStorage.getItem('weatherData');
         if (cachedData) {
             const cached = JSON.parse(cachedData);
             const cacheAge = Date.now() - cached.timestamp;
-            
-            // Use cached data if less than 30 minutes old
-            if (cacheAge < 30 * 60 * 1000) {
-                console.log('Using cached weather data');
+            if (cacheAge < 30 * 60 * 1000) { // < 30 minutes
                 updateWeatherDisplay(cached.data);
                 return;
             }
         }
-        
-        // Fallback to mock data if API fails
-        console.log('Using fallback weather data');
+        // Fallback
         updateWeatherDisplay({
-            weather: [{ icon: '01d', description: 'clear sky' }],
+            weather: [{ icon: '01d', description: 'cerah' }],
             main: { temp: 28, humidity: 75 },
             wind: { speed: 5 }
         });
@@ -103,36 +77,27 @@ async function getWeatherData() {
 function updateWeatherDisplay(weatherData) {
     const weatherLabel = document.getElementById('weather-label');
     const weatherInfo = document.getElementById('weather-info');
-    
-    if (!weatherLabel || !weatherInfo) {
-        console.error('Weather elements not found');
-        return;
-    }
-    
+    if (!weatherLabel || !weatherInfo) return;
+
     try {
         const weather = weatherData.weather[0];
         const temp = Math.round(weatherData.main.temp);
         const humidity = weatherData.main.humidity;
         const windSpeed = weatherData.wind.speed;
-        
+
         // Update weather icon
         const icon = weatherIcons[weather.icon] || '🌤️';
         weatherLabel.textContent = icon;
-        
-        // Get weather description in Indonesian
-        const description = weatherDescriptions[weather.description.toLowerCase()] || capitalizeWords(weather.description);
-        
-        // Update weather info
+
+        // For lang=id, API already returns Indonesian description
+        const descRaw = weather.description || '';
+        const descKey = (descRaw || '').toLowerCase();
+        const description = weatherDescriptions[descKey] || capitalizeWords(descRaw);
+
         weatherInfo.textContent = `${description} ${temp}°C`;
-        
-        // Add tooltip with more details
         weatherInfo.title = `Kelembaban: ${humidity}% | Angin: ${windSpeed} m/s`;
-        
-        console.log(`Weather updated: ${description} ${temp}°C (${weather.icon})`);
-        
     } catch (error) {
         console.error('Error updating weather display:', error);
-        // Fallback display
         weatherLabel.textContent = '🌤️';
         weatherInfo.textContent = 'Memuat cuaca...';
     }
@@ -140,16 +105,15 @@ function updateWeatherDisplay(weatherData) {
 
 // Initialize weather
 function initWeather() {
-    console.log('Initializing weather with real API...');
-    
-    // Get real weather data immediately
-    getWeatherData();
-    
-    // Update weather every 30 minutes
-    setInterval(() => {
-        console.log('Updating weather data...');
+    try {
         getWeatherData();
-    }, 30 * 60 * 1000);
+        // Update every 30 minutes
+        setInterval(() => {
+            getWeatherData();
+        }, 30 * 60 * 1000);
+    } catch (e) {
+        console.warn('initWeather failed:', e);
+    }
 }
 
 // Start weather updates when DOM is loaded
@@ -160,8 +124,4 @@ if (document.readyState === 'loading') {
 }
 
 // Export functions for potential use in other scripts
-window.WeatherAPI = {
-    getWeatherData,
-    updateWeatherDisplay,
-    initWeather
-}; 
+window.WeatherAPI = { getWeatherData, updateWeatherDisplay, initWeather }; 
