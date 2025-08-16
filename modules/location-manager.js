@@ -265,11 +265,34 @@ export class LocationManager {
             const jarakNext = this.haversine(userLat, userLon, 
                 parseFloat(nextStop.stop_lat), parseFloat(nextStop.stop_lon));
             
+            // Layanan di halte berikutnya
+            let nextStopServicesHtml = '';
+            try {
+                const stopToRoutes = window.transJakartaApp.modules.gtfs.getStopToRoutes();
+                const routes = window.transJakartaApp.modules.gtfs.getRoutes();
+                const ids = stopToRoutes[nextStop.stop_id] ? Array.from(stopToRoutes[nextStop.stop_id]) : [];
+                const badges = ids.map(rid => {
+                    const r = routes.find(rt => rt.route_id === rid);
+                    if (!r) return '';
+                    const color = r.route_color ? ('#' + r.route_color) : '#6c757d';
+                    const label = r.route_short_name || r.route_id;
+                    return `<span class="badge badge-koridor-interaktif rounded-pill me-1 mb-1" style="background:${color};color:#fff;cursor:default;font-weight:bold;font-size:0.85em;padding:4px 8px;">${label}</span>`;
+                }).join('');
+                if (badges) {
+                    nextStopServicesHtml = `
+                        <div style='margin-top:4px;'>
+                            <div class='text-muted' style='font-size:0.9em;font-weight:600;margin-bottom:2px;'>Layanan di halte berikutnya</div>
+                            <div style='display:flex;flex-wrap:wrap;gap:4px;'>${badges}</div>
+                        </div>`;
+                }
+            } catch (e) {}
+            
             nextStopInfo = `
                 <div style='margin-bottom:6px;'>
                     <div class='text-muted' style='font-size:0.95em;font-weight:600;margin-bottom:2px;'>Halte Selanjutnya</div>
                     <div style='font-size:1.1em;font-weight:bold;'>${nextStop.stop_name}</div>
                     <div style='margin-bottom:2px;'><b>Jarak:</b> ${jarakNext < 1000 ? Math.round(jarakNext) + ' m' : (jarakNext/1000).toFixed(2) + ' km'}</div>
+                    ${nextStopServicesHtml}
                 </div>
             `;
         }
