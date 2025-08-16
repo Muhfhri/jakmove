@@ -78,7 +78,13 @@ export class UIManager {
             bm.style.maxWidth = '160px';
             bm.innerHTML = `
                 <option value="positron">Positron</option>
+                <option value="voyager">Voyager</option>
+                <option value="dark">Dark Matter</option>
                 <option value="osm">OSM</option>
+                <option value="streets">Streets</option>
+                <option value="topo">Topo</option>
+                <option value="gray">Gray</option>
+                <option value="opentopo">OpenTopo</option>
                 <option value="satellite">Satelit</option>
             `;
             // Restore saved base style

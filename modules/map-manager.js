@@ -100,8 +100,18 @@ export class MapManager {
         this._styleName = name;
         let style;
         if (name === 'positron') style = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json';
+        else if (name === 'voyager') style = 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json';
+        else if (name === 'dark') style = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
         else if (name === 'osm') style = 'https://demotiles.maplibre.org/style.json';
         else if (name === 'satellite') style = this._buildSatelliteStyle();
+        else if (name === 'streets') style = this._buildRasterStyle(['https://services.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}'], 'Tiles © Esri');
+        else if (name === 'topo') style = this._buildRasterStyle(['https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}'], 'Tiles © Esri');
+        else if (name === 'gray') style = this._buildRasterStyle(['https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}'], 'Tiles © Esri');
+        else if (name === 'opentopo') style = this._buildRasterStyle([
+            'https://a.tile.opentopomap.org/{z}/{x}/{y}.png',
+            'https://b.tile.opentopomap.org/{z}/{x}/{y}.png',
+            'https://c.tile.opentopomap.org/{z}/{x}/{y}.png'
+        ], 'Map data: © OpenStreetMap contributors, SRTM | Style: © OpenTopoMap');
         else style = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json';
 
         this.map.setStyle(style);
@@ -151,6 +161,16 @@ export class MapManager {
                 esri: { type: 'raster', tiles: ['https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], tileSize: 256, attribution: 'Tiles © Esri' }
             },
             layers: [ { id: 'esri', type: 'raster', source: 'esri' } ]
+        };
+    }
+
+    _buildRasterStyle(tiles, attribution) {
+        return {
+            version: 8,
+            sources: {
+                base: { type: 'raster', tiles, tileSize: 256, attribution }
+            },
+            layers: [ { id: 'base', type: 'raster', source: 'base' } ]
         };
     }
 
