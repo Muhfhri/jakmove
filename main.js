@@ -10,6 +10,7 @@ import { UIManager } from './modules/ui-manager.js';
 class TransJakartaApp {
     constructor() {
         this.modules = {};
+        this._clockTimer = null;
         this.init();
     }
 
@@ -35,6 +36,9 @@ class TransJakartaApp {
 
             // Setup event listeners
             this.setupEventListeners();
+            
+            // Start live clock
+            this.initLiveClock();
             
             // Load saved state
             this.loadSavedState();
@@ -80,10 +84,41 @@ class TransJakartaApp {
         }
     }
 
+    initLiveClock() {
+        const el = document.getElementById('liveClock');
+        if (!el) return;
+        if (this._clockTimer) clearInterval(this._clockTimer);
+        const formatter = new Intl.DateTimeFormat('id-ID', {
+            hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'Asia/Jakarta'
+        });
+        const dateFormatter = new Intl.DateTimeFormat('id-ID', {
+            weekday: 'long', day: '2-digit', month: 'long', year: 'numeric', timeZone: 'Asia/Jakarta'
+        });
+        const update = () => {
+            const now = new Date();
+            el.textContent = formatter.format(now);
+            el.title = dateFormatter.format(now);
+        };
+        update();
+        this._clockTimer = setInterval(update, 1000);
+    }
+
     loadSavedState() {
+        const savedStyle = localStorage.getItem('baseMapStyle');
+        if (savedStyle) {
+            this.modules.map.setBaseStyle(savedStyle);
+        }
         const savedRouteId = localStorage.getItem('activeRouteId');
         if (savedRouteId) {
             this.modules.routes.selectRoute(savedRouteId);
+            const savedVar = localStorage.getItem('selectedRouteVariant_' + savedRouteId) || '';
+            if (savedVar) {
+                this.modules.routes.selectRouteVariant(savedVar);
+            }
+        }
+        // Initialize weather if WeatherAPI available
+        if (window.WeatherAPI && typeof window.WeatherAPI.initWeather === 'function') {
+            try { window.WeatherAPI.initWeather(); } catch (e) { console.warn('Weather init failed:', e); }
         }
     }
 
@@ -95,6 +130,7 @@ class TransJakartaApp {
         
         // Clear localStorage
         localStorage.removeItem('activeRouteId');
+        // Do not clear baseMapStyle so user preference persists
         
         // Reset UI
         if (this.modules.ui && this.modules.ui.reset) {
