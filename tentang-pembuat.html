@@ -1,0 +1,1754 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tentang Pembuat - JakMove</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/style.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Tentang Pembuat Page Specific Styles */
+        .tentang-pembuat-page {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            transition: all 0.3s ease;
+        }
+
+        .tentang-pembuat-page .main-content {
+            background: transparent;
+        }
+
+        /* Hero Section */
+        .tentang-pembuat-page .hero-section {
+            background: linear-gradient(135deg, rgba(38, 70, 151, 0.1) 0%, rgba(79, 168, 222, 0.1) 100%);
+            border-radius: 2rem;
+            padding: 3rem 2rem;
+            margin-bottom: 3rem;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .tentang-pembuat-page .hero-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="%23ffffff" opacity="0.1"/><circle cx="75" cy="75" r="1" fill="%23ffffff" opacity="0.1"/><circle cx="50" cy="10" r="0.5" fill="%23ffffff" opacity="0.1"/><circle cx="10" cy="60" r="0.5" fill="%23ffffff" opacity="0.1"/><circle cx="90" cy="40" r="0.5" fill="%23ffffff" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+            opacity: 0.3;
+        }
+
+        .tentang-pembuat-page .hero-content {
+            position: relative;
+            z-index: 2;
+        }
+
+        .tentang-pembuat-page .hero-avatar {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 5px solid #ffffff;
+            box-shadow: 0 15px 35px rgba(38, 70, 151, 0.2);
+            margin: 0 auto 2rem;
+            transition: all 0.3s ease;
+        }
+
+        .tentang-pembuat-page .hero-avatar:hover {
+            transform: scale(1.05);
+            box-shadow: 0 20px 40px rgba(38, 70, 151, 0.3);
+        }
+
+        .tentang-pembuat-page .hero-title {
+            color: #264697;
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+
+        .tentang-pembuat-page .hero-subtitle {
+            color: #6c757d;
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .tentang-pembuat-page .hero-tags {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .tentang-pembuat-page .hero-tag {
+            background: linear-gradient(135deg, #264697 0%, #4FA8DE 100%);
+            color: #ffffff;
+            padding: 0.75rem 1.5rem;
+            border-radius: 2rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(38, 70, 151, 0.2);
+        }
+
+        .tentang-pembuat-page .hero-tag:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(38, 70, 151, 0.3);
+        }
+
+        /* Content Sections */
+        .tentang-pembuat-page .content-section {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 1.5rem;
+            padding: 2.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .tentang-pembuat-page .section-title {
+            color: #264697;
+            font-size: 1.8rem;
+            margin-bottom: 2rem;
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .tentang-pembuat-page .section-title::before {
+            content: '';
+            width: 4px;
+            height: 2rem;
+            background: linear-gradient(135deg, #264697 0%, #4FA8DE 100%);
+            border-radius: 2px;
+        }
+
+        .tentang-pembuat-page .section-content {
+            color: #495057;
+            font-size: 1.1rem;
+            line-height: 1.7;
+        }
+
+        /* Technology Grid */
+        .tentang-pembuat-page .tech-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .tentang-pembuat-page .tech-card {
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .tentang-pembuat-page .tech-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #264697, #4FA8DE);
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
+        }
+
+        .tentang-pembuat-page .tech-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .tentang-pembuat-page .tech-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        }
+
+        .tentang-pembuat-page .tech-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #264697 0%, #4FA8DE 100%);
+            border-radius: 1rem;
+            color: #ffffff;
+            margin-bottom: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .tentang-pembuat-page .tech-card:hover .tech-icon {
+            transform: scale(1.1) rotate(5deg);
+        }
+
+        .tentang-pembuat-page .tech-icon iconify-icon {
+            font-size: 1.8rem;
+        }
+
+        .tentang-pembuat-page .tech-title {
+            color: #264697;
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+        }
+
+        .tentang-pembuat-page .tech-description {
+            color: #6c757d;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        /* Features Grid */
+        .tentang-pembuat-page .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .tentang-pembuat-page .feature-card {
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .tentang-pembuat-page .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        }
+
+        .tentang-pembuat-page .feature-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 70px;
+            height: 70px;
+            background: linear-gradient(135deg, #264697 0%, #4FA8DE 100%);
+            border-radius: 50%;
+            color: #ffffff;
+            margin: 0 auto 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .tentang-pembuat-page .feature-card:hover .feature-icon {
+            transform: scale(1.1);
+        }
+
+        .tentang-pembuat-page .feature-icon iconify-icon {
+            font-size: 2rem;
+        }
+
+        .tentang-pembuat-page .feature-title {
+            color: #264697;
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+        }
+
+        .tentang-pembuat-page .feature-description {
+            color: #6c757d;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        /* Contact Section */
+        .tentang-pembuat-page .contact-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .tentang-pembuat-page .contact-card {
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .tentang-pembuat-page .contact-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        }
+
+        .tentang-pembuat-page .contact-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #264697 0%, #4FA8DE 100%);
+            border-radius: 50%;
+            color: #ffffff;
+            margin: 0 auto 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .tentang-pembuat-page .contact-card:hover .contact-icon {
+            transform: scale(1.1);
+        }
+
+        .tentang-pembuat-page .contact-icon iconify-icon {
+            font-size: 1.8rem;
+        }
+
+        .tentang-pembuat-page .contact-title {
+            color: #264697;
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .tentang-pembuat-page .contact-link {
+            color: #495057;
+            text-decoration: none;
+            font-size: 0.95rem;
+            transition: color 0.3s ease;
+        }
+
+        .tentang-pembuat-page .contact-link:hover {
+            color: #264697;
+            text-decoration: none;
+        }
+
+        /* Thank You Section */
+        .tentang-pembuat-page .thank-you-section {
+            background: linear-gradient(135deg, rgba(38, 70, 151, 0.1) 0%, rgba(79, 168, 222, 0.1) 100%);
+            border-radius: 1.5rem;
+            padding: 2.5rem;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .tentang-pembuat-page .thank-you-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain2" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="%23ffffff" opacity="0.1"/><circle cx="75" cy="75" r="1" fill="%23ffffff" opacity="0.1"/><circle cx="50" cy="10" r="0.5" fill="%23ffffff" opacity="0.1"/><circle cx="10" cy="60" r="0.5" fill="%23ffffff" opacity="0.1"/><circle cx="90" cy="40" r="0.5" fill="%23ffffff" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23grain2)"/></svg>');
+            opacity: 0.3;
+        }
+
+        .tentang-pembuat-page .thank-you-content {
+            position: relative;
+            z-index: 2;
+        }
+
+        .tentang-pembuat-page .thank-you-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            border-radius: 50%;
+            color: #ffffff;
+            margin: 0 auto 1.5rem;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .tentang-pembuat-page .thank-you-icon iconify-icon {
+            font-size: 2.5rem;
+        }
+
+        .tentang-pembuat-page .thank-you-title {
+            color: #28a745;
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        .tentang-pembuat-page .thank-you-text {
+            color: #495057;
+            font-size: 1.1rem;
+            line-height: 1.7;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        /* Breadcrumb */
+        .tentang-pembuat-page .breadcrumb {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 1rem;
+            padding: 1.25rem 1.75rem;
+            margin-bottom: 2rem;
+            border: 1px solid #dee2e6;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+
+        .tentang-pembuat-page .breadcrumb-item {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 1rem;
+        }
+
+        .tentang-pembuat-page .breadcrumb-item + .breadcrumb-item::before {
+            content: "•";
+            color: #6c757d;
+            font-weight: 400;
+            font-size: 1.3rem;
+            margin: 0 1rem;
+            opacity: 0.7;
+            line-height: 1;
+        }
+
+        .tentang-pembuat-page .breadcrumb-link {
+            color: #264697;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .tentang-pembuat-page .breadcrumb-link:hover {
+            color: #4FA8DE;
+            text-decoration: none;
+            transform: translateX(-3px);
+        }
+
+        .tentang-pembuat-page .breadcrumb-link iconify-icon {
+            font-size: 1.1rem;
+            transition: transform 0.3s ease;
+        }
+
+        .tentang-pembuat-page .breadcrumb-link:hover iconify-icon {
+            transform: scale(1.1);
+        }
+
+        .tentang-pembuat-page .breadcrumb-item.active {
+            color: #6c757d;
+            font-weight: 600;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .tentang-pembuat-page .hero-section {
+                padding: 2rem 1.5rem;
+                margin-bottom: 2rem;
+            }
+
+            .tentang-pembuat-page .hero-title {
+                font-size: 2rem;
+            }
+
+            .tentang-pembuat-page .hero-subtitle {
+                font-size: 1.1rem;
+            }
+
+            .tentang-pembuat-page .hero-avatar {
+                width: 120px;
+                height: 120px;
+            }
+
+            .tentang-pembuat-page .content-section {
+                padding: 2rem;
+            }
+
+            .tentang-pembuat-page .section-title {
+                font-size: 1.6rem;
+            }
+
+            .tentang-pembuat-page .tech-grid,
+            .tentang-pembuat-page .features-grid,
+            .tentang-pembuat-page .contact-grid {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+
+            .tentang-pembuat-page .hero-tags {
+                gap: 0.75rem;
+            }
+
+            .tentang-pembuat-page .hero-tag {
+                padding: 0.6rem 1.2rem;
+                font-size: 0.9rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .tentang-pembuat-page .hero-section {
+                padding: 1.5rem 1rem;
+            }
+
+            .tentang-pembuat-page .hero-title {
+                font-size: 1.8rem;
+            }
+
+            .tentang-pembuat-page .hero-subtitle {
+                font-size: 1rem;
+            }
+
+            .tentang-pembuat-page .hero-avatar {
+                width: 100px;
+                height: 100px;
+            }
+
+            .tentang-pembuat-page .content-section {
+                padding: 1.5rem;
+            }
+
+            .tentang-pembuat-page .section-title {
+                font-size: 1.4rem;
+            }
+
+            .tentang-pembuat-page .section-content {
+                font-size: 1rem;
+            }
+
+            .tentang-pembuat-page .hero-tags {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .tentang-pembuat-page .hero-tag {
+                width: 100%;
+                max-width: 200px;
+                justify-content: center;
+            }
+        }
+
+        /* Dark Mode Styles */
+        [data-theme="dark"] .tentang-pembuat-page {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            color: #ffffff;
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .hero-section {
+            background: linear-gradient(135deg, rgba(38, 70, 151, 0.2) 0%, rgba(79, 168, 222, 0.2) 100%);
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .hero-title {
+            color: #ffffff;
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .hero-subtitle {
+            color: #e0e0e0;
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .content-section {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .section-title {
+            color: #ffffff;
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .section-content {
+            color: #e0e0e0;
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .tech-card,
+        [data-theme="dark"] .tentang-pembuat-page .feature-card,
+        [data-theme="dark"] .tentang-pembuat-page .contact-card {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .tech-card:hover,
+        [data-theme="dark"] .tentang-pembuat-page .feature-card:hover,
+        [data-theme="dark"] .tentang-pembuat-page .contact-card:hover {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .tech-title,
+        [data-theme="dark"] .tentang-pembuat-page .feature-title,
+        [data-theme="dark"] .tentang-pembuat-page .contact-title {
+            color: #ffffff;
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .tech-description,
+        [data-theme="dark"] .tentang-pembuat-page .feature-description {
+            color: #e0e0e0;
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .contact-link {
+            color: #4FA8DE;
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .contact-link:hover {
+            color: #63b3ed;
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .thank-you-section {
+            background: linear-gradient(135deg, rgba(38, 70, 151, 0.2) 0%, rgba(79, 168, 222, 0.2) 100%);
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .thank-you-title {
+            color: #ffffff;
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .thank-you-text {
+            color: #e0e0e0;
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .breadcrumb {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .breadcrumb-link {
+            color: #4FA8DE;
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .breadcrumb-link:hover {
+            color: #ffffff;
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .breadcrumb-item.active {
+            color: #a0aec0;
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .breadcrumb-item + .breadcrumb-item::before {
+            color: #a0aec0;
+        }
+
+        /* Fonts Grid */
+        .tentang-pembuat-page .fonts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .tentang-pembuat-page .font-card {
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            height: fit-content;
+        }
+
+        .tentang-pembuat-page .font-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #264697, #4FA8DE);
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
+        }
+
+        .tentang-pembuat-page .font-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .tentang-pembuat-page .font-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        }
+
+        .tentang-pembuat-page .font-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid #f1f3f4;
+        }
+
+        .tentang-pembuat-page .font-name {
+            color: #264697;
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin: 0;
+            flex: 1;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+
+        .tentang-pembuat-page .font-class {
+            background: #f8f9fa;
+            color: #6c757d;
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.75rem;
+            font-family: 'Courier New', monospace;
+            border: 1px solid #e9ecef;
+            white-space: nowrap;
+            margin-left: 0.5rem;
+            flex-shrink: 0;
+        }
+
+        .tentang-pembuat-page .font-preview {
+            margin-bottom: 1rem;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 0.75rem;
+            border: 1px solid #e9ecef;
+            min-height: 120px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .tentang-pembuat-page .font-sample {
+            margin: 0.25rem 0;
+            line-height: 1.4;
+            color: #495057;
+            font-size: 0.9rem;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            hyphens: auto;
+        }
+
+        .tentang-pembuat-page .font-sample:first-child {
+            font-size: 1rem;
+            color: #264697;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+        }
+
+        .tentang-pembuat-page .font-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 0.75rem;
+            border-top: 1px solid #f1f3f4;
+            font-size: 0.8rem;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .tentang-pembuat-page .font-weight,
+        .tentang-pembuat-page .font-style {
+            color: #6c757d;
+            background: #f8f9fa;
+            padding: 0.2rem 0.5rem;
+            border-radius: 0.5rem;
+            border: 1px solid #e9ecef;
+            font-size: 0.75rem;
+            white-space: nowrap;
+        }
+
+        /* Font-specific styling */
+        .tentang-pembuat-page .font-card:nth-child(1)::before {
+            background: linear-gradient(90deg, #e74c3c, #c0392b);
+        }
+
+        .tentang-pembuat-page .font-card:nth-child(2)::before {
+            background: linear-gradient(90deg, #264697, #4FA8DE);
+        }
+
+        .tentang-pembuat-page .font-card:nth-child(3)::before {
+            background: linear-gradient(90deg, #27ae60, #2ecc71);
+        }
+
+        .tentang-pembuat-page .font-card:nth-child(4)::before {
+            background: linear-gradient(90deg, #f39c12, #e67e22);
+        }
+
+        .tentang-pembuat-page .font-card:nth-child(5)::before {
+            background: linear-gradient(90deg, #9b59b6, #8e44ad);
+        }
+
+        /* Dark mode styles for font cards */
+        [data-theme="dark"] .tentang-pembuat-page .font-card {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .font-card:hover {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .font-name {
+            color: #ffffff;
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .font-class {
+            background: rgba(79, 168, 222, 0.1);
+            color: #4FA8DE;
+            border: 1px solid rgba(79, 168, 222, 0.3);
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .font-preview {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .font-sample {
+            color: #e0e0e0;
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .font-sample:first-child {
+            color: #ffffff;
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .font-header,
+        [data-theme="dark"] .tentang-pembuat-page .font-info {
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .font-weight,
+        [data-theme="dark"] .tentang-pembuat-page .font-style {
+            background: rgba(160, 174, 192, 0.1);
+            color: #a0aec0;
+            border: 1px solid rgba(160, 174, 192, 0.2);
+        }
+
+        /* Responsive styles for font cards */
+        @media (max-width: 768px) {
+            .tentang-pembuat-page .fonts-grid {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+
+            .tentang-pembuat-page .font-card {
+                padding: 1.25rem;
+            }
+
+            .tentang-pembuat-page .font-name {
+                font-size: 1rem;
+            }
+
+            .tentang-pembuat-page .font-class {
+                font-size: 0.7rem;
+                padding: 0.2rem 0.6rem;
+            }
+
+            .tentang-pembuat-page .font-preview {
+                padding: 0.75rem;
+                min-height: 100px;
+            }
+
+            .tentang-pembuat-page .font-sample {
+                font-size: 0.85rem;
+                margin: 0.2rem 0;
+            }
+
+            .tentang-pembuat-page .font-sample:first-child {
+                font-size: 0.95rem;
+            }
+
+            .tentang-pembuat-page .font-info {
+                font-size: 0.75rem;
+                gap: 0.25rem;
+            }
+
+            .tentang-pembuat-page .font-weight,
+            .tentang-pembuat-page .font-style {
+                font-size: 0.7rem;
+                padding: 0.15rem 0.4rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .tentang-pembuat-page .font-card {
+                padding: 1rem;
+            }
+
+            .tentang-pembuat-page .font-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.5rem;
+            }
+
+            .tentang-pembuat-page .font-class {
+                margin-left: 0;
+                align-self: flex-start;
+            }
+
+            .tentang-pembuat-page .font-preview {
+                min-height: 90px;
+            }
+
+            .tentang-pembuat-page .font-info {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.5rem;
+            }
+        }
+
+        /* Features Grid */
+        .tentang-pembuat-page .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .tentang-pembuat-page .feature-card {
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .tentang-pembuat-page .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        }
+
+        .tentang-pembuat-page .feature-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 70px;
+            height: 70px;
+            background: linear-gradient(135deg, #264697 0%, #4FA8DE 100%);
+            border-radius: 50%;
+            color: #ffffff;
+            margin: 0 auto 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .tentang-pembuat-page .feature-card:hover .feature-icon {
+            transform: scale(1.1);
+        }
+
+        .tentang-pembuat-page .feature-icon iconify-icon {
+            font-size: 2rem;
+        }
+
+        .tentang-pembuat-page .feature-title {
+            color: #264697;
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+        }
+
+        .tentang-pembuat-page .feature-description {
+            color: #6c757d;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        /* Contact Section */
+        .tentang-pembuat-page .contact-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .tentang-pembuat-page .contact-card {
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .tentang-pembuat-page .contact-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        }
+
+        .tentang-pembuat-page .contact-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #264697 0%, #4FA8DE 100%);
+            border-radius: 50%;
+            color: #ffffff;
+            margin: 0 auto 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .tentang-pembuat-page .contact-card:hover .contact-icon {
+            transform: scale(1.1);
+        }
+
+        .tentang-pembuat-page .contact-icon iconify-icon {
+            font-size: 1.8rem;
+        }
+
+        .tentang-pembuat-page .contact-title {
+            color: #264697;
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .tentang-pembuat-page .contact-link {
+            color: #495057;
+            text-decoration: none;
+            font-size: 0.95rem;
+            transition: color 0.3s ease;
+        }
+
+        .tentang-pembuat-page .contact-link:hover {
+            color: #264697;
+            text-decoration: none;
+        }
+
+        /* Thank You Section */
+        .tentang-pembuat-page .thank-you-section {
+            background: linear-gradient(135deg, rgba(38, 70, 151, 0.1) 0%, rgba(79, 168, 222, 0.1) 100%);
+            border-radius: 1.5rem;
+            padding: 2.5rem;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .tentang-pembuat-page .thank-you-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain2" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="%23ffffff" opacity="0.1"/><circle cx="75" cy="75" r="1" fill="%23ffffff" opacity="0.1"/><circle cx="50" cy="10" r="0.5" fill="%23ffffff" opacity="0.1"/><circle cx="10" cy="60" r="0.5" fill="%23ffffff" opacity="0.1"/><circle cx="90" cy="40" r="0.5" fill="%23ffffff" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23grain2)"/></svg>');
+            opacity: 0.3;
+        }
+
+        .tentang-pembuat-page .thank-you-content {
+            position: relative;
+            z-index: 2;
+        }
+
+        .tentang-pembuat-page .thank-you-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            border-radius: 50%;
+            color: #ffffff;
+            margin: 0 auto 1.5rem;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .tentang-pembuat-page .thank-you-icon iconify-icon {
+            font-size: 2.5rem;
+        }
+
+        .tentang-pembuat-page .thank-you-title {
+            color: #28a745;
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        .tentang-pembuat-page .thank-you-text {
+            color: #495057;
+            font-size: 1.1rem;
+            line-height: 1.7;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        /* Breadcrumb */
+        .tentang-pembuat-page .breadcrumb {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 1rem;
+            padding: 1.25rem 1.75rem;
+            margin-bottom: 2rem;
+            border: 1px solid #dee2e6;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+
+        .tentang-pembuat-page .breadcrumb-item {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 1rem;
+        }
+
+        .tentang-pembuat-page .breadcrumb-item + .breadcrumb-item::before {
+            content: "•";
+            color: #6c757d;
+            font-weight: 400;
+            font-size: 1.3rem;
+            margin: 0 1rem;
+            opacity: 0.7;
+            line-height: 1;
+        }
+
+        .tentang-pembuat-page .breadcrumb-link {
+            color: #264697;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .tentang-pembuat-page .breadcrumb-link:hover {
+            color: #4FA8DE;
+            text-decoration: none;
+            transform: translateX(-3px);
+        }
+
+        .tentang-pembuat-page .breadcrumb-link iconify-icon {
+            font-size: 1.1rem;
+            transition: transform 0.3s ease;
+        }
+
+        .tentang-pembuat-page .breadcrumb-link:hover iconify-icon {
+            transform: scale(1.1);
+        }
+
+        .tentang-pembuat-page .breadcrumb-item.active {
+            color: #6c757d;
+            font-weight: 600;
+        }
+
+        /* Dark mode styles for additional components */
+        [data-theme="dark"] .tentang-pembuat-page .feature-card,
+        [data-theme="dark"] .tentang-pembuat-page .contact-card {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .feature-card:hover,
+        [data-theme="dark"] .tentang-pembuat-page .contact-card:hover {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .feature-title,
+        [data-theme="dark"] .tentang-pembuat-page .contact-title {
+            color: #ffffff;
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .feature-description {
+            color: #e0e0e0;
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .contact-link {
+            color: #4FA8DE;
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .contact-link:hover {
+            color: #63b3ed;
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .thank-you-section {
+            background: linear-gradient(135deg, rgba(38, 70, 151, 0.2) 0%, rgba(79, 168, 222, 0.2) 100%);
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .thank-you-title {
+            color: #ffffff;
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .thank-you-text {
+            color: #e0e0e0;
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .breadcrumb {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .breadcrumb-link {
+            color: #4FA8DE;
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .breadcrumb-link:hover {
+            color: #ffffff;
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .breadcrumb-item.active {
+            color: #a0aec0;
+        }
+
+        [data-theme="dark"] .tentang-pembuat-page .breadcrumb-item + .breadcrumb-item::before {
+            color: #a0aec0;
+        }
+    </style>
+</head>
+<body class="tentang-pembuat-page">
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg sticky-top bg-white shadow-sm border-bottom" style="top: 0; z-index: 1030;">
+        <div class="container-fluid px-4">
+            <span class="navbar-brand plus-jakarta-sans fw-bold text-primary">
+                <img class="brand-title" alt="JakMove">
+            </span>
+            
+            <!-- Desktop Navigation -->
+            <div class="navbar-nav me-auto d-none d-lg-flex">
+                <a class="nav-link d-flex align-items-center gap-2" href="index.html">
+                    <iconify-icon icon="mdi:map-marker-multiple"></iconify-icon>
+                    <span>Peta Interaktif</span>
+                </a>
+                <a class="nav-link d-flex align-items-center gap-2" href="transportasi-jakarta.html">
+                    <iconify-icon icon="mdi:bus"></iconify-icon>
+                    <span>Transportasi Jakarta</span>
+                </a>
+                <a class="nav-link active d-flex align-items-center gap-2" href="tentang-pembuat.html">
+                    <iconify-icon icon="mdi:account" inline></iconify-icon>
+                    <span>Tentang Pembuat</span>
+                </a>
+            </div>
+            
+            <!-- Mobile Toggle Button -->
+            <button class="navbar-toggler custom-toggler d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#navbarOffcanvas" aria-controls="navbarOffcanvas" aria-expanded="false" aria-label="Toggle navigation">
+                <div class="hamburger-line"></div>
+                <div class="hamburger-line"></div>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Offcanvas -->
+    <div class="offcanvas offcanvas-start" tabindex="-1" id="navbarOffcanvas">
+        <div class="offcanvas-header">
+            <h5 class="offcanvas-title plus-jakarta-sans fw-bold text-primary" id="navbarOffcanvasLabel">
+                <img class="brand-title" alt="JakMove">
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+        </div>
+        <div class="offcanvas-body">
+            <nav class="nav-menu">
+                <a href="index.html" class="nav-menu-item">
+                    <div class="nav-menu-icon">
+                        <iconify-icon icon="mdi:map-marker"></iconify-icon>
+                    </div>
+                    <div class="nav-menu-content">
+                        <div class="nav-menu-title">Peta Interaktif</div>
+                        <div class="nav-menu-desc">Jelajahi rute Transjakarta</div>
+                    </div>
+                </a>
+                <a href="transportasi-jakarta.html" class="nav-menu-item">
+                    <div class="nav-menu-icon">
+                        <iconify-icon icon="mdi:bus"></iconify-icon>
+                    </div>
+                    <div class="nav-menu-content">
+                        <div class="nav-menu-title">Transportasi Jakarta</div>
+                        <div class="nav-menu-desc">Info lengkap transportasi</div>
+                    </div>
+                </a>
+                <a href="tentang-pembuat.html" class="nav-menu-item active">
+                    <div class="nav-menu-icon">
+                        <iconify-icon icon="mdi:account" inline></iconify-icon>
+                    </div>
+                    <div class="nav-menu-content">
+                        <div class="nav-menu-title">Tentang Pembuat</div>
+                        <div class="nav-menu-desc">Informasi developer website</div>
+                    </div>
+                </a>
+            </nav>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="container py-5" style="margin-top: 80px;">
+            <!-- Breadcrumb Navigation -->
+            <nav aria-label="breadcrumb" class="mb-4">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item">
+                        <a href="index.html" class="breadcrumb-link">
+                            <iconify-icon icon="mdi:home" inline></iconify-icon>
+                            Beranda
+                        </a>
+                    </li>
+                    <li class="breadcrumb-item active" aria-current="page">Tentang Pembuat</li>
+                </ol>
+            </nav>
+            
+            <div class="row justify-content-center">
+                <div class="col-lg-10">
+                    <!-- Hero Section -->
+                    <div class="hero-section">
+                        <div class="hero-content">
+                            <img src="https://muhfhri.github.io/-/image/muhfhri.png" 
+                                 alt="Muhammad Fachri Al Husein" 
+                                 class="hero-avatar">
+                            <h1 class="hero-title plus-jakarta-sans fw-bold">Muhammad Fachri Al Husein</h1>
+                            <p class="hero-subtitle plus-jakarta-sans">
+                                Seorang pengguna transportasi umum (terutama Transjakarta), membuat website ini agar berguna mengetahui halte di beberapa koridor, 
+                                terutama bus stop agar tidak nyasar.
+                            </p>
+                            <div class="hero-tags">
+                                <span class="hero-tag">
+                                    <iconify-icon icon="mdi:bus"></iconify-icon>
+                                    Transportasi Umum
+                                </span>
+                                <span class="hero-tag">
+                                    <iconify-icon icon="mdi:map-marker"></iconify-icon>
+                                    Transjakarta
+                                </span>
+                                <span class="hero-tag">
+                                    <iconify-icon icon="mdi:code-braces"></iconify-icon>
+                                    Developer
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Motivation Section -->
+                    <div class="content-section">
+                        <h2 class="section-title plus-jakarta-sans fw-bold">
+                            <iconify-icon icon="mdi:lightbulb-on"></iconify-icon>
+                            Motivasi
+                        </h2>
+                        <div class="section-content">
+                            <p>
+                                Sebagai pengguna aktif transportasi umum Jakarta, saya sering mengalami kesulitan dalam mencari informasi halte dan rute Transjakarta. 
+                                Website ini dibuat untuk membantu sesama pengguna transportasi umum agar tidak tersesat dan dapat dengan mudah menemukan halte terdekat.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Vision Section -->
+                    <div class="content-section">
+                        <h2 class="section-title plus-jakarta-sans fw-bold">
+                            <iconify-icon icon="mdi:eye"></iconify-icon>
+                            Visi
+                        </h2>
+                        <div class="section-content">
+                            <p>
+                                Menciptakan platform informasi transportasi yang mudah diakses, akurat, dan bermanfaat bagi masyarakat Jakarta. 
+                                Website ini diharapkan dapat menjadi referensi utama untuk informasi transportasi umum di Jakarta.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Technology Section -->
+                    <div class="content-section">
+                        <h2 class="section-title plus-jakarta-sans fw-bold">
+                            <iconify-icon icon="mdi:tools"></iconify-icon>
+                            Teknologi yang Digunakan
+                        </h2>
+                        <div class="tech-grid">
+                            <div class="tech-card">
+                                <div class="tech-icon">
+                                    <iconify-icon icon="mdi:language-html5"></iconify-icon>
+                                </div>
+                                <h4 class="tech-title plus-jakarta-sans fw-bold">Frontend Development</h4>
+                                <p class="tech-description">
+                                    HTML5, CSS3, JavaScript, dan Bootstrap 5 untuk membangun antarmuka yang modern dan responsif.
+                                </p>
+                            </div>
+
+                            <div class="tech-card">
+                                <div class="tech-icon">
+                                    <iconify-icon icon="mdi:map-marker-path"></iconify-icon>
+                                </div>
+                                <h4 class="tech-title plus-jakarta-sans fw-bold">Interactive Maps</h4>
+                                <p class="tech-description">
+                                    Leaflet.js untuk menampilkan peta interaktif dengan performa tinggi dan fitur yang lengkap.
+                                </p>
+                            </div>
+
+                            <div class="tech-card">
+                                <div class="tech-icon">
+                                    <iconify-icon icon="mdi:database"></iconify-icon>
+                                </div>
+                                <h4 class="tech-title plus-jakarta-sans fw-bold">GTFS Data</h4>
+                                <p class="tech-description">
+                                    General Transit Feed Specification untuk data transportasi yang standar dan terstruktur.
+                                </p>
+                            </div>
+
+                            <div class="tech-card">
+                                <div class="tech-icon">
+                                    <iconify-icon icon="mdi:palette"></iconify-icon>
+                                </div>
+                                <h4 class="tech-title plus-jakarta-sans fw-bold">Icon System</h4>
+                                <p class="tech-description">
+                                    Iconify untuk icon yang konsisten dan mudah dikelola dengan library icon yang lengkap.
+                                </p>
+                            </div>
+
+                            <div class="tech-card">
+                                <div class="tech-icon">
+                                    <iconify-icon icon="mdi:format-font"></iconify-icon>
+                                </div>
+                                <h4 class="tech-title plus-jakarta-sans fw-bold">Typography</h4>
+                                <p class="tech-description">
+                                    Plus Jakarta Sans untuk tipografi yang modern dan mudah dibaca dengan berbagai variasi.
+                                </p>
+                            </div>
+
+                            <div class="tech-card">
+                                <div class="tech-icon">
+                                    <iconify-icon icon="mdi:responsive"></iconify-icon>
+                                </div>
+                                <h4 class="tech-title plus-jakarta-sans fw-bold">Responsive Design</h4>
+                                <p class="tech-description">
+                                    CSS Grid, Flexbox, dan media queries untuk layout yang adaptif di semua perangkat.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Fonts Section -->
+                    <div class="content-section">
+                        <h2 class="section-title plus-jakarta-sans fw-bold">
+                            <iconify-icon icon="mdi:format-font"></iconify-icon>
+                            Jenis Font Website
+                        </h2>
+                        <div class="fonts-grid">
+                            <div class="font-card">
+                                <div class="font-header">
+                                    <h4 class="font-name pt-sans">PT Sans Narrow</h4>
+                                    <span class="font-class">.pt-sans</span>
+                                </div>
+                                <div class="font-preview pt-sans">
+                                    <p class="font-sample">The quick brown fox jumps over the lazy dog</p>
+                                    <p class="font-sample">ABCDEFGHIJKLMNOPQRSTUVWXYZ</p>
+                                    <p class="font-sample">abcdefghijklmnopqrstuvwxyz</p>
+                                    <p class="font-sample">0123456789</p>
+                                </div>
+                                <div class="font-info">
+                                    <span class="font-weight">Weight: 400, 700</span>
+                                    <span class="font-style">Style: Normal</span>
+                                </div>
+                            </div>
+
+                            <div class="font-card">
+                                <div class="font-header">
+                                    <h4 class="font-name">Plus Jakarta Sans</h4>
+                                    <span class="font-class">.plus-jakarta-sans</span>
+                                </div>
+                                <div class="font-preview plus-jakarta-sans">
+                                    <p class="font-sample">The quick brown fox jumps over the lazy dog</p>
+                                    <p class="font-sample">ABCDEFGHIJKLMNOPQRSTUVWXYZ</p>
+                                    <p class="font-sample">abcdefghijklmnopqrstuvwxyz</p>
+                                    <p class="font-sample">0123456789</p>
+                                </div>
+                                <div class="font-info">
+                                    <span class="font-weight">Weight: 300, 400, 500, 600, 700, 800</span>
+                                    <span class="font-style">Style: Normal</span>
+                                </div>
+                            </div>
+
+                            <div class="font-card">
+                                <div class="font-header">
+                                    <h4 class="font-name">Plus Jakarta Sans Lancip</h4>
+                                    <span class="font-class">.lancip</span>
+                                </div>
+                                <div class="font-preview lancip">
+                                    <p class="font-sample">The quick brown fox jumps over the lazy dog</p>
+                                    <p class="font-sample">ABCDEFGHIJKLMNOPQRSTUVWXYZ</p>
+                                    <p class="font-sample">abcdefghijklmnopqrstuvwxyz</p>
+                                    <p class="font-sample">0123456789</p>
+                                </div>
+                                <div class="font-info">
+                                    <span class="font-weight">Weight: 400, 700</span>
+                                    <span class="font-style">Style: ss01 (Lancip)</span>
+                                </div>
+                            </div>
+
+                            <div class="font-card">
+                                <div class="font-header">
+                                    <h4 class="font-name">Plus Jakarta Sans Lurus</h4>
+                                    <span class="font-class">.lurus</span>
+                                </div>
+                                <div class="font-preview lurus">
+                                    <p class="font-sample">The quick brown fox jumps over the lazy dog</p>
+                                    <p class="font-sample">ABCDEFGHIJKLMNOPQRSTUVWXYZ</p>
+                                    <p class="font-sample">abcdefghijklmnopqrstuvwxyz</p>
+                                    <p class="font-sample">0123456789</p>
+                                </div>
+                                <div class="font-info">
+                                    <span class="font-weight">Weight: 400, 700</span>
+                                    <span class="font-style">Style: ss02 (Lurus)</span>
+                                </div>
+                            </div>
+
+                            <div class="font-card">
+                                <div class="font-header">
+                                    <h4 class="font-name">Plus Jakarta Sans Lingkar</h4>
+                                    <span class="font-class">.lingkar</span>
+                                </div>
+                                <div class="font-preview lingkar">
+                                    <p class="font-sample">The quick brown fox jumps over the lazy dog</p>
+                                    <p class="font-sample">ABCDEFGHIJKLMNOPQRSTUVWXYZ</p>
+                                    <p class="font-sample">abcdefghijklmnopqrstuvwxyz</p>
+                                    <p class="font-sample">0123456789</p>
+                                </div>
+                                <div class="font-info">
+                                    <span class="font-weight">Weight: 400, 700</span>
+                                    <span class="font-style">Style: ss03 (Lingkar)</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Features Section -->
+                    <div class="content-section">
+                        <h2 class="section-title plus-jakarta-sans fw-bold">
+                            <iconify-icon icon="mdi:star"></iconify-icon>
+                            Fitur Utama
+                        </h2>
+                        <div class="features-grid">
+                            <div class="feature-card">
+                                <div class="feature-icon">
+                                    <iconify-icon icon="mdi:map-marker-multiple"></iconify-icon>
+                                </div>
+                                <h4 class="feature-title plus-jakarta-sans fw-bold">Peta Interaktif</h4>
+                                <p class="feature-description">
+                                    Menampilkan halte dan rute Transjakarta secara real-time dengan peta interaktif yang responsif.
+                                </p>
+                            </div>
+
+                            <div class="feature-card">
+                                <div class="feature-icon">
+                                    <iconify-icon icon="mdi:magnify"></iconify-icon>
+                                </div>
+                                <h4 class="feature-title plus-jakarta-sans fw-bold">Pencarian Halte</h4>
+                                <p class="feature-description">
+                                    Mencari halte berdasarkan nama atau koridor dengan sistem pencarian yang cepat dan akurat.
+                                </p>
+                            </div>
+
+                            <div class="feature-card">
+                                <div class="feature-icon">
+                                    <iconify-icon icon="mdi:routes"></iconify-icon>
+                                </div>
+                                <h4 class="feature-title plus-jakarta-sans fw-bold">Informasi Rute</h4>
+                                <p class="feature-description">
+                                    Detail lengkap setiap rute Transjakarta termasuk jadwal, halte, dan informasi perjalanan.
+                                </p>
+                            </div>
+
+                            <div class="feature-card">
+                                <div class="feature-icon">
+                                    <iconify-icon icon="mdi:crosshairs-gps"></iconify-icon>
+                                </div>
+                                <h4 class="feature-title plus-jakarta-sans fw-bold">Live Location</h4>
+                                <p class="feature-description">
+                                    Menampilkan posisi pengguna dan halte terdekat dengan akurasi tinggi untuk navigasi optimal.
+                                </p>
+                            </div>
+
+                            <div class="feature-card">
+                                <div class="feature-icon">
+                                    <iconify-icon icon="mdi:theme-light-dark"></iconify-icon>
+                                </div>
+                                <h4 class="feature-title plus-jakarta-sans fw-bold">Dark Mode</h4>
+                                <p class="feature-description">
+                                    Tema gelap untuk kenyamanan pengguna yang dapat disesuaikan sesuai preferensi.
+                                </p>
+                            </div>
+
+                            <div class="feature-card">
+                                <div class="feature-icon">
+                                    <iconify-icon icon="mdi:responsive"></iconify-icon>
+                                </div>
+                                <h4 class="feature-title plus-jakarta-sans fw-bold">Responsive Design</h4>
+                                <p class="feature-description">
+                                    Optimal di semua perangkat mulai dari smartphone hingga desktop dengan layout yang adaptif.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Contact Section -->
+                    <div class="content-section">
+                        <h2 class="section-title plus-jakarta-sans fw-bold">
+                            <iconify-icon icon="mdi:account-multiple"></iconify-icon>
+                            Kontak & Sosial Media
+                        </h2>
+                        <div class="contact-grid">
+                            <div class="contact-card">
+                                <div class="contact-icon">
+                                    <iconify-icon icon="mdi:github"></iconify-icon>
+                                </div>
+                                <h6 class="contact-title">GitHub</h6>
+                                <a href="https://github.com/muhfhri" target="_blank" rel="noopener noreferrer" class="contact-link">
+                                    github.com/muhfhri
+                                </a>
+                            </div>
+                            <div class="contact-card">
+                                <div class="contact-icon">
+                                    <iconify-icon icon="mdi:instagram"></iconify-icon>
+                                </div>
+                                <h6 class="contact-title">Instagram</h6>
+                                <a href="https://www.instagram.com/muhfhri._/" target="_blank" rel="noopener noreferrer" class="contact-link">
+                                    @muhfhri._
+                                </a>
+                            </div>
+                            <div class="contact-card">
+                                <div class="contact-icon">
+                                    <iconify-icon icon="mdi:web"></iconify-icon>
+                                </div>
+                                <h6 class="contact-title">Website</h6>
+                                <a href="https://muhfhri.github.io/-/" target="_blank" rel="noopener noreferrer" class="contact-link">
+                                    muhfhri.github.io
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Thank You Section -->
+                    <div class="thank-you-section">
+                        <div class="thank-you-content">
+                            <div class="thank-you-icon">
+                                <iconify-icon icon="mdi:heart"></iconify-icon>
+                            </div>
+                            <h3 class="thank-you-title plus-jakarta-sans fw-bold">Terima Kasih Transjakarta</h3>
+                            <p class="thank-you-text">
+                                Ucapan terima kasih yang sebesar-besarnya kepada <strong>PT Transportasi Jakarta</strong> yang telah menyediakan 
+                                data GTFS (General Transit Feed Specification) secara terbuka dan dapat diakses publik. 
+                                Data yang Anda berikan telah memungkinkan pengembangan website ini untuk membantu masyarakat Jakarta.
+                            </p>
+                            <p class="thank-you-text mb-0">
+                                <strong>JakMove</strong> berkomitmen untuk selalu menggunakan data resmi dari Transjakarta 
+                                dan memberikan informasi yang akurat kepada pengguna transportasi umum Jakarta.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="modern-footer">
+        <div class="container">
+            <div class="footer-main">
+                <div class="row g-4">
+                    <div class="col-lg-4 col-md-6">
+                        <div class="footer-brand">
+                            <h4 class="footer-title plus-jakarta-sans fw-bold">
+                                <img class="brand-title" alt="JakMove">
+                            </h4>
+                            <p class="footer-subtitle plus-jakarta-sans">Platform Peta Interaktif Transportasi Jakarta</p>
+                            <p class="footer-description plus-jakarta-sans">
+                                Informasi lengkap transportasi Jakarta dengan peta interaktif dan data GTFS Resmi TransJakarta.
+                            </p>
+                        </div>
+                    </div>
+                    <div class="col-lg-2 col-md-6">
+                        <h5 class="footer-heading plus-jakarta-sans fw-bold">
+                            <iconify-icon icon="mdi:link"></iconify-icon>
+                            Links
+                        </h5>
+                        <ul class="footer-links">
+                            <li><a href="index.html">Beranda</a></li>
+                            <li><a href="transportasi-jakarta.html">Transportasi</a></li>
+                            <li><a href="legal.html">Kebijakan</a></li>
+                        </ul>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <h5 class="footer-heading plus-jakarta-sans fw-bold">
+                            <iconify-icon icon="mdi:phone"></iconify-icon>
+                            Kontak
+                        </h5>
+                        <div class="footer-contact">
+                            <div class="contact-item">
+                                <iconify-icon icon="mdi:github"></iconify-icon>
+                                <span>GitHub Repository</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <h5 class="footer-heading plus-jakarta-sans fw-bold">
+                            <iconify-icon icon="mdi:share-variant"></iconify-icon>
+                            Social
+                        </h5>
+                        <div class="footer-social">
+                            <a href="https://github.com/muhfhri" class="social-link" target="_blank" rel="noopener noreferrer">
+                                <iconify-icon icon="mdi:github"></iconify-icon>
+                            </a>
+                            <a href="https://www.instagram.com/muhfhri._/" class="social-link" target="_blank" rel="noopener noreferrer">
+                                <iconify-icon icon="mdi:instagram"></iconify-icon>
+                            </a>
+                            <a href="https://muhfhri.github.io/-/" class="social-link" target="_blank" rel="noopener noreferrer">
+                                <iconify-icon icon="mdi:web"></iconify-icon>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <div class="footer-copyright plus-jakarta-sans">
+                            <div class="copyright-line">
+                                <iconify-icon icon="mdi:copyright"></iconify-icon>
+                                2025 <img class="brand-title" alt="JakMove">
+                            </div>
+                            <div class="copyright-line">
+                                Dibuat dengan <iconify-icon icon="mdi:heart" style="color: #e74c3c;"></iconify-icon> oleh Muhammad Fachri
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="footer-legal">
+                            <a href="legal.html" class="legal-link plus-jakarta-sans">
+                                <iconify-icon icon="mdi:file-document"></iconify-icon>
+                                Kebijakan Penggunaan
+                            </a>
+                            <span class="separator">•</span>
+                            <a href="#" class="legal-link plus-jakarta-sans">
+                                <iconify-icon icon="mdi:github"></iconify-icon>
+                                Contribute
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/weather.js"></script>
+    <script src="https://code.iconify.design/iconify-icon/1.0.2/iconify-icon.min.js"></script>
+    <script src="js/dark-mode-switch.js"></script>
+    <script src="js/navbar.js"></script>
+</body>
+</html>

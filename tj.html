@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transjakarta Koridor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=PT+Sans+Narrow:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/theme.js"></script>
+    <link rel="stylesheet" href="css/dark-mode.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap');
+        
+        body {
+            font-family: 'PT Sans Narrow', sans-serif;
+            background-color: #f8f9fa;
+            letter-spacing: 0.6px;
+        }
+        
+        .badge {
+            font-family: 'PT Sans Narrow', sans-serif;
+        }
+        
+        .plus-jakarta-sans {
+            font-family: 'Plus Jakarta Sans', sans-serif !important;
+            letter-spacing: 0px;
+        }
+        .pt-sans {
+            font-family: 'PT Sans Narrow', sans-serif;
+            letter-spacing: 0.6px;
+        }
+
+        .bg-2 {
+            background-color:#264697 !important;
+        }
+        .bg-2a {
+            background-color:#4FA8DE !important;
+        }
+
+        .bg-7F {
+            background-color:#ff326b !important;
+        }
+
+        .title {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-top: 1rem;
+        }
+
+        .rounded-input {
+            border-radius: 1rem;
+            padding: 0.75rem 1.25rem;
+        }
+        
+        .section-box {
+            padding: 1.5rem;
+            border-radius: 1.5rem;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+            margin-bottom: 2rem;
+        }
+
+        .form-label {
+            font-weight: 700;
+        }
+
+        #hasilRute, #searchResults, #koridorResults {
+            margin-top: 1rem;
+        }
+
+        .text-slider {
+            min-height: 60px;
+            padding-top: 8px;
+            padding-bottom: 8px;
+            overflow: hidden;
+            position: relative;
+        }
+        .text-slider h2 {
+            position: static !important;
+            opacity: 1 !important;
+            transform: none !important;
+            width: auto !important;
+            left: auto !important;
+            top: auto !important;
+            pointer-events: auto !important;
+            user-select: auto !important;
+            margin: 0.2em 0;
+            text-align: center;
+        }
+        .text-slider,
+        .text-slider * {
+            pointer-events: auto !important;
+            user-select: auto !important;
+        }
+        .text-slider-container {
+          width: 100%;
+          overflow: hidden;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          min-height: 2.2em;
+          position: relative;
+        }
+        .text-slider-inner {
+          display: inline-block;
+          white-space: nowrap;
+          transition: transform 0.5s cubic-bezier(.77,0,.18,1);
+          will-change: transform;
+          font-size: 2em;
+          font-weight: bold;
+        }
+        .badge.bg-2a[onclick], .badge.bg-7F[onclick] {
+            transition: box-shadow 0.2s, transform 0.2s;
+        }
+        .badge.bg-2a[onclick]:hover, .badge.bg-7F[onclick]:hover {
+            box-shadow: 0 0 0 2px #26469744;
+            transform: scale(1.08);
+            filter: brightness(1.1);
+        }
+        .text-slider-motivasi {
+      min-height: 60px;
+      position: relative;
+      overflow: hidden;
+    }
+    .text-slider-motivasi h2 {
+      font-size: clamp(1.2rem, 4vw, 2rem);
+      position: absolute;
+      width: 100%;
+      left: 0;
+      top: 0;
+      opacity: 0;
+      transform: translateY(30px);
+      margin: 0;
+      line-height: 1.2;
+      text-align: center;
+      transition: opacity 0.5s, transform 0.5s;
+      z-index: 1;
+      pointer-events: none;
+    }
+    .text-slider-motivasi h2.active {
+      opacity: 1;
+      transform: translateY(0);
+      z-index: 2;
+      pointer-events: auto;
+    }
+    .text-slider-motivasi h2.out {
+      opacity: 0;
+      transform: translateY(-30px);
+      z-index: 1;
+      transition: opacity 0.5s, transform 0.5s;
+    }
+    .text-slider-motivasi,
+    .text-slider-motivasi * {
+      user-select: none;
+      -webkit-user-select: none;
+      -ms-user-select: none;
+      -moz-user-select: none;
+      pointer-events: none;
+    }
+            .text-slider-container {
+          width: 100%;
+          overflow: hidden;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          min-height: 2.2em;
+          position: relative;
+        }
+        .text-slider-inner {
+          display: inline-block;
+          white-space: nowrap;
+          transition: transform 0.5s cubic-bezier(.77,0,.18,1);
+          will-change: transform;
+          font-size: 2em;
+          font-weight: bold;
+        }
+        #modalMapKoridor .modal-content {
+                      background: rgba(255,255,255,0.05) !important;
+                      backdrop-filter: blur(16px) !important;
+                      border: none !important;
+                      box-shadow: none !important;
+                    }
+                    #modalMapKoridor .modal-header, #modalMapKoridor .modal-body {
+                      background: transparent !important;
+                      border: none !important;
+                    }
+  .dark-mode-bg { transition: background 0.3s; }
+  body.dark-mode .dark-mode-bg { background: #232a36 !important; color: #f4f6fa !important; }
+  body.dark-mode #unifiedSearchInput, body.dark-mode .form-control, body.dark-mode .form-select {
+    background: #232a36 !important;
+    color: #f4f6fa !important;
+    border: none !important;
+  }
+  .bus-result-card {
+    border-radius: 1.5em !important;
+    box-shadow: 0 4px 24px 0 #0002 !important;
+    background: #fff;
+    font-family: 'Rubik', 'Plus Jakarta Sans', sans-serif;
+    margin-bottom: 2rem;
+    padding: 2rem 1.5rem;
+    transition: background 0.3s, box-shadow 0.3s;
+  }
+  body.dark-mode .bus-result-card {
+    background: #232a36 !important;
+    color: #f4f6fa !important;
+  }
+  .bus-result-card .badge {
+    font-size: 2.2em !important;
+    border-radius: 1em !important;
+    background: #4fa8de !important;
+    box-shadow: 0 2px 8px #4fa8de33;
+  }
+  .bus-result-card img {
+    border-radius: 1em !important;
+    padding: 0.2em;
+    box-shadow: 0 2px 8px #0001;
+  }
+  @media (max-width: 600px) {
+    .bus-result-card { padding: 1.2rem 0.7rem; }
+    .bus-result-card .badge { font-size: 1.3em !important; }
+  }
+  .nav-link#unified-tab {
+    color: #264697 !important;
+  }
+  .nav-link#bus-tab {
+    color: #264697 !important;
+  }
+    </style>
+</head>
+
+<body class="container py-4">
+    <div class="text-end mb-3">
+        <input type="checkbox" class="btn-check" id="darkSwitch" checked autocomplete="off">
+        <label class="btn btn-dark btn-sm rounded-pill" for="darkSwitch">
+            <iconify-icon id="darkmode"></iconify-icon>
+        </label>
+    </div>
+    
+    <div class="text-center mb-4 plus-jakarta-sans">
+        <img src="image/tije.png" width="200" alt="Logo Transjakarta & JakLingko">
+        <!-- SLIDER HORIZONTAL: Transjakarta, MetroTrans, dst -->
+        <div class="text-slider-container">
+          <span class="title text-slider-inner" id="serviceTextSlider">Transjakarta</span>
+        </div>
+
+
+        <div class="d-flex align-items-center justify-content-center gap-2 mb-2">
+            <span id="liveClock" class="fw-bold" style="min-width:70px"></span>
+            <marquee class="text-muted small flex-grow-1">Klik nama halte untuk mengetahui lokasi halte di Google Maps</marquee>
+        </div>
+    </div>
+
+    <!-- SLIDER MOTIVASI VERTICAL -->
+    <div class="text-slider-motivasi mb-3 plus-jakarta-sans" style="height:60px;">
+        <h2 class="fw-bold active">Connecting the Life of Jakarta</h2>
+        <h2 class="fw-bold">#INTEGRASI</h2>
+        <h2 class="fw-bold">#KINILEBIHBAIK</h2>
+        <h2 class="fw-bold">SMART Mobility for Smart City</h2>
+        <h2 class="fw-bold">PT Transportasi Jakarta</h2>
+        <h2 class="fw-bold">JakLingko Indonesia</h2>
+        <h2 class="fw-bold">#MenemaniPerjalanan</h2>
+        <h2 class="fw-bold">Dibuat Oleh <img id="light" class="img-fluid" width="70"></h2>
+        <h2 class="fw-bold">100% Data halte berasal dari Map Transjakarta</h2>
+        <h2 class="fw-bold">Data Integrasi masih bersifat eksperimental</h2>
+    </div>
+    <script>
+    (function() {
+      const slides = document.querySelectorAll('.text-slider-motivasi h2');
+      let idx = 0;
+      function showSlide(i, prevIdx) {
+        slides.forEach((el, j) => {
+          el.classList.remove('active', 'out');
+          if (j === i) el.classList.add('active');
+          if (j === prevIdx) el.classList.add('out');
+        });
+      }
+      setInterval(() => {
+        const prevIdx = idx;
+        idx = (idx + 1) % slides.length;
+        showSlide(idx, prevIdx);
+      }, 2000);
+      showSlide(idx, null);
+    })();
+    </script>
+  
+    <!-- END SLIDER MOTIVASI VERTICAL -->
+
+    
+
+    <!-- Ganti bagian alert di HTML dengan ini -->
+<div id="tj-info-alert" class="container"></div>
+
+<!-- SECTION: Cari Rute -->
+<div class="p-4 mb-4 rounded-4 shadow bg-light bg-opacity-75 dark-mode-bg">
+  <div class="alert alert-warning alert-dismissible fade show py-2 small mb-2" style="font-size:1.05em;" role="alert">
+            ⚠️ Fitur <b>Cari Rute</b> masih bersifat <b>eksperimental</b>. Kalo kamu ga mau nyasar atau bingung, mendingan tanya petugas di halte yaa!<br>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Tutup"></button>
+        </div>
+  <h3 class="fw-bold text-center fs-3 mb-3">Mau pergi kemana?</h3>
+  <div class="row g-3 mb-2">
+            <div class="col-md-6">
+          <input type="text" id="halteAsalInput" class="form-control py-3 px-4 rounded-pill shadow-sm border-0 fs-5" placeholder="Masukin halte awal kamu" list="halteList">
+            </div>
+            <div class="col-md-6">
+          <input type="text" id="halteTujuanInput" class="form-control py-3 px-4 rounded-pill shadow-sm border-0 fs-5" placeholder="Masukin halte tujuan kamu" list="halteList">
+                <datalist id="halteList"></datalist>
+            </div>
+            <div class="col-12">
+          <button id="cariRuteBtn" class="btn btn-outline-dark rounded-pill w-100 py-3 fs-5">Cari Rute</button>
+            </div>
+        </div>
+        <div id="hasilRute" class="mt-3"></div>
+    </div>
+
+<!-- SECTION: Unified Search & Bus Number Search Tabs -->
+    <div class="section-box mb-4">
+  <ul class="nav nav-tabs nav-justified mb-3" id="searchTab" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active shadow-sm" id="unified-tab" data-bs-toggle="tab" data-bs-target="#unified-pane" type="button" role="tab" aria-controls="unified-pane" aria-selected="true">
+        <iconify-icon inline icon="mdi:magnify"></iconify-icon> Pencarian Layanan
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link shadow-sm" id="bus-tab" data-bs-toggle="tab" data-bs-target="#bus-pane" type="button" role="tab" aria-controls="bus-pane" aria-selected="false">
+        <iconify-icon inline icon="mdi:bus"></iconify-icon> Cari Jenis Bus dengan Nomor
+      </button>
+    </li>
+  </ul>
+  <div class="tab-content pt-2" id="searchTabContent">
+    <!-- Unified Search Tab -->
+    <div class="tab-pane fade show active" id="unified-pane" role="tabpanel" aria-labelledby="unified-tab">
+      <div class="input-group mb-3">
+        <input id="unifiedSearchInput" class="form-control fs-5 py-3 px-4 rounded-pill shadow-sm border-0" placeholder="Cari halte, layanan, atau koridor..." autocomplete="off">
+      </div>
+      <ul id="unifiedSearchResults" class="list-group mt-2"></ul>
+    </div>
+    <!-- Bus Number Search Tab -->
+    <div class="tab-pane fade" id="bus-pane" role="tabpanel" aria-labelledby="bus-tab">
+      <div class="input-group mb-3">
+        <input id="busNumberInput" class="form-control fs-5 py-3 px-4 rounded-pill shadow-sm border-0" placeholder="Masukkan kode bus (cth. TJ223)" autocomplete="off">
+      </div>
+      <div id="busImageModal" class="modal" tabindex="-1" style="display:none;position:fixed;z-index:9999;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.8);justify-content:center;align-items:center;">
+        <span id="busImageModalClose" style="position:absolute;top:24px;right:32px;font-size:2.5em;color:#fff;cursor:pointer;z-index:2;">&times;</span>
+        <img id="busImageModalImg" src="" alt="Bus Besar" style="max-width:90vw;max-height:90vh;object-fit:contain;box-shadow:0 2px 16px #000a;border-radius:1em;">
+      </div>
+      <div id="busNumberSuggestions" class="mb-2"></div>
+      <div id="busNumberResults" class="mt-2"></div>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION: Pilihan Layanan -->
+<h3 class="text-center fw-bold my-3 fs-3">Pilihan Layanan Transjakarta</h3>
+<div class="p-4 mb-4 rounded-4 shadow bg-light bg-opacity-75 dark-mode-bg">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="form-group">
+              <label for="serviceSelect" class="form-label fs-5 fw-bold">Layanan</label>
+              <select id="serviceSelect" class="form-select py-3 px-4 rounded-pill shadow-sm border-0 fs-5 bg-light">
+                        <option value="BRT" selected>BRT</option>
+                        <option value="Non-BRT">Non-BRT</option>
+                        <option value="TransJabodetabek">Transjabodetabek</option>
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-group">
+              <label for="koridorSelect" class="form-label fs-5 fw-bold">Koridor</label>
+              <select id="koridorSelect" class="form-select py-3 px-4 rounded-pill shadow-sm border-0 fs-5" disabled>
+                        <option value="" selected>Koridor</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<!-- SECTION: Cari Halte (disembunyikan) -->
+<div class="p-4 mb-4 rounded-4 shadow bg-light bg-opacity-75 dark-mode-bg" style="display:none">
+  <label for="searchInput" class="form-label fs-5 fw-bold">Cari Halte</label>
+  <input type="text" id="searchInput" class="form-control py-3 px-4 rounded-pill shadow-sm border-0 fs-5 mb-3" placeholder="Masukkan nama halte">
+</div>
+<!-- DAFTAR HALTE SECTION -->
+<div class="section-box mb-4 p-4">
+  <h5 class="fw-bold fs-4 mb-3" style="color:#264697;">Daftar Halte:</h5>
+  <h3 id="jurusan" class="fs-5 mb-3"><span>Cari koridor yang kamu mau dulu yaa</span></h3>
+  <ul id="koridorResults" class="list-group fw-bold"></ul>
+</div>
+
+    <div class="text-center mt-4">
+        <a href="https://muhfhri.github.io/-/#home" class="btn btn-outline-dark rounded-5">Kembali ke Beranda</a>
+    </div>
+
+   <div class="container my-5">
+  <div class="container text-start plus-jakarta-sans">
+    <h3 class="fw-bold">Legenda :</h3>
+
+    <p>Contoh tampilan halte:</p>
+
+    <!-- Baris halte -->
+    <div class="d-flex justify-content-between align-items-center border p-2 mb-2" style="max-width: 400px;">
+      <div class="d-flex align-items-center">
+        <span class="badge bg-2 me-2" style="width:24px; height:24px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center;">11</span>
+        <span class="fw-bold pt-sans">Galur</span>
+      </div>
+      <div>
+        <span class="badge bg-2a me-1" style="width:24px; height:24px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; cursor:pointer;" onclick="window.selectKoridor('BRT','2A')" title="Lihat Koridor 2A">2A</span>
+        <span class="badge bg-7F" style="width:24px; height:24px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; cursor:pointer;" onclick="window.selectKoridor('BRT','7F')" title="Lihat Koridor 7F">7F</span>
+      </div>
+    </div>
+    <style>
+      .badge.bg-2a[onclick], .badge.bg-7F[onclick] {
+        transition: box-shadow 0.2s, transform 0.2s;
+      }
+      .badge.bg-2a[onclick]:hover, .badge.bg-7F[onclick]:hover {
+        box-shadow: 0 0 0 2px #26469744;
+        transform: scale(1.08);
+        filter: brightness(1.1);
+      }
+    </style>
+
+    <p class="plus-jakarta-sans">
+      Badge <span class="badge bg-2" style="width:24px; height:24px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center;">11</span> menunjukkan nomor halte.
+      <br>
+      Badge di sebelah kanan <span class="badge bg-2a me-1" style="width:24px; height:24px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center;">2A</span>
+        <span class="badge bg-7F" style="width:24px; height:24px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center;">7F</span> menunjukkan koridor lain yang juga melewati halte tersebut.
+    </p>
+
+    <p>
+      Penanda arah seperti 
+      <span class="text-muted fw-bold bg-warning px-2 py-1 rounded">→ arah BLOK M</span>
+      berarti halte ini hanya melayani perjalanan ke arah Blok M. 
+      <br>Contoh lainnya:
+      <span class="text-muted fw-bold bg-warning px-2 py-1 rounded">→ ke Masjid Agung</span> yang berarti langsung ke halte Masjid Agung
+    </p>
+<script src="js/tjNumberSearch.js"></script>
+
+    <p>
+      Ikon transportasi lainnya:
+      <br>
+      <iconify-icon inline icon="jam:train"></iconify-icon> = KRL &nbsp;&nbsp;|&nbsp;&nbsp;
+      <iconify-icon inline icon="pepicons-pop:train-circle"></iconify-icon> = MRT
+    </p>
+    <a href="gtfs.html" class="btn btn-primary rounded-5">Peta GTFS</a>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const input = document.getElementById('busNumberInput');
+    const resultsDiv = document.getElementById('busNumberResults');
+    const suggestionsDiv = document.getElementById('busNumberSuggestions');
+    if (!input || !resultsDiv || !suggestionsDiv) return;
+    input.addEventListener('input', function() {
+      const val = input.value;
+      if (!val) {
+        resultsDiv.innerHTML = '';
+        suggestionsDiv.innerHTML = '';
+        return;
+      }
+      const results = searchBusByNumber(val);
+      resultsDiv.innerHTML = renderBusSearchResults(results);
+      // Tampilkan saran jika hasil pencarian kosong atau lebih dari 1 kemungkinan
+      if (results.length === 0) {
+        suggestionsDiv.innerHTML = window.getBusSuggestions(val);
+      } else {
+        suggestionsDiv.innerHTML = '';
+      }
+    });
+  });
+</script>
+
+    <center class="plus-jakarta-sans">
+        <div class="my-3 align-items-center">
+            <img class="btn bg-2a my-2 logo-putih" src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/%2BJakarta_Logo_%28Indonesian_Language%29.svg/330px-%2BJakarta_Logo_%28Indonesian_Language%29.svg.png" width="150" alt="">
+        </div>
+        <a href="https://transportforjakarta.or.id/wp-content/uploads/2025/04/2025-04a-Peta-Integrasi-Jakarta-FDTJ-Web.pdf" class="btn btn-primary rounded-5">Peta Integrasi</a>
+        <br><span class="text-muted">Oleh <a href="https://transportforjakarta.or.id/peta/" class="text-primary link-none fw-bold">FDTJ</a></span>
+    </center>
+   </div>
+    <div class="container text-center text-muted mt-5 plus-jakarta-sans">
+        <h5 class="fw-bold">Sumber Informasi</h5>
+        <a href="https://transjakarta.co.id/" class="link-none text-muted">Transjakarta</a> |
+        <a href="https://jaklingkoindonesia.co.id/" class="link-none text-muted">JakLingko</a> |
+        <a href="https://wikipedia.org" class="link-none text-muted">Wikipedia</a> |
+        <a href="https://maps.google.com" class="link-none text-muted">Google Maps</a>
+    </div>
+    
+    <div class="footer mt-2 plus-jakarta-sans">
+        <div class="text-center fw-bold">
+            Dibuat oleh <a href="index"><img id="light" class="img-fluid" src="image/tije.png" alt="Logo Transjakarta & JakLingko" width="80"></a>
+            <br>2025, Free to Use & Open Source
+        </div>
+    </div>
+    <script type="module" src="js/tije.js"></script>
+
+    <script src="https://code.iconify.design/iconify-icon/1.0.2/iconify-icon.min.js"></script>
+    <script src="js/dark-mode-switch.js"></script>
+    <script>
+        (function() {
+          const texts = [
+            "Transjakarta",
+            "MetroTrans",
+            "MiniTrans",
+            "MikroTrans",
+            "Bus Wisata",
+            "Royal Trans",
+            "24 Jam Koridor Utama",
+          ];
+          let idx = 0;
+          const el = document.getElementById('serviceTextSlider');
+          function slideToNext() {
+        
+            el.style.transform = 'translateX(120%)';
+            setTimeout(() => {
+              idx = (idx + 1) % texts.length;
+              el.textContent = texts[idx];
+              el.style.transition = 'none';
+              el.style.transform = 'translateX(-120%)';
+            
+              void el.offsetWidth;
+              el.style.transition = 'transform 0.5s cubic-bezier(.77,0,.18,1)';
+              el.style.transform = 'translateX(0)';
+            }, 400);
+          }
+          setInterval(slideToNext, 5000);
+        })();
+    </script>
+    <script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Tambahkan icon di samping select layanan
+  const select = document.getElementById('serviceSelect');
+  if (!select) return;
+  // Buat elemen icon
+  const icon = document.createElement('iconify-icon');
+  icon.id = 'serviceSelectIcon';
+  icon.style.fontSize = '1.5em';
+  icon.style.marginRight = '8px';
+  icon.style.verticalAlign = 'middle';
+  // Fungsi update icon sesuai value
+  function updateIcon() {
+    if (select.value === 'BRT') {
+      icon.setAttribute('icon', 'mdi:bus');
+      icon.setAttribute('title', 'BRT');
+    } else if (select.value === 'Non-BRT') {
+      icon.setAttribute('icon', 'mdi:bus-side');
+      icon.setAttribute('title', 'Non-BRT');
+    } else if (select.value === 'Transjabodetabek') {
+      icon.setAttribute('icon', 'mdi:bus-multiple');
+      icon.setAttribute('title', 'Transjabodetabek');
+    } else {
+      icon.setAttribute('icon', 'mdi:bus');
+      icon.setAttribute('title', 'Layanan');
+    }
+  }
+  updateIcon();
+  select.parentNode.insertBefore(icon, select);
+  select.addEventListener('change', updateIcon);
+});
+</script>
+    <script>
+document.addEventListener("DOMContentLoaded", function() {
+  // Array info unik Transjakarta
+  const infos = [
+    `<div class="alert alert-secondary text-center alert-dismissible fade show py-2 small mb-2" style="font-size:0.95em;" role="alert">
+      <b>ℹ️ Ketahui Bus di sekitar kamu yuk!</b>
+      <br><span class="h2 fw-bold border-white btn btn-primary">DMR-240144</span><br>
+      Huruf <b>DMR</b> berarti bus dari operator <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ62v4bdhEy2bqj3UugSr9LVEX3Bt6Ffza2Ig&s" width="70">,
+      <br>angka <b><span class="text-primary">24</span></b> menandakan tahun 2024,
+      <br>dan <b><span class="text-primary">0144</span></b> adalah bus ke 144.
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Tutup"></button>
+    </div>`,
+    `<div class="alert alert-info alert-dismissible fade show py-2 small mb-2" style="font-size:0.95em;" role="alert">
+      <b>🚏 Tahukah kamu?</b>
+      <br>Transjakarta adalah sistem BRT (Bus Rapid Transit) terpanjang di dunia dengan lebih dari 250 km jalur khusus!
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Tutup"></button>
+    </div>`,
+    `<div class="alert alert-success alert-dismissible fade show py-2 small mb-2" style="font-size:0.95em;" role="alert">
+      <b>🚌 Fun Fact!</b>
+      <br>Beberapa halte Transjakarta sudah terintegrasi dengan KRL, LRT, dan MRT untuk kemudahan mobilitas warga Jakarta. Gunakan Badge Icon KRL dan LRT serta MRT di samping nama halte untuk mengetahuinya!
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Tutup"></button>
+    </div>`,
+    `<div class="alert alert-warning alert-dismissible fade show py-2 small mb-2" style="font-size:0.95em;" role="alert">
+      <b>⚡ Bus Listrik!</b>
+      <br>Transjakarta kini juga mengoperasikan bus listrik ramah lingkungan di beberapa koridor maupun di non-koridor!.
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Tutup"></button>
+    </div>`
+    // Tambahkan info lain sesuai keinginan
+  ];
+
+  // Pilih satu info secara acak
+  const randomInfo = infos[Math.floor(Math.random() * infos.length)];
+  document.getElementById('tj-info-alert').innerHTML = randomInfo;
+});
+</script>
+
+</body>
+
+</html>

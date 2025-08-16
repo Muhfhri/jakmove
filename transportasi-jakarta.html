@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transportasi Jakarta - JakMove | Info Lengkap Transportasi Jakarta</title>
+    <meta name="description" content="Informasi lengkap transportasi Jakarta: Transjakarta, JakLingko, MRT, LRT, KRL, dan layanan transportasi lainnya.">
+    <meta name="keywords" content="Transportasi Jakarta, Transjakarta, JakLingko, MRT Jakarta, LRT Jakarta, KRL, Bus Jakarta, Transportasi Umum">
+    <meta name="author" content="Muhammad Fachri">
+    <link rel="icon" href="image/tije.png" type="image/png">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#264697">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=PT+Sans+Narrow:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <link rel="stylesheet" href="css/dark-mode.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- Sticky Navigation Bar -->
+    <nav class="navbar navbar-expand-lg sticky-top bg-white shadow-sm border-bottom" style="top: 0; z-index: 1030;">
+        <div class="container-fluid px-4">
+            <span class="navbar-brand plus-jakarta-sans fw-bold text-primary">
+                <img class="brand-title" alt="JakMove">
+            </span>
+            
+            <!-- Desktop Navigation -->
+            <div class="navbar-nav me-auto d-none d-lg-flex">
+                <a class="nav-link d-flex align-items-center gap-2" href="index.html">
+                    <iconify-icon icon="mdi:map-marker-multiple"></iconify-icon>
+                    <span>Peta Interaktif</span>
+                </a>
+                <a class="nav-link active d-flex align-items-center gap-2" href="transportasi-jakarta.html">
+                    <iconify-icon icon="mdi:bus"></iconify-icon>
+                    <span>Transportasi Jakarta</span>
+                </a>
+                <a class="nav-link d-flex align-items-center gap-2" href="tentang-pembuat.html">
+                    <iconify-icon icon="mdi:account"></iconify-icon>
+                    <span>Tentang Pembuat</span>
+                </a>
+            </div>
+            
+            <!-- Mobile Toggle Button -->
+            <button class="navbar-toggler custom-toggler d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#navbarOffcanvas" aria-controls="navbarOffcanvas" aria-expanded="false" aria-label="Toggle navigation">
+                <div class="hamburger-line"></div>
+                <div class="hamburger-line"></div>
+            </button>
+        </div>
+    </nav>
+    
+    <!-- Offcanvas Sidebar for Mobile -->
+    <div class="offcanvas offcanvas-start" tabindex="-1" id="navbarOffcanvas" aria-labelledby="navbarOffcanvasLabel">
+        <div class="offcanvas-header">
+            <h5 class="offcanvas-title plus-jakarta-sans fw-bold text-primary" id="navbarOffcanvasLabel">
+                <img class="brand-title" alt="JakMove">
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body">
+            <nav class="nav-menu">
+                <a href="index.html" class="nav-menu-item">
+                    <div class="nav-menu-icon">
+                        <iconify-icon icon="mdi:map-marker"></iconify-icon>
+                    </div>
+                    <div class="nav-menu-content">
+                        <div class="nav-menu-title">Peta Interaktif</div>
+                        <div class="nav-menu-desc">Jelajahi rute Transjakarta</div>
+                    </div>
+                </a>
+                <a href="transportasi-jakarta.html" class="nav-menu-item active">
+                    <div class="nav-menu-icon">
+                        <iconify-icon icon="mdi:bus"></iconify-icon>
+                    </div>
+                    <div class="nav-menu-content">
+                        <div class="nav-menu-title">Transportasi Jakarta</div>
+                        <div class="nav-menu-desc">Info lengkap transportasi</div>
+                    </div>
+                </a>
+                <a href="tentang-pembuat.html" class="nav-menu-item">
+                    <div class="nav-menu-icon">
+                        <iconify-icon icon="mdi:account"></iconify-icon>
+                    </div>
+                    <div class="nav-menu-content">
+                        <div class="nav-menu-title">Tentang Pembuat</div>
+                        <div class="nav-menu-desc">Informasi developer website</div>
+                    </div>
+                </a>
+            </nav>
+        </div>
+    </div>
+
+    <!-- Modern Header -->
+    <div class="modern-header mb-4">
+        <div class="header-content container-fluid">
+            <div class="row align-items-center">
+                <!-- Logo Section -->
+                <div class="col-12 col-lg-6 mb-3 mb-lg-0">
+                    <div class="logo-section d-flex align-items-center gap-3">
+                        <img src="image/tije.png" width="180" alt="Logo Transjakarta & JakLingko" class="logo-img">
+                        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/%2BJakarta_Logo_%28Indonesian_Language%29.svg/330px-%2BJakarta_Logo_%28Indonesian_Language%29.svg.png" 
+                             width="120" alt="Logo Jakarta Kota Kolaborasi" class="jakarta-logo">
+                        <div class="brand-text">
+                            <img class="brand-title plus-jakarta-sans fw-bold mb-1">
+                            <p class="brand-subtitle plus-jakarta-sans mb-0">Smart Transit Experience</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Header Info Section -->
+                <div class="col-12 col-lg-6">
+                    <div class="header-info d-flex flex-wrap justify-content-center justify-content-lg-end gap-2">
+                        <div class="live-clock-container d-flex align-items-center gap-2">
+                            <iconify-icon icon="mdi:clock-outline" class="clock-icon"></iconify-icon>
+                            <span id="liveClock" class="fw-bold plus-jakarta-sans"></span>
+                        </div>
+                        <div class="weather-container d-flex align-items-center gap-2">
+                            <span id="weather-label" class="weather-icon">🌤️</span>
+                            <span id="weather-info" class="weather-info">Memuat cuaca...</span>
+                        </div>
+                        <div class="status-indicator d-flex align-items-center gap-2">
+                            <div class="status-dot"></div>
+                            <span class="status-text plus-jakarta-sans">Diperbarui</span>
+                        </div>
+                        <!-- Dark Mode Toggle -->
+                        <div class="theme-toggle-container">
+                            <input type="checkbox" class="btn-check" id="darkSwitch" checked autocomplete="off">
+                            <label class="theme-toggle-btn" for="darkSwitch">
+                                <iconify-icon icon="mdi:theme-light-dark" class="theme-icon"></iconify-icon>
+                                <span class="theme-text">Dark</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Announcement Bar -->
+            <div class="row mt-3">
+                <div class="col-12">
+                    <div class="announcement-bar d-flex align-items-center gap-2">
+                        <iconify-icon icon="mdi:information-outline" class="announcement-icon"></iconify-icon>
+                        <marquee class="announcement-text plus-jakarta-sans">
+                            Informasi transportasi Jakarta ini dibuat untuk edukasi dan tidak berafiliasi dengan pihak manapun. Data bersumber dari berbagai sumber resmi.
+                        </marquee>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="main-content container">
+        <!-- Breadcrumb Navigation -->
+        <nav aria-label="breadcrumb" class="mb-4">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item">
+                    <a href="index.html" class="breadcrumb-link">
+                        <iconify-icon icon="mdi:home" inline></iconify-icon>
+                        Beranda
+                    </a>
+                </li>
+                <li class="breadcrumb-item active" aria-current="page">Transportasi Jakarta</li>
+            </ol>
+        </nav>
+        
+        <!-- Page Header -->
+        <div class="page-header mb-4">
+            <div class="section-header">
+                <h2 class="section-title plus-jakarta-sans fw-bold">
+                    <iconify-icon icon="mdi:bus-multiple"></iconify-icon>
+                    Transportasi Jakarta
+                </h2>
+                <p class="section-subtitle plus-jakarta-sans text-muted">
+                    Informasi lengkap tentang berbagai layanan transportasi umum di Jakarta
+                </p>
+            </div>
+        </div>
+
+        <!-- Transport Services Grid -->
+        <div class="transport-services mb-5">
+            <div class="row g-4">
+                <!-- Transjakarta -->
+                <div class="col-lg-6 col-md-12">
+                    <div class="transport-card">
+                        <div class="transport-card-header">
+                            <div class="transport-icon">
+                                <iconify-icon icon="mdi:bus"></iconify-icon>
+                            </div>
+                            <div class="transport-info">
+                                <h3 class="transport-title plus-jakarta-sans fw-bold">Transjakarta</h3>
+                                <p class="transport-subtitle plus-jakarta-sans">Bus Rapid Transit (BRT)</p>
+                            </div>
+                        </div>
+                        <div class="transport-image">
+                            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/11/Transjakarta_BMP-240335.jpg/1020px-Transjakarta_BMP-240335.jpg" 
+                                 alt="Transjakarta Bus" class="transport-img">
+                        </div>
+                        <div class="transport-card-body">
+                            <div class="transport-stats">
+                                <div class="stat-item">
+                                    <span class="stat-label">Koridor</span>
+                                    <span class="stat-value">13+</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Halte</span>
+                                    <span class="stat-value">200+</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Armada</span>
+                                    <span class="stat-value">1000+</span>
+                                </div>
+                            </div>
+                            <div class="transport-features">
+                                <span class="feature-badge">Dedicated Lane</span>
+                                <span class="feature-badge">AC Bus</span>
+                                <span class="feature-badge">Cashless</span>
+                                <span class="feature-badge">24/7</span>
+                            </div>
+                            <div class="transport-description">
+                                <p>Sistem bus rapid transit terbesar di Asia Tenggara dengan jalur khusus dan layanan 24 jam.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MRT Jakarta -->
+                <div class="col-lg-6 col-md-12">
+                    <div class="transport-card">
+                        <div class="transport-card-header">
+                            <div class="transport-icon">
+                                <iconify-icon icon="mdi:train"></iconify-icon>
+                            </div>
+                            <div class="transport-info">
+                                <h3 class="transport-title plus-jakarta-sans fw-bold">MRT Jakarta</h3>
+                                <p class="transport-subtitle plus-jakarta-sans">Mass Rapid Transit</p>
+                            </div>
+                        </div>
+                        <div class="transport-image">
+                            <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTiznMRfgGo9BBciYngLsrWiC1ebIT46_xwfw&s" 
+                                 alt="MRT Jakarta" class="transport-img">
+                        </div>
+                        <div class="transport-card-body">
+                            <div class="transport-stats">
+                                <div class="stat-item">
+                                    <span class="stat-label">Jalur</span>
+                                    <span class="stat-value">2</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Stasiun</span>
+                                    <span class="stat-value">13</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Panjang</span>
+                                    <span class="stat-value">15.7 km</span>
+                                </div>
+                            </div>
+                            <div class="transport-features">
+                                <span class="feature-badge">Underground</span>
+                                <span class="feature-badge">AC</span>
+                                <span class="feature-badge">Cashless</span>
+                                <span class="feature-badge">Modern</span>
+                            </div>
+                            <div class="transport-description">
+                                <p>Sistem kereta bawah tanah modern yang menghubungkan Jakarta Selatan dengan Jakarta Pusat.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LRT Jakarta -->
+                <div class="col-lg-6 col-md-12">
+                    <div class="transport-card">
+                        <div class="transport-card-header">
+                            <div class="transport-icon">
+                                <iconify-icon icon="mdi:train-variant"></iconify-icon>
+                            </div>
+                            <div class="transport-info">
+                                <h3 class="transport-title plus-jakarta-sans fw-bold">LRT Jakarta</h3>
+                                <p class="transport-subtitle plus-jakarta-sans">Light Rail Transit</p>
+                            </div>
+                        </div>
+                        <div class="transport-image">
+                            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/9/9a/LRT_Jakarta_-_Hyundai_Rotem_LRV_in_Boulevard_Utara_Station.jpg/250px-LRT_Jakarta_-_Hyundai_Rotem_LRV_in_Boulevard_Utara_Station.jpg" 
+                                 alt="LRT Jakarta" class="transport-img">
+                        </div>
+                        <div class="transport-card-body">
+                            <div class="transport-stats">
+                                <div class="stat-item">
+                                    <span class="stat-label">Jalur</span>
+                                    <span class="stat-value">1</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Stasiun</span>
+                                    <span class="stat-value">6</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Panjang</span>
+                                    <span class="stat-value">5.8 km</span>
+                                </div>
+                            </div>
+                            <div class="transport-features">
+                                <span class="feature-badge">Elevated</span>
+                                <span class="feature-badge">AC</span>
+                                <span class="feature-badge">Cashless</span>
+                                <span class="feature-badge">Driverless</span>
+                            </div>
+                            <div class="transport-description">
+                                <p>Sistem kereta ringan otomatis yang menghubungkan Jakarta Utara dengan Jakarta Pusat.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LRT Jabodebek -->
+                <div class="col-lg-6 col-md-12">
+                    <div class="transport-card">
+                        <div class="transport-card-header">
+                            <div class="transport-icon">
+                                <iconify-icon icon="mdi:train-variant"></iconify-icon>
+                            </div>
+                            <div class="transport-info">
+                                <h3 class="transport-title plus-jakarta-sans fw-bold">LRT Jabodebek</h3>
+                                <p class="transport-subtitle plus-jakarta-sans">Light Rail Transit Jabodetabek</p>
+                            </div>
+                        </div>
+                        <div class="transport-image">
+                            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/28/LRT_Jabodebek_Bekasi_Line.jpg/250px-LRT_Jabodebek_Bekasi_Line.jpg" 
+                                 alt="LRT Jabodebek" class="transport-img">
+                        </div>
+                        <div class="transport-card-body">
+                            <div class="transport-stats">
+                                <div class="stat-item">
+                                    <span class="stat-label">Jalur</span>
+                                    <span class="stat-value">3</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Stasiun</span>
+                                    <span class="stat-value">18</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Panjang</span>
+                                    <span class="stat-value">42.1 km</span>
+                                </div>
+                            </div>
+                            <div class="transport-features">
+                                <span class="feature-badge">Elevated</span>
+                                <span class="feature-badge">AC</span>
+                                <span class="feature-badge">Cashless</span>
+                                <span class="feature-badge">Jabodetabek</span>
+                            </div>
+                            <div class="transport-description">
+                                <p>Sistem kereta ringan yang menghubungkan Jakarta dengan kota-kota satelit di Jabodetabek.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- KRL Commuterline -->
+                <div class="col-lg-6 col-md-12">
+                    <div class="transport-card">
+                        <div class="transport-card-header">
+                            <div class="transport-icon">
+                                <iconify-icon icon="mdi:train-car"></iconify-icon>
+                            </div>
+                            <div class="transport-info">
+                                <h3 class="transport-title plus-jakarta-sans fw-bold">KRL Commuterline</h3>
+                                <p class="transport-subtitle plus-jakarta-sans">Kereta Rel Listrik</p>
+                            </div>
+                        </div>
+                        <div class="transport-image">
+                            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/KRL_INKA_seri_EA207_%28CLI-225%29_%26_KRL_CRRC_seri_SFC120-V_%28CLI-125%29_in_Jakarta_Kota_station.jpg/1200px-KRL_INKA_seri_EA207_%28CLI-225%29_%26_KRL_CRRC_seri_SFC120-V_%28CLI-125%29_in_Jakarta_Kota_station.jpg" 
+                                 alt="KRL Commuterline" class="transport-img">
+                        </div>
+                        <div class="transport-card-body">
+                            <div class="transport-stats">
+                                <div class="stat-item">
+                                    <span class="stat-label">Jalur</span>
+                                    <span class="stat-value">6</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Stasiun</span>
+                                    <span class="stat-value">80+</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Panjang</span>
+                                    <span class="stat-value">418 km</span>
+                                </div>
+                            </div>
+                            <div class="transport-features">
+                                <span class="feature-badge">Electric</span>
+                                <span class="feature-badge">AC</span>
+                                <span class="feature-badge">Cashless</span>
+                                <span class="feature-badge">Jabodetabek</span>
+                            </div>
+                            <div class="transport-description">
+                                <p>Sistem kereta komuter yang menghubungkan Jakarta dengan kota-kota satelit di Jabodetabek.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Transjakarta GTFS Data Section -->
+        <div class="transjakarta-gtfs-section mb-5">
+            <div class="section-header">
+                <h3 class="section-title plus-jakarta-sans fw-bold">
+                    <iconify-icon icon="mdi:database"></iconify-icon>
+                    Data Lengkap Transjakarta (GTFS)
+                </h3>
+                <p class="section-subtitle plus-jakarta-sans text-muted">
+                    Informasi detail berdasarkan data GTFS resmi Transjakarta
+                </p>
+            </div>
+            
+            <!-- Statistics Cards -->
+            <div class="row g-4 mb-4">
+                <div class="col-lg-3 col-md-6">
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <iconify-icon icon="mdi:routes"></iconify-icon>
+                        </div>
+                        <div class="stat-content">
+                            <h4 class="stat-number" id="totalRoutes">-</h4>
+                            <p class="stat-label">Total Rute</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <iconify-icon icon="mdi:map-marker-multiple"></iconify-icon>
+                        </div>
+                        <div class="stat-content">
+                            <h4 class="stat-number" id="totalStops">-</h4>
+                            <p class="stat-label">Total Halte</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <iconify-icon icon="mdi:bus-multiple"></iconify-icon>
+                        </div>
+                        <div class="stat-content">
+                            <h4 class="stat-number" id="totalTrips">-</h4>
+                            <p class="stat-label">Total Perjalanan</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <iconify-icon icon="mdi:bus-clock"></iconify-icon>
+                        </div>
+                        <div class="stat-content">
+                            <h4 class="stat-number" id="totalStopTimes">-</h4>
+                            <p class="stat-label">Total Jadwal</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Route Categories -->
+            <div class="route-categories mb-4">
+                <h4 class="section-subtitle plus-jakarta-sans fw-bold mb-3">
+                    <iconify-icon icon="mdi:tag-multiple"></iconify-icon>
+                    Kategori Rute
+                </h4>
+                <div class="row g-3" id="routeCategories">
+                    <!-- Categories will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Jenis Kartu Uang Elektronik -->
+        <div class="electronic-cards-section mb-5">
+            <div class="section-header">
+                <h3 class="section-title plus-jakarta-sans fw-bold">
+                    <iconify-icon icon="mdi:credit-card-multiple"></iconify-icon>
+                    Jenis Kartu Uang Elektronik
+                </h3>
+                <p class="section-subtitle plus-jakarta-sans text-muted">
+                    Berbagai jenis kartu uang elektronik yang dapat digunakan untuk transportasi Jakarta
+                </p>
+            </div>
+
+            <!-- KUE Image at Top -->
+            <div class="kue-image-top mb-4">
+                <img src="https://nurahmanafandi.wordpress.com/wp-content/uploads/2023/08/kartu-uang-elektronik-2023-pilihan.png" 
+                     alt="Kartu Uang Elektronik (KUE) 2023" 
+                     class="kue-image">
+            </div>
+
+            <!-- Electronic Cards List -->
+            <div class="cards-list-container">
+                <!-- Color Legend -->
+                <div class="color-legend mb-4">
+                    <h6 class="legend-title plus-jakarta-sans fw-bold mb-3">
+                        <iconify-icon icon="mdi:palette"></iconify-icon>
+                        Arti Warna Kartu:
+                    </h6>
+                    <div class="legend-items">
+                        <div class="legend-item">
+                            <div class="legend-color supported"></div>
+                            <span class="legend-text plus-jakarta-sans">Hijau - Support JakLingko</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color limited"></div>
+                            <span class="legend-text plus-jakarta-sans">Kuning - Terbatas</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color not-supported"></div>
+                            <span class="legend-text plus-jakarta-sans">Merah - Tidak Support JakLingko</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="cards-list">
+                    <div class="card-item jaklingko-supported">
+                        <div class="card-number">1</div>
+                        <div class="card-content">
+                            <h6 class="card-title plus-jakarta-sans fw-bold">Bank Mandiri - E Money</h6>
+                            <p class="card-description plus-jakarta-sans">Kartu uang elektronik dari Bank Mandiri</p>
+                        </div>
+                    </div>
+                    
+                    <div class="card-item jaklingko-supported">
+                        <div class="card-number">2</div>
+                        <div class="card-content">
+                            <h6 class="card-title plus-jakarta-sans fw-bold">Bank Jakarta - JakCard</h6>
+                            <p class="card-description plus-jakarta-sans">Kartu uang elektronik dari Bank Jakarta</p>
+                        </div>
+                    </div>
+                    
+                    <div class="card-item jaklingko-supported">
+                        <div class="card-number">3</div>
+                        <div class="card-content">
+                            <h6 class="card-title plus-jakarta-sans fw-bold">BCA - Flazz</h6>
+                            <p class="card-description plus-jakarta-sans">Kartu uang elektronik dari BCA</p>
+                        </div>
+                    </div>
+                    
+                    <div class="card-item jaklingko-supported">
+                        <div class="card-number">4</div>
+                        <div class="card-content">
+                            <h6 class="card-title plus-jakarta-sans fw-bold">BNI - TapCash</h6>
+                            <p class="card-description plus-jakarta-sans">Kartu uang elektronik dari BNI</p>
+                        </div>
+                    </div>
+                    
+                    <div class="card-item jaklingko-limited">
+                        <div class="card-number">5</div>
+                        <div class="card-content">
+                            <h6 class="card-title plus-jakarta-sans fw-bold">BRI - Brizzi</h6>
+                            <p class="card-description plus-jakarta-sans">Kartu uang elektronik dari BRI</p>
+                        </div>
+                    </div>
+                    
+                    <div class="card-item jaklingko-not-supported">
+                        <div class="card-number">6</div>
+                        <div class="card-content">
+                            <h6 class="card-title plus-jakarta-sans fw-bold">Kartu Multi Trip (KRL)</h6>
+                            <p class="card-description plus-jakarta-sans">Hanya bisa di mesin masuk halte BRT</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- QR Payment Support Section -->
+        <div class="qr-payment-section mb-5">
+            <div class="section-header">
+                <h3 class="section-title plus-jakarta-sans fw-bold">
+                    <iconify-icon icon="mdi:qrcode-scan"></iconify-icon>
+                    Dukungan Pembayaran QR
+                </h3>
+                <p class="section-subtitle plus-jakarta-sans text-muted">
+                    Informasi pembayaran QR untuk berbagai layanan transportasi Jakarta
+                </p>
+            </div>
+
+            <div class="qr-services-container">
+                <div class="qr-service-card">
+                    <div class="qr-service-header">
+                        <div class="qr-service-icon">
+                            <img src="https://iconlogovector.com/uploads/images/2024/02/lg-65df344690108-Transjakarta.webp" 
+                                 alt="Logo Transjakarta" 
+                                 class="service-logo tj-logo">
+                        </div>
+                        <h4 class="qr-service-title plus-jakarta-sans fw-bold">Transjakarta</h4>
+                    </div>
+                    <div class="qr-service-content">
+                        <p class="qr-service-description plus-jakarta-sans">
+                            Tiket QR Transjakarta hanya mendukung Halte BRT. Pembayaran akan menghasilkan kode QR untuk di scan di gate halte (pintu masuk halte).
+                        </p>
+                        <div class="qr-payment-methods">
+                            <h6 class="payment-methods-title plus-jakarta-sans fw-bold">Metode Pembayaran:</h6>
+                            <ul class="qr-service-list">
+                                <li class="qr-service-item">
+                                    <iconify-icon icon="mdi:qrcode"></iconify-icon>
+                                    <span>AstraPay</span>
+                                </li>
+                                <li class="qr-service-item">
+                                    <iconify-icon icon="mdi:qrcode"></iconify-icon>
+                                    <span>GoPay</span>
+                                </li>
+                                <li class="qr-service-item">
+                                    <iconify-icon icon="mdi:qrcode"></iconify-icon>
+                                    <span>TJPay</span>
+                                </li>
+                                <li class="qr-service-item">
+                                    <iconify-icon icon="mdi:qrcode"></iconify-icon>
+                                    <span>blu by BCA Digital</span>
+                                </li>
+                            </ul>
+                        </div>
+                        <div class="qr-service-feature">
+                            <iconify-icon icon="mdi:qrcode-scan"></iconify-icon>
+                            <span>QRIS Tap khusus untuk RoyalTrans</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="qr-service-card">
+                    <div class="qr-service-header">
+                        <div class="qr-service-icon">
+                            <img src="https://upload.wikimedia.org/wikipedia/commons/2/23/MRT_Jakarta_logo_vertical.svg" 
+                                 alt="Logo MRT Jakarta" 
+                                 class="service-logo mrt-logo">
+                        </div>
+                        <h4 class="qr-service-title plus-jakarta-sans fw-bold">MRT Jakarta</h4>
+                    </div>
+                    <div class="qr-service-content">
+                        <p class="qr-service-description plus-jakarta-sans">
+                            Mendukung pembayaran QRIS TAP untuk kemudahan bertransaksi.
+                        </p>
+                        <div class="qr-service-feature">
+                            <iconify-icon icon="mdi:qrcode-scan"></iconify-icon>
+                            <span>QRIS TAP</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="qr-service-card">
+                    <div class="qr-service-header">
+                        <div class="qr-service-icon">
+                            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/f2/Logo_KAI_Commuter.svg/1200px-Logo_KAI_Commuter.svg.png" 
+                                 alt="Logo KAI Commuter" 
+                                 class="service-logo commuter-logo">
+                        </div>
+                        <h4 class="qr-service-title plus-jakarta-sans fw-bold">Commuterline</h4>
+                    </div>
+                    <div class="qr-service-content">
+                        <p class="qr-service-description plus-jakarta-sans">
+                            Mendukung pembayaran QR Gopay untuk kemudahan bertransaksi.
+                        </p>
+                        <div class="qr-service-feature">
+                            <iconify-icon icon="mdi:qrcode-scan"></iconify-icon>
+                            <span>QR Gopay</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- JakLingko Integration System -->
+
+        <!-- Tips Section -->
+        <div class="tips-section mb-5">
+            <div class="section-header">
+                <h3 class="section-title plus-jakarta-sans fw-bold">
+                    <iconify-icon icon="mdi:lightbulb"></iconify-icon>
+                    Tips Perjalanan
+                </h3>
+            </div>
+            <div class="tips-content">
+                <div class="row g-4">
+                    <div class="col-lg-4 col-md-6">
+                        <div class="tip-card">
+                            <div class="tip-icon">
+                                <iconify-icon icon="mdi:clock-outline"></iconify-icon>
+                            </div>
+                            <h5 class="tip-title plus-jakarta-sans fw-bold">Waktu Operasional</h5>
+                            <p class="tip-description">
+                                Transjakarta beroperasi 24 jam, sementara MRT/LRT beroperasi 05:00-24:00 WIB.
+                            </p>
+                        </div>
+                    </div>
+                    <div class="col-lg-4 col-md-6">
+                        <div class="tip-card">
+                            <div class="tip-icon">
+                                <iconify-icon icon="mdi:credit-card"></iconify-icon>
+                            </div>
+                            <h5 class="tip-title plus-jakarta-sans fw-bold">Pembayaran</h5>
+                            <p class="tip-description">
+                                Gunakan JakCard untuk pembayaran yang lebih mudah dan murah dibanding tunai.
+                            </p>
+                        </div>
+                    </div>
+                    <div class="col-lg-4 col-md-6">
+                        <div class="tip-card">
+                            <div class="tip-icon">
+                                <iconify-icon icon="mdi:map-marker"></iconify-icon>
+                            </div>
+                            <h5 class="tip-title plus-jakarta-sans fw-bold">Rute Optimal</h5>
+                            <p class="tip-description">
+                                Gunakan aplikasi JakMove untuk menemukan rute terbaik dan halte terdekat.
+                            </p>
+                        </div>
+                    </div>
+                    <div class="col-lg-4 col-md-6">
+                        <div class="tip-card">
+                            <div class="tip-icon">
+                                <iconify-icon icon="mdi:transfer"></iconify-icon>
+                            </div>
+                            <h5 class="tip-title plus-jakarta-sans fw-bold">Halte Terintegrasi</h5>
+                            <p class="tip-description">
+                                Manfaatkan halte terintegrasi untuk perpindahan antar moda tanpa keluar halte.
+                            </p>
+                        </div>
+                    </div>
+                    <div class="col-lg-4 col-md-6">
+                        <div class="tip-card">
+                            <div class="tip-icon">
+                                <iconify-icon icon="mdi:card-account-details"></iconify-icon>
+                            </div>
+                            <h5 class="tip-title plus-jakarta-sans fw-bold">Aktivasi Kartu</h5>
+                            <p class="tip-description">
+                                Aktifkan kartu integrasi di aplikasi JakLingko atau mesin card reader di halte.
+                            </p>
+                        </div>
+                    </div>
+                    <div class="col-lg-4 col-md-6">
+                        <div class="tip-card">
+                            <div class="tip-icon">
+                                <iconify-icon icon="mdi:hand-pointing-up"></iconify-icon>
+                            </div>
+                            <h5 class="tip-title plus-jakarta-sans fw-bold">Tap In & Out</h5>
+                            <p class="tip-description">
+                                Jangan lupa tap in saat naik dan tap out saat turun untuk tarif yang tepat.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modern Footer -->
+    <footer class="modern-footer">
+        <div class="container">
+            <div class="footer-main py-4">
+                <div class="row align-items-center">
+                    <!-- Brand Section -->
+                    <div class="col-lg-4 col-md-6 mb-4 mb-lg-0">
+                        <div class="footer-brand">
+                            <div class="footer-brand-text">
+                                <h4 class="footer-title">
+                                    <img class="brand-title" alt="JakMove">
+                                </h4>
+                                <p class="footer-subtitle">Smart Transit Experience</p>
+                            </div>
+                            <p class="footer-description">
+                                Platform peta interaktif dan informasi layanan Transjakarta yang membantu Anda menjelajahi transportasi Jakarta dengan mudah.
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <!-- Quick Links -->
+                    <div class="col-lg-2 col-md-6 mb-4 mb-lg-0">
+                        <h5 class="footer-heading">
+                            <iconify-icon icon="mdi:link-variant" inline></iconify-icon>
+                            Quick Links
+                        </h5>
+                        <ul class="footer-links">
+                            <li><a href="index.html">
+                                <iconify-icon icon="mdi:map-marker-multiple" inline></iconify-icon>
+                                Peta Interaktif
+                            </a></li>
+                            <li><a href="transportasi-jakarta.html">
+                                <iconify-icon icon="mdi:bus" inline></iconify-icon>
+                                Transportasi Jakarta
+                            </a></li>
+                            <li><a href="tentang-pembuat.html">
+                                <iconify-icon icon="mdi:account" inline></iconify-icon>
+                                Tentang Pembuat
+                            </a></li>
+                            <li><a href="#">
+                                <iconify-icon icon="mdi:help-circle" inline></iconify-icon>
+                                Bantuan
+                            </a></li>
+                        </ul>
+                    </div>
+                    
+                    <!-- Features -->
+                    <div class="col-lg-2 col-md-6 mb-4 mb-lg-0">
+                        <h5 class="footer-heading">
+                            <iconify-icon icon="mdi:star" inline></iconify-icon>
+                            Fitur
+                        </h5>
+                        <ul class="footer-links">
+                            <li><a href="#">
+                                <iconify-icon icon="mdi:map-search" inline></iconify-icon>
+                                Pencarian Halte
+                            </a></li>
+                            <li><a href="#">
+                                <iconify-icon icon="mdi:clock-outline" inline></iconify-icon>
+                                Rute Optimal
+                            </a></li>
+                            <li><a href="#">
+                                <iconify-icon icon="mdi:crosshairs-gps" inline></iconify-icon>
+                                Live Location
+                            </a></li>
+                        </ul>
+                    </div>
+                    
+                    <!-- Contact -->
+                    <div class="col-lg-2 col-md-6 mb-4 mb-lg-0">
+                        <h5 class="footer-heading">
+                            <iconify-icon icon="mdi:contact" inline></iconify-icon>
+                            Kontak
+                        </h5>
+                        <div class="footer-contact">
+                            <div class="contact-item">
+                                <iconify-icon icon="mdi:map-marker-outline" inline></iconify-icon>
+                                <span>Jakarta, Indonesia</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Social -->
+                    <div class="col-lg-2 col-md-6">
+                        <h5 class="footer-heading">
+                            <iconify-icon icon="mdi:share-variant" inline></iconify-icon>
+                            Social
+                        </h5>
+                        <div class="footer-social">
+                            <a href="https://github.com/muhfhri" class="social-link" title="GitHub" target="_blank" rel="noopener noreferrer">
+                                <iconify-icon icon="mdi:github" inline></iconify-icon>
+                            </a>
+                            <a href="https://www.instagram.com/muhfhri._/" class="social-link" title="Instagram" target="_blank" rel="noopener noreferrer">
+                                <iconify-icon icon="mdi:instagram" inline></iconify-icon>
+                            </a>
+                            <a href="https://muhfhri.github.io/-/" class="social-link" title="Website" target="_blank" rel="noopener noreferrer">
+                                <iconify-icon icon="mdi:web" inline></iconify-icon>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Footer Bottom -->
+            <div class="footer-bottom py-3">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <div class="footer-copyright">
+                            <div class="copyright-line">
+                                <iconify-icon icon="mdi:copyright" inline></iconify-icon>
+                                2025 <img class="brand-title" alt="JakMove">
+                            </div>
+                            <div class="copyright-line">
+                                Dibuat dengan 
+                                <iconify-icon icon="mdi:heart" style="color: #e74c3c;" inline></iconify-icon> 
+                                oleh Muhammad Fachri
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="footer-legal">
+                            <a href="legal.html" class="legal-link plus-jakarta-sans">
+                                <iconify-icon icon="mdi:file-document"></iconify-icon>
+                                Kebijakan Penggunaan
+                            </a>
+                            <span class="separator">•</span>
+                            <a href="#" class="legal-link plus-jakarta-sans">
+                                <iconify-icon icon="mdi:github"></iconify-icon>
+                                Contribute
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/weather.js"></script>
+    <script src="https://code.iconify.design/iconify-icon/1.0.2/iconify-icon.min.js"></script>
+    <script src="js/dark-mode-switch.js"></script>
+    <script src="js/navbar.js"></script>
+    <script src="js/gtfs-data.js"></script>
+
+    <script>
+    function updateLiveClock() {
+      const el = document.getElementById('liveClock');
+      if (!el) return;
+      const now = new Date();
+      el.textContent = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+    setInterval(updateLiveClock, 1000);
+    updateLiveClock();
+    </script>
+</body>
+</html> 

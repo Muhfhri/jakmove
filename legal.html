@@ -1,0 +1,1269 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kebijakan Penggunaan - JakMove</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/style.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Legal Page Specific Styles */
+        .legal-page {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            transition: all 0.3s ease;
+        }
+
+        .legal-page .main-content {
+            background: transparent;
+        }
+
+        /* Policy Section */
+        .legal-page .policy-section {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 1.5rem;
+            padding: 2.5rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .legal-page .policy-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="%23ffffff" opacity="0.1"/><circle cx="75" cy="75" r="1" fill="%23ffffff" opacity="0.1"/><circle cx="50" cy="10" r="0.5" fill="%23ffffff" opacity="0.1"/><circle cx="10" cy="60" r="0.5" fill="%23ffffff" opacity="0.1"/><circle cx="90" cy="40" r="0.5" fill="%23ffffff" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+            opacity: 0.3;
+        }
+
+        .legal-page .policy-content {
+            position: relative;
+            z-index: 2;
+        }
+
+        /* Policy Header */
+        .legal-page .policy-header {
+            text-align: center;
+            margin-bottom: 3rem;
+            padding-bottom: 2rem;
+            border-bottom: 2px solid rgba(38, 70, 151, 0.1);
+        }
+
+        .legal-page .policy-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #264697 0%, #4FA8DE 100%);
+            border-radius: 50%;
+            color: #ffffff;
+            margin: 0 auto 1.5rem;
+            box-shadow: 0 8px 25px rgba(38, 70, 151, 0.3);
+        }
+
+        .legal-page .policy-icon iconify-icon {
+            font-size: 2.5rem;
+        }
+
+        .legal-page .policy-subtitle {
+            color: #6c757d;
+            font-size: 1.1rem;
+            margin-top: 0.5rem;
+        }
+
+        /* Policy Cards */
+        .legal-page .policy-card {
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-radius: 1rem;
+            margin-bottom: 2rem;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .legal-page .policy-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            border-color: rgba(38, 70, 151, 0.2);
+        }
+
+        .legal-page .policy-card.warning-card {
+            border-left: 4px solid #f39c12;
+        }
+
+        .legal-page .policy-card.important-card {
+            border-left: 4px solid #e74c3c;
+        }
+
+        .legal-page .policy-card.contact-card {
+            border-left: 4px solid #27ae60;
+        }
+
+        .legal-page .card-header {
+            background: linear-gradient(135deg, rgba(38, 70, 151, 0.05) 0%, rgba(79, 168, 222, 0.05) 100%);
+            padding: 1.5rem;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .legal-page .card-header iconify-icon {
+            font-size: 1.5rem;
+            color: #264697;
+        }
+
+        .legal-page .card-body {
+            padding: 1.5rem;
+        }
+
+        /* Text Styling */
+        .legal-page .highlight {
+            color: #264697;
+            font-weight: 600;
+            background: linear-gradient(135deg, rgba(38, 70, 151, 0.1) 0%, rgba(79, 168, 222, 0.1) 100%);
+            padding: 0.2rem 0.5rem;
+            border-radius: 0.5rem;
+        }
+
+        .legal-page .success-text {
+            color: #27ae60;
+            font-weight: 600;
+        }
+
+        .legal-page .warning-text {
+            color: #f39c12;
+            font-weight: 600;
+        }
+
+        .legal-page .important-text {
+            color: #e74c3c;
+            font-weight: 600;
+        }
+
+        /* Info Box */
+        .legal-page .info-box {
+            background: linear-gradient(135deg, rgba(39, 174, 96, 0.1) 0%, rgba(46, 204, 113, 0.1) 100%);
+            border: 1px solid rgba(39, 174, 96, 0.2);
+            border-radius: 0.75rem;
+            padding: 1rem;
+            margin-top: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .legal-page .info-box iconify-icon {
+            color: #27ae60;
+            font-size: 1.2rem;
+        }
+
+        .legal-page .info-box span {
+            color: #27ae60;
+            font-weight: 500;
+        }
+
+        /* Permission Grid */
+        .legal-page .permission-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .legal-page .permission-item {
+            background: rgba(255, 255, 255, 0.5);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            border-radius: 0.75rem;
+            padding: 1.25rem;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+
+        .legal-page .permission-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+            border-color: rgba(38, 70, 151, 0.2);
+        }
+
+        .legal-page .permission-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #264697 0%, #4FA8DE 100%);
+            border-radius: 0.75rem;
+            color: #ffffff;
+            flex-shrink: 0;
+        }
+
+        .legal-page .permission-icon iconify-icon {
+            font-size: 1.5rem;
+        }
+
+        .legal-page .permission-content h4 {
+            color: #264697;
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .legal-page .permission-content p {
+            color: #6c757d;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            margin: 0;
+        }
+
+        /* Restriction List */
+        .legal-page .restriction-list {
+            margin-top: 1.5rem;
+        }
+
+        .legal-page .restriction-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+            padding: 0.75rem;
+            background: rgba(243, 156, 18, 0.05);
+            border: 1px solid rgba(243, 156, 18, 0.1);
+            border-radius: 0.5rem;
+        }
+
+        .legal-page .restriction-item iconify-icon {
+            color: #f39c12;
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+
+        .legal-page .restriction-item span {
+            color: #495057;
+            font-weight: 500;
+        }
+
+        /* Attribution Grid */
+        .legal-page .attribution-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .legal-page .attribution-item {
+            background: rgba(231, 76, 60, 0.05);
+            border: 1px solid rgba(231, 76, 60, 0.1);
+            border-radius: 0.75rem;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .legal-page .attribution-label {
+            color: #e74c3c;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .legal-page .attribution-value {
+            color: #264697;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        /* Contribution List */
+        .legal-page .contribution-list {
+            margin-top: 1.5rem;
+        }
+
+        .legal-page .contribution-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+            padding: 0.75rem;
+            background: rgba(39, 174, 96, 0.05);
+            border: 1px solid rgba(39, 174, 96, 0.1);
+            border-radius: 0.5rem;
+        }
+
+        .legal-page .contribution-item iconify-icon {
+            color: #27ae60;
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+
+        .legal-page .contribution-item span {
+            color: #495057;
+            font-weight: 500;
+        }
+
+        /* Disclaimer Box */
+        .legal-page .disclaimer-box {
+            background: linear-gradient(135deg, rgba(243, 156, 18, 0.1) 0%, rgba(230, 126, 34, 0.1) 100%);
+            border: 1px solid rgba(243, 156, 18, 0.2);
+            border-radius: 0.75rem;
+            padding: 1rem;
+            margin-top: 1rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+        }
+
+        .legal-page .disclaimer-box iconify-icon {
+            color: #f39c12;
+            font-size: 1.2rem;
+            margin-top: 0.1rem;
+        }
+
+        .legal-page .disclaimer-box div {
+            color: #495057;
+            line-height: 1.6;
+        }
+
+        /* Contact Methods */
+        .legal-page .contact-methods {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .legal-page .contact-method {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1rem 1.5rem;
+            background: linear-gradient(135deg, #264697 0%, #4FA8DE 100%);
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 0.75rem;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .legal-page .contact-method:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(38, 70, 151, 0.3);
+            color: #ffffff;
+            text-decoration: none;
+        }
+
+        .legal-page .contact-method iconify-icon {
+            font-size: 1.2rem;
+        }
+
+        .legal-page .policy-title {
+            color: #264697;
+            font-size: 2.5rem;
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            position: relative;
+        }
+
+        .legal-page .policy-title::before {
+            content: '';
+            width: 4px;
+            height: 2.5rem;
+            background: linear-gradient(135deg, #264697 0%, #4FA8DE 100%);
+            border-radius: 2px;
+        }
+
+        .legal-page .policy-title iconify-icon {
+            font-size: 2.5rem;
+            color: #264697;
+        }
+
+        .legal-page .section-title {
+            color: #264697;
+            font-size: 1.6rem;
+            margin: 2.5rem 0 1rem 0;
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .legal-page .section-title::before {
+            content: '';
+            width: 3px;
+            height: 1.6rem;
+            background: linear-gradient(135deg, #264697 0%, #4FA8DE 100%);
+            border-radius: 2px;
+        }
+
+        .legal-page .policy-text {
+            color: #495057;
+            font-size: 1.1rem;
+            line-height: 1.7;
+            margin-bottom: 1.5rem;
+            text-align: justify;
+        }
+
+        .legal-page .policy-list {
+            list-style: none;
+            padding-left: 0;
+            margin-bottom: 1.5rem;
+        }
+
+        .legal-page .policy-list li {
+            color: #495057;
+            font-size: 1.05rem;
+            line-height: 1.6;
+            margin-bottom: 0.75rem;
+            padding-left: 2rem;
+            position: relative;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .legal-page .policy-list li::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0.5rem;
+            width: 8px;
+            height: 8px;
+            background: linear-gradient(135deg, #264697 0%, #4FA8DE 100%);
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .legal-page .policy-list li strong {
+            color: #264697;
+            font-weight: 600;
+        }
+
+        /* Breadcrumb */
+        .legal-page .breadcrumb {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 1rem;
+            padding: 1.25rem 1.75rem;
+            margin-bottom: 2rem;
+            border: 1px solid #dee2e6;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+
+        .legal-page .breadcrumb-item {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 1rem;
+        }
+
+        .legal-page .breadcrumb-item + .breadcrumb-item::before {
+            content: "•";
+            color: #6c757d;
+            font-weight: 400;
+            font-size: 1.3rem;
+            margin: 0 1rem;
+            opacity: 0.7;
+            line-height: 1;
+        }
+
+        .legal-page .breadcrumb-link {
+            color: #264697;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .legal-page .breadcrumb-link:hover {
+            color: #4FA8DE;
+            text-decoration: none;
+            transform: translateX(-3px);
+        }
+
+        .legal-page .breadcrumb-link iconify-icon {
+            font-size: 1.1rem;
+            transition: transform 0.3s ease;
+        }
+
+        .legal-page .breadcrumb-link:hover iconify-icon {
+            transform: scale(1.1);
+        }
+
+        .legal-page .breadcrumb-item.active {
+            color: #6c757d;
+            font-weight: 600;
+        }
+
+        /* Dark Mode Styles */
+        [data-theme="dark"] .legal-page {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            color: #ffffff;
+        }
+
+        [data-theme="dark"] .legal-page .policy-section {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        [data-theme="dark"] .legal-page .policy-title {
+            color: #ffffff;
+        }
+
+        [data-theme="dark"] .legal-page .policy-title iconify-icon {
+            color: #ffffff;
+        }
+
+        [data-theme="dark"] .legal-page .section-title {
+            color: #ffffff;
+        }
+
+        [data-theme="dark"] .legal-page .policy-text {
+            color: #e0e0e0;
+        }
+
+        [data-theme="dark"] .legal-page .policy-list li {
+            color: #e0e0e0;
+        }
+
+        [data-theme="dark"] .legal-page .policy-list li strong {
+            color: #4FA8DE;
+        }
+
+        [data-theme="dark"] .legal-page .breadcrumb {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        [data-theme="dark"] .legal-page .breadcrumb-link {
+            color: #4FA8DE;
+        }
+
+        [data-theme="dark"] .legal-page .breadcrumb-link:hover {
+            color: #ffffff;
+        }
+
+        [data-theme="dark"] .legal-page .breadcrumb-item.active {
+            color: #a0aec0;
+        }
+
+        [data-theme="dark"] .legal-page .breadcrumb-item + .breadcrumb-item::before {
+            color: #a0aec0;
+        }
+
+        /* Dark mode styles for new components */
+        [data-theme="dark"] .legal-page .policy-header {
+            border-bottom-color: rgba(255, 255, 255, 0.1);
+        }
+
+        [data-theme="dark"] .legal-page .policy-subtitle {
+            color: #e0e0e0;
+        }
+
+        [data-theme="dark"] .legal-page .policy-card {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        [data-theme="dark"] .legal-page .policy-card:hover {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(79, 168, 222, 0.3);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
+        }
+
+        [data-theme="dark"] .legal-page .card-header {
+            background: linear-gradient(135deg, rgba(79, 168, 222, 0.1) 0%, rgba(38, 70, 151, 0.1) 100%);
+            border-bottom-color: rgba(255, 255, 255, 0.1);
+        }
+
+        [data-theme="dark"] .legal-page .card-header iconify-icon {
+            color: #4FA8DE;
+        }
+
+        [data-theme="dark"] .legal-page .highlight {
+            color: #4FA8DE;
+            background: linear-gradient(135deg, rgba(79, 168, 222, 0.2) 0%, rgba(38, 70, 151, 0.2) 100%);
+        }
+
+        [data-theme="dark"] .legal-page .success-text {
+            color: #2ecc71;
+        }
+
+        [data-theme="dark"] .legal-page .warning-text {
+            color: #f1c40f;
+        }
+
+        [data-theme="dark"] .legal-page .important-text {
+            color: #e74c3c;
+        }
+
+        [data-theme="dark"] .legal-page .info-box {
+            background: linear-gradient(135deg, rgba(46, 204, 113, 0.2) 0%, rgba(39, 174, 96, 0.2) 100%);
+            border-color: rgba(46, 204, 113, 0.3);
+        }
+
+        [data-theme="dark"] .legal-page .info-box span {
+            color: #2ecc71;
+        }
+
+        [data-theme="dark"] .legal-page .permission-item {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        [data-theme="dark"] .legal-page .permission-item:hover {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(79, 168, 222, 0.3);
+        }
+
+        [data-theme="dark"] .legal-page .permission-content h4 {
+            color: #ffffff;
+        }
+
+        [data-theme="dark"] .legal-page .permission-content p {
+            color: #e0e0e0;
+        }
+
+        [data-theme="dark"] .legal-page .restriction-item {
+            background: rgba(241, 196, 15, 0.1);
+            border-color: rgba(241, 196, 15, 0.2);
+        }
+
+        [data-theme="dark"] .legal-page .restriction-item span {
+            color: #e0e0e0;
+        }
+
+        [data-theme="dark"] .legal-page .attribution-item {
+            background: rgba(231, 76, 60, 0.1);
+            border-color: rgba(231, 76, 60, 0.2);
+        }
+
+        [data-theme="dark"] .legal-page .attribution-value {
+            color: #ffffff;
+        }
+
+        [data-theme="dark"] .legal-page .contribution-item {
+            background: rgba(46, 204, 113, 0.1);
+            border-color: rgba(46, 204, 113, 0.2);
+        }
+
+        [data-theme="dark"] .legal-page .contribution-item span {
+            color: #e0e0e0;
+        }
+
+        [data-theme="dark"] .legal-page .disclaimer-box {
+            background: linear-gradient(135deg, rgba(241, 196, 15, 0.1) 0%, rgba(243, 156, 18, 0.1) 100%);
+            border-color: rgba(241, 196, 15, 0.2);
+        }
+
+        [data-theme="dark"] .legal-page .disclaimer-box div {
+            color: #e0e0e0;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .legal-page .policy-section {
+                padding: 2rem;
+                margin: 0 1rem;
+            }
+
+            .legal-page .policy-title {
+                font-size: 2rem;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.5rem;
+            }
+
+            .legal-page .policy-title::before {
+                display: none;
+            }
+
+            .legal-page .section-title {
+                font-size: 1.4rem;
+                margin: 2rem 0 1rem 0;
+            }
+
+            .legal-page .policy-text {
+                font-size: 1rem;
+            }
+
+            .legal-page .policy-list li {
+                font-size: 1rem;
+                padding-left: 1.5rem;
+            }
+
+            .legal-page .breadcrumb {
+                padding: 1rem 1.25rem;
+                margin: 0 1rem 2rem 1rem;
+            }
+
+            .legal-page .policy-header {
+                margin-bottom: 2rem;
+                padding-bottom: 1.5rem;
+            }
+
+            .legal-page .policy-icon {
+                width: 60px;
+                height: 60px;
+                margin-bottom: 1rem;
+            }
+
+            .legal-page .policy-icon iconify-icon {
+                font-size: 2rem;
+            }
+
+            .legal-page .permission-grid {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+
+            .legal-page .attribution-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 0.75rem;
+            }
+
+            .legal-page .contact-methods {
+                flex-direction: column;
+            }
+
+            .legal-page .contact-method {
+                justify-content: center;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .legal-page .policy-section {
+                padding: 1.5rem;
+                margin: 0 0.5rem;
+            }
+
+            .legal-page .policy-title {
+                font-size: 1.8rem;
+            }
+
+            .legal-page .section-title {
+                font-size: 1.3rem;
+            }
+
+            .legal-page .policy-text {
+                font-size: 0.95rem;
+            }
+
+            .legal-page .policy-list li {
+                font-size: 0.95rem;
+                padding-left: 1.25rem;
+            }
+
+            .legal-page .breadcrumb {
+                padding: 0.75rem 1rem;
+                margin: 0 0.5rem 1.5rem 0.5rem;
+            }
+
+            .legal-page .breadcrumb-item {
+                font-size: 0.9rem;
+            }
+
+            .legal-page .policy-header {
+                margin-bottom: 1.5rem;
+                padding-bottom: 1rem;
+            }
+
+            .legal-page .policy-icon {
+                width: 50px;
+                height: 50px;
+                margin-bottom: 0.75rem;
+            }
+
+            .legal-page .policy-icon iconify-icon {
+                font-size: 1.5rem;
+            }
+
+            .legal-page .policy-subtitle {
+                font-size: 1rem;
+            }
+
+            .legal-page .card-header {
+                padding: 1rem;
+            }
+
+            .legal-page .card-body {
+                padding: 1rem;
+            }
+
+            .legal-page .permission-item {
+                padding: 1rem;
+            }
+
+            .legal-page .permission-icon {
+                width: 40px;
+                height: 40px;
+            }
+
+            .legal-page .permission-icon iconify-icon {
+                font-size: 1.2rem;
+            }
+
+            .legal-page .attribution-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .legal-page .contact-method {
+                padding: 0.75rem 1rem;
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body class="legal-page">
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg sticky-top bg-white shadow-sm border-bottom" style="top: 0; z-index: 1030;">
+        <div class="container-fluid px-4">
+            <span class="navbar-brand plus-jakarta-sans fw-bold text-primary">
+                <img class="brand-title" alt="JakMove">
+            </span>
+            
+            <!-- Desktop Navigation -->
+            <div class="navbar-nav me-auto d-none d-lg-flex">
+                <a class="nav-link d-flex align-items-center gap-2" href="index.html">
+                    <iconify-icon icon="mdi:map-marker-multiple"></iconify-icon>
+                    <span>Peta Interaktif</span>
+                </a>
+                <a class="nav-link d-flex align-items-center gap-2" href="transportasi-jakarta.html">
+                    <iconify-icon icon="mdi:bus"></iconify-icon>
+                    <span>Transportasi Jakarta</span>
+                </a>
+                <a class="nav-link d-flex align-items-center gap-2" href="tentang-pembuat.html">
+                    <iconify-icon icon="mdi:account"></iconify-icon>
+                    <span>Tentang Pembuat</span>
+                </a>
+            </div>
+            
+            <!-- Mobile Toggle Button -->
+            <button class="navbar-toggler custom-toggler d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#navbarOffcanvas" aria-controls="navbarOffcanvas" aria-expanded="false" aria-label="Toggle navigation">
+                <div class="hamburger-line"></div>
+                <div class="hamburger-line"></div>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Offcanvas -->
+    <div class="offcanvas offcanvas-start" tabindex="-1" id="navbarOffcanvas">
+        <div class="offcanvas-header">
+            <h5 class="offcanvas-title plus-jakarta-sans fw-bold text-primary" id="navbarOffcanvasLabel">
+                <img class="brand-title" alt="JakMove">
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+        </div>
+        <div class="offcanvas-body">
+            <nav class="nav-menu">
+                <a href="index.html" class="nav-menu-item">
+                    <div class="nav-menu-icon">
+                        <iconify-icon icon="mdi:map-marker"></iconify-icon>
+                    </div>
+                    <div class="nav-menu-content">
+                        <div class="nav-menu-title">Peta Interaktif</div>
+                        <div class="nav-menu-desc">Jelajahi rute Transjakarta</div>
+                    </div>
+                </a>
+                <a href="transportasi-jakarta.html" class="nav-menu-item">
+                    <div class="nav-menu-icon">
+                        <iconify-icon icon="mdi:bus"></iconify-icon>
+                    </div>
+                    <div class="nav-menu-content">
+                        <div class="nav-menu-title">Transportasi Jakarta</div>
+                        <div class="nav-menu-desc">Info lengkap transportasi</div>
+                    </div>
+                </a>
+                <a href="tentang-pembuat.html" class="nav-menu-item">
+                    <div class="nav-menu-icon">
+                        <iconify-icon icon="mdi:account"></iconify-icon>
+                    </div>
+                    <div class="nav-menu-content">
+                        <div class="nav-menu-title">Tentang Pembuat</div>
+                        <div class="nav-menu-desc">Informasi developer website</div>
+                    </div>
+                </a>
+            </nav>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="container py-5" style="margin-top: 80px;">
+            <!-- Breadcrumb Navigation -->
+            <nav aria-label="breadcrumb" class="mb-4">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item">
+                        <a href="index.html" class="breadcrumb-link">
+                            <iconify-icon icon="mdi:home" inline></iconify-icon>
+                            Beranda
+                        </a>
+                    </li>
+                    <li class="breadcrumb-item active" aria-current="page">Kebijakan Penggunaan</li>
+                </ol>
+            </nav>
+            
+            <div class="row justify-content-center">
+                <div class="col-lg-8">
+                    <div class="policy-section">
+                        <div class="policy-header">
+                            <div class="policy-icon">
+                                <iconify-icon icon="mdi:shield-check"></iconify-icon>
+                            </div>
+                            <h1 class="policy-title plus-jakarta-sans fw-bold">
+                                Kebijakan Penggunaan & Privasi
+                            </h1>
+                            <p class="policy-subtitle plus-jakarta-sans">
+                                Ketentuan dan syarat penggunaan platform JakMove
+                            </p>
+                        </div>
+                        
+                        <div class="policy-content">
+                            <div class="policy-card">
+                                <div class="card-header">
+                                    <iconify-icon icon="mdi:information"></iconify-icon>
+                                    <h2 class="section-title plus-jakarta-sans fw-bold">Tentang JakMove</h2>
+                                </div>
+                                <div class="card-body">
+                                    <p class="policy-text">
+                                        <strong>JakMove</strong> adalah platform informasi transportasi Jakarta yang bersifat <span class="highlight">open source</span> dan dapat digunakan secara bebas oleh siapa saja. 
+                                        Website ini dikembangkan untuk kepentingan publik dan menggunakan data <span class="highlight">GTFS (General Transit Feed Specification)</span> yang bersifat publik dari Transjakarta.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="policy-card">
+                                <div class="card-header">
+                                    <iconify-icon icon="mdi:database"></iconify-icon>
+                                    <h2 class="section-title plus-jakarta-sans fw-bold">Penggunaan Data</h2>
+                                </div>
+                                <div class="card-body">
+                                    <p class="policy-text">
+                                        JakMove <span class="success-text">tidak mengumpulkan data pribadi pengguna</span>. Website ini hanya menggunakan data GTFS yang bersifat publik untuk menampilkan 
+                                        informasi transportasi Jakarta seperti rute, halte, dan jadwal. Tidak ada data pribadi yang disimpan atau diproses.
+                                    </p>
+                                    <div class="info-box">
+                                        <iconify-icon icon="mdi:check-circle"></iconify-icon>
+                                        <span>Data yang digunakan bersumber dari Transjakarta dan bersifat publik</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="policy-card">
+                                <div class="card-header">
+                                    <iconify-icon icon="mdi:check-circle"></iconify-icon>
+                                    <h2 class="section-title plus-jakarta-sans fw-bold">Penggunaan yang Diizinkan</h2>
+                                </div>
+                                <div class="card-body">
+                                    <p class="policy-text">
+                                        Anda diperbolehkan untuk menggunakan platform JakMove dalam hal berikut:
+                                    </p>
+                                    <div class="permission-grid">
+                                        <div class="permission-item">
+                                            <div class="permission-icon">
+                                                <iconify-icon icon="mdi:map-marker"></iconify-icon>
+                                            </div>
+                                            <div class="permission-content">
+                                                <h4>Informasi Transportasi</h4>
+                                                <p>Menggunakan website untuk mendapatkan informasi transportasi Jakarta</p>
+                                            </div>
+                                        </div>
+                                        <div class="permission-item">
+                                            <div class="permission-icon">
+                                                <iconify-icon icon="mdi:school"></iconify-icon>
+                                            </div>
+                                            <div class="permission-content">
+                                                <h4>Tujuan Pendidikan</h4>
+                                                <p>Menggunakan data GTFS untuk tujuan pendidikan dan pembelajaran</p>
+                                            </div>
+                                        </div>
+                                        <div class="permission-item">
+                                            <div class="permission-icon">
+                                                <iconify-icon icon="mdi:github"></iconify-icon>
+                                            </div>
+                                            <div class="permission-content">
+                                                <h4>Kontribusi</h4>
+                                                <p>Berkontribusi pada pengembangan proyek melalui GitHub</p>
+                                            </div>
+                                        </div>
+                                        <div class="permission-item">
+                                            <div class="permission-icon">
+                                                <iconify-icon icon="mdi:account"></iconify-icon>
+                                            </div>
+                                            <div class="permission-content">
+                                                <h4>Penggunaan Pribadi</h4>
+                                                <p>Menggunakan website untuk tujuan pribadi atau non-komersial</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="policy-card warning-card">
+                                <div class="card-header">
+                                    <iconify-icon icon="mdi:alert-circle"></iconify-icon>
+                                    <h2 class="section-title plus-jakarta-sans fw-bold">Penggunaan yang Dilarang</h2>
+                                </div>
+                                <div class="card-body">
+                                    <p class="policy-text">
+                                        Berikut adalah hal-hal yang <span class="warning-text">tidak diperbolehkan</span> dalam penggunaan JakMove:
+                                    </p>
+                                    <div class="restriction-list">
+                                        <div class="restriction-item">
+                                            <iconify-icon icon="mdi:close-circle"></iconify-icon>
+                                            <span>Menggunakan website untuk tujuan komersial tanpa izin</span>
+                                        </div>
+                                        <div class="restriction-item">
+                                            <iconify-icon icon="mdi:close-circle"></iconify-icon>
+                                            <span>Menghapus atau mengubah atribusi sumber (JakMove)</span>
+                                        </div>
+                                        <div class="restriction-item">
+                                            <iconify-icon icon="mdi:close-circle"></iconify-icon>
+                                            <span>Menyalahgunakan data untuk tujuan yang merugikan</span>
+                                        </div>
+                                        <div class="restriction-item">
+                                            <iconify-icon icon="mdi:close-circle"></iconify-icon>
+                                            <span>Melakukan reverse engineering atau hacking website</span>
+                                        </div>
+                                        <div class="restriction-item">
+                                            <iconify-icon icon="mdi:close-circle"></iconify-icon>
+                                            <span>Menggunakan konten tanpa mencantumkan sumber asli</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="policy-card important-card">
+                                <div class="card-header">
+                                    <iconify-icon icon="mdi:star"></iconify-icon>
+                                    <h2 class="section-title plus-jakarta-sans fw-bold">Atribusi Sumber (Wajib)</h2>
+                                </div>
+                                <div class="card-body">
+                                    <p class="policy-text">
+                                        Jika Anda menggunakan atau mengadaptasi konten dari JakMove, Anda <span class="important-text">wajib mencantumkan</span> informasi berikut:
+                                    </p>
+                                    <div class="attribution-grid">
+                                        <div class="attribution-item">
+                                            <div class="attribution-label">Nama Proyek</div>
+                                            <div class="attribution-value">JakMove</div>
+                                        </div>
+                                        <div class="attribution-item">
+                                            <div class="attribution-label">Link Website</div>
+                                            <div class="attribution-value">jakmove.com</div>
+                                        </div>
+                                        <div class="attribution-item">
+                                            <div class="attribution-label">Pembuat</div>
+                                            <div class="attribution-value">Muhammad Fachri</div>
+                                        </div>
+                                        <div class="attribution-item">
+                                            <div class="attribution-label">Lisensi</div>
+                                            <div class="attribution-value">Open Source</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="policy-card">
+                                <div class="card-header">
+                                    <iconify-icon icon="mdi:handshake"></iconify-icon>
+                                    <h2 class="section-title plus-jakarta-sans fw-bold">Kontribusi</h2>
+                                </div>
+                                <div class="card-body">
+                                    <p class="policy-text">
+                                        JakMove adalah proyek <span class="highlight">open source</span> yang mengundang kontribusi dari siapa saja. Dengan berkontribusi, Anda menyetujui bahwa:
+                                    </p>
+                                    <div class="contribution-list">
+                                        <div class="contribution-item">
+                                            <iconify-icon icon="mdi:check"></iconify-icon>
+                                            <span>Kontribusi Anda akan menjadi bagian dari proyek open source</span>
+                                        </div>
+                                        <div class="contribution-item">
+                                            <iconify-icon icon="mdi:check"></iconify-icon>
+                                            <span>Kontribusi akan dilisensikan di bawah lisensi yang sama dengan proyek</span>
+                                        </div>
+                                        <div class="contribution-item">
+                                            <iconify-icon icon="mdi:check"></iconify-icon>
+                                            <span>Anda memiliki hak untuk memberikan kontribusi tersebut</span>
+                                        </div>
+                                        <div class="contribution-item">
+                                            <iconify-icon icon="mdi:check"></iconify-icon>
+                                            <span>Setiap kontribusi akan dipertimbangkan dan dihargai</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="policy-card">
+                                <div class="card-header">
+                                    <iconify-icon icon="mdi:shield-alert"></iconify-icon>
+                                    <h2 class="section-title plus-jakarta-sans fw-bold">Pembatasan Tanggung Jawab</h2>
+                                </div>
+                                <div class="card-body">
+                                    <p class="policy-text">
+                                        JakMove disediakan <span class="warning-text">"sebagaimana adanya"</span> tanpa jaminan apapun. Kami tidak bertanggung jawab atas kerugian yang timbul dari 
+                                        penggunaan website ini. Data transportasi yang ditampilkan dapat berubah dan tidak selalu 100% akurat.
+                                    </p>
+                                    <div class="disclaimer-box">
+                                        <iconify-icon icon="mdi:information"></iconify-icon>
+                                        <div>
+                                            <strong>Peringatan:</strong> Selalu verifikasi informasi transportasi dengan sumber resmi Transjakarta sebelum melakukan perjalanan.
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="policy-card">
+                                <div class="card-header">
+                                    <iconify-icon icon="mdi:update"></iconify-icon>
+                                    <h2 class="section-title plus-jakarta-sans fw-bold">Perubahan Kebijakan</h2>
+                                </div>
+                                <div class="card-body">
+                                    <p class="policy-text">
+                                        Kami berhak untuk mengubah kebijakan penggunaan ini kapan saja. Perubahan akan diumumkan di website ini dan 
+                                        akan berlaku sejak tanggal publikasi.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="policy-card contact-card">
+                                <div class="card-header">
+                                    <iconify-icon icon="mdi:email"></iconify-icon>
+                                    <h2 class="section-title plus-jakarta-sans fw-bold">Kontak</h2>
+                                </div>
+                                <div class="card-body">
+                                    <p class="policy-text">
+                                        Untuk pertanyaan mengenai kebijakan penggunaan ini, silakan hubungi melalui:
+                                    </p>
+                                    <div class="contact-methods">
+                                        <a href="https://github.com/muhfhri" class="contact-method" target="_blank" rel="noopener noreferrer">
+                                            <iconify-icon icon="mdi:github"></iconify-icon>
+                                            <span>GitHub Repository</span>
+                                        </a>
+                                        <a href="https://www.instagram.com/muhfhri._/" class="contact-method" target="_blank" rel="noopener noreferrer">
+                                            <iconify-icon icon="mdi:instagram"></iconify-icon>
+                                            <span>Instagram</span>
+                                        </a>
+                                        <a href="https://muhfhri.github.io/-/" class="contact-method" target="_blank" rel="noopener noreferrer">
+                                            <iconify-icon icon="mdi:web"></iconify-icon>
+                                            <span>Website Pribadi</span>
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="modern-footer">
+        <div class="container">
+            <div class="footer-main">
+                <div class="row g-4">
+                    <div class="col-lg-4 col-md-6">
+                        <div class="footer-brand">
+                            <h4 class="footer-title plus-jakarta-sans fw-bold">
+                                <img class="brand-title" alt="JakMove">
+                            </h4>
+                            <p class="footer-subtitle plus-jakarta-sans">Platform Peta Interaktif Transportasi Jakarta</p>
+                            <p class="footer-description plus-jakarta-sans">
+                                Informasi lengkap transportasi Jakarta dengan peta interaktif dan data GTFS Resmi TransJakarta.
+                            </p>
+                        </div>
+                    </div>
+                    <div class="col-lg-2 col-md-6">
+                        <h5 class="footer-heading plus-jakarta-sans fw-bold">
+                            <iconify-icon icon="mdi:link"></iconify-icon>
+                            Links
+                        </h5>
+                        <ul class="footer-links">
+                            <li><a href="index.html">Beranda</a></li>
+                            <li><a href="transportasi-jakarta.html">Transportasi</a></li>
+                            <li><a href="legal.html">Kebijakan</a></li>
+                        </ul>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <h5 class="footer-heading plus-jakarta-sans fw-bold">
+                            <iconify-icon icon="mdi:phone"></iconify-icon>
+                            Kontak
+                        </h5>
+                        <div class="footer-contact">
+                            <div class="contact-item">
+                                <iconify-icon icon="mdi:github"></iconify-icon>
+                                <span>GitHub Repository</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <h5 class="footer-heading plus-jakarta-sans fw-bold">
+                            <iconify-icon icon="mdi:share-variant"></iconify-icon>
+                            Social
+                        </h5>
+                        <div class="footer-social">
+                            <a href="https://github.com/muhfhri" class="social-link" target="_blank" rel="noopener noreferrer">
+                                <iconify-icon icon="mdi:github"></iconify-icon>
+                            </a>
+                            <a href="https://www.instagram.com/muhfhri._/" class="social-link" target="_blank" rel="noopener noreferrer">
+                                <iconify-icon icon="mdi:instagram"></iconify-icon>
+                            </a>
+                            <a href="https://muhfhri.github.io/-/" class="social-link" target="_blank" rel="noopener noreferrer">
+                                <iconify-icon icon="mdi:web"></iconify-icon>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <div class="footer-copyright plus-jakarta-sans">
+                            <div class="copyright-line">
+                                <iconify-icon icon="mdi:copyright"></iconify-icon>
+                                2025 <img class="brand-title" alt="JakMove">
+                            </div>
+                            <div class="copyright-line">
+                                Dibuat dengan <iconify-icon icon="mdi:heart" style="color: #e74c3c;"></iconify-icon> oleh Muhammad Fachri
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="footer-legal">
+                            <a href="legal.html" class="legal-link plus-jakarta-sans">
+                                <iconify-icon icon="mdi:file-document"></iconify-icon>
+                                Kebijakan Penggunaan
+                            </a>
+                            <span class="separator">•</span>
+                            <a href="#" class="legal-link plus-jakarta-sans">
+                                <iconify-icon icon="mdi:github"></iconify-icon>
+                                Contribute
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/weather.js"></script>
+    <script src="https://code.iconify.design/iconify-icon/1.0.2/iconify-icon.min.js"></script>
+    <script src="js/dark-mode-switch.js"></script>
+    <script src="js/navbar.js"></script>
+</body>
+</html> 
