@@ -18,6 +18,7 @@ export class LocationManager {
         this.arrivalTimer = null;
         this._pendingNearest = false;
         this._pendingNearestMax = 6;
+        this.arrivalStop = null; // halte yang sedang dicapai (untuk pesan arrival)
     }
 
     // Toggle live location
@@ -77,6 +78,7 @@ export class LocationManager {
         }
 
         this.lastArrivedStopId = null;
+        this.arrivalStop = null;
         this.userCentered = false;
         this.isActive = false;
         this.updateLiveLocationButton(false);
@@ -211,22 +213,21 @@ export class LocationManager {
     // Handle arrival detection
     handleArrivalDetection(userLat, userLon, currentStop, nextStop, jarakNext) {
         if (jarakNext < 30 && this.lastArrivedStopId !== nextStop.stop_id) {
-            // Start arrival timer
-            console.log(`Timer dimulai untuk halte: ${nextStop.stop_name}`);
+            // Mulai kartu arrival untuk nextStop (bukan currentStop)
+            this.arrivalStop = nextStop;
             this.arrivalTimer = setTimeout(() => {
-                console.log(`Timer selesai, pindah dari ${currentStop.stop_name} ke ${nextStop.stop_name}`);
+                // Setelah 10 detik, set halte saat ini menjadi nextStop dan reset status arrival
                 this.currentStopId = nextStop.stop_id;
                 this.selectedCurrentStopForUser = nextStop;
                 this.lastArrivedStopId = null;
-                
+                this.arrivalStop = null;
                 if (this.userMarker) {
                     const pos = this.lastUserPos;
                     if (pos) {
-                        this.showUserRouteInfo(pos.lat, pos.lng, nextStop, this.selectedRouteIdForUser);
+                        this.showUserRouteInfo(pos.lat, pos.lon, nextStop, this.selectedRouteIdForUser);
                     }
                 }
             }, 10000);
-
             this.lastArrivedStopId = nextStop.stop_id;
         }
     }
@@ -306,17 +307,15 @@ export class LocationManager {
     // Build arrival message
     buildArrivalMessage() {
         if (!this.lastArrivedStopId) return '';
-
-        const nextStop = this.selectedCurrentStopForUser;
-        if (!nextStop) return '';
-
+        const arrivedStop = this.arrivalStop || this.selectedCurrentStopForUser;
+        if (!arrivedStop) return '';
         return `
             <div style='background:linear-gradient(135deg, #10b981, #059669);color:white;padding:12px;border-radius:8px;margin-top:8px;box-shadow:0 4px 6px rgba(0,0,0,0.1);border-left:4px solid #047857;'>
                 <div style='display:flex;align-items:center;gap:8px;'>
                     <div style='font-size:1.2em;'>🎉</div>
                     <div style='flex:1;'>
                         <div style='font-weight:bold;font-size:1.1em;margin-bottom:2px;'>Tiba di Halte!</div>
-                        <div style='font-size:0.95em;opacity:0.9;'>${nextStop.stop_name}</div>
+                        <div style='font-size:0.95em;opacity:0.9;'>${arrivedStop.stop_name}</div>
                     </div>
                 </div>
             </div>
@@ -528,6 +527,7 @@ export class LocationManager {
         this.selectedCurrentStopForUser = null;
         this.currentStopId = null;
         this.lastArrivedStopId = null;
+        this.arrivalStop = null;
     }
 
     // Activate live service from a given stop and route

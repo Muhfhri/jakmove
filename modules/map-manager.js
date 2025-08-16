@@ -4,12 +4,13 @@ export class MapManager {
         this.map = null;
         this.markers = new Map();
         this.layers = new Map();
-        this.popup = null;
         this.isInitialized = false;
         this._styleName = 'positron';
         this._radiusLayerId = 'radius-stops';
         this._radiusSourceId = 'radius-source';
-        this._currentPopup = null;
+        this._currentPopup = null; // feature popup only
+        this.featurePopup = null;
+        this.userPopup = null;
         this._activeRouteData = null; // Simpan data rute aktif
     }
 
@@ -42,8 +43,14 @@ export class MapManager {
             });
 
             this.setupMapEvents();
-            this.popup = new maplibregl.Popup({ 
+            this.featurePopup = new maplibregl.Popup({ 
                 closeButton: true, 
+                closeOnClick: false, 
+                maxWidth: '350px',
+                className: 'custom-popup-transparent'
+            });
+            this.userPopup = new maplibregl.Popup({ 
+                closeButton: false, 
                 closeOnClick: false, 
                 maxWidth: '350px',
                 className: 'custom-popup-transparent'
@@ -61,7 +68,7 @@ export class MapManager {
     setupMapEvents() {
         this.map.on('load', () => { console.log('Map loaded'); });
         
-        // Close popup when clicking outside
+        // Close feature popup when clicking outside
         this.map.on('click', (e) => {
             if (this._currentPopup && !e.originalEvent.target.closest('.maplibregl-popup')) {
                 this._currentPopup.remove();
@@ -330,7 +337,7 @@ export class MapManager {
         `;
 
         if (this._currentPopup) this._currentPopup.remove();
-        this._currentPopup = this.popup.setLngLat(lngLat).setHTML(popupContent).addTo(this.map);
+        this._currentPopup = this.featurePopup.setLngLat(lngLat).setHTML(popupContent).addTo(this.map);
 
         setTimeout(() => {
             const el = this._currentPopup && this._currentPopup.getElement();
@@ -465,7 +472,8 @@ export class MapManager {
         if (!src || !src._data) return;
         const coords = src._data.geometry && src._data.geometry.coordinates;
         if (!coords) return;
-        this.popup.setLngLat(coords).setHTML('Posisi Anda').addTo(this.map);
+        if (!this.userPopup) return;
+        this.userPopup.setLngLat(coords).setHTML('Posisi Anda').addTo(this.map);
     }
 
     updateUserPopup(_markerId, html) {
@@ -473,7 +481,8 @@ export class MapManager {
         if (!src || !src._data) return;
         const coords = src._data.geometry && src._data.geometry.coordinates;
         if (!coords) return;
-        this.popup.setLngLat(coords).setHTML(html).addTo(this.map);
+        if (!this.userPopup) return;
+        this.userPopup.setLngLat(coords).setHTML(html).addTo(this.map);
     }
 
     addSearchResultMarker(lat, lng, title) {
@@ -482,7 +491,7 @@ export class MapManager {
         this.map.addSource(sourceId, { type: 'geojson', data: { type: 'Feature', properties: { title }, geometry: { type: 'Point', coordinates: [lng, lat] } } });
         this.map.addLayer({ id, type: 'circle', source: sourceId, paint: { 'circle-radius': 6, 'circle-color': '#d9534f', 'circle-stroke-color': '#fff', 'circle-stroke-width': 2 } });
         this.layers.set(id, { sourceId, layerId: id });
-        this.popup.setLngLat([lng, lat]).setHTML(title).addTo(this.map);
+        this.showHtmlPopupAt(lng, lat, title);
         return id;
     }
 
@@ -619,17 +628,19 @@ export class MapManager {
         // Clear active route data
         this._activeRouteData = null;
         
-        // Close any open popup
+        // Close any open feature popup
         if (this._currentPopup) {
             this._currentPopup.remove();
             this._currentPopup = null;
         }
+        // Do not close user popup here to keep live info; reset() will handle it
     }
 
     reset() {
         this.clearLayers();
         this.setView(-6.2, 106.8, 11);
-        if (this.popup) this.popup.remove();
+        if (this.featurePopup) this.featurePopup.remove();
+        if (this.userPopup) this.userPopup.remove();
         this._currentPopup = null;
         this._activeRouteData = null;
     }
@@ -653,9 +664,9 @@ export class MapManager {
     }
 
     showHtmlPopupAt(lng, lat, html) {
-        if (!this.popup) return;
+        if (!this.featurePopup) return;
         if (this._currentPopup) this._currentPopup.remove();
-        this._currentPopup = this.popup.setLngLat([lng, lat]).setHTML(html).addTo(this.map);
+        this._currentPopup = this.featurePopup.setLngLat([lng, lat]).setHTML(html).addTo(this.map);
         return this._currentPopup;
     }
 } 

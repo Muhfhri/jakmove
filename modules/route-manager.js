@@ -15,6 +15,7 @@ export class RouteManager {
 
         this.selectedRouteId = routeId;
         this.saveActiveRouteId(routeId);
+        localStorage.setItem('activeRouteId', routeId);
         
         // Reset variant when changing routes
         if (this.lastRouteId !== routeId) {
@@ -245,6 +246,11 @@ export class RouteManager {
         `;
     }
 
+    infoIconLink(url, title) {
+        if (!url) return '';
+        return `<a href="${url}" target="_blank" title="${title}" class="info-link" style="margin-left:6px; text-decoration:none; display:inline-flex; align-items:center;"><iconify-icon icon="mdi:information-outline" inline></iconify-icon></a>`;
+    }
+
     // Build operating days HTML
     buildOperatingDaysHTML(trips) {
         const serviceIds = Array.from(new Set(trips.map(t => t.service_id)));
@@ -259,6 +265,8 @@ export class RouteManager {
         };
 
         const hariText = serviceIds.map(sid => serviceIdMap[sid] || sid).join(' / ');
+        const rawUrl = `gtfs-raw-viewer.html?file=calendar&service_id=${encodeURIComponent(serviceIds.join(','))}`;
+        const infoIcon = this.infoIconLink(rawUrl, 'Lihat data calendar');
         
         return `
             <div class='info-item mb-2'>
@@ -267,7 +275,7 @@ export class RouteManager {
                 </div>
                 <div class='info-content'>
                     <div class='info-label'>Hari Operasi</div>
-                    <div class='info-value'>${hariText}</div>
+                    <div class='info-value'>${hariText}${infoIcon}</div>
                 </div>
             </div>
         `;
@@ -305,6 +313,9 @@ export class RouteManager {
         const minStart = startTimes.reduce((a, b) => this.timeToSeconds(a) < this.timeToSeconds(b) ? a : b);
         const maxEnd = endTimes.reduce((a, b) => this.timeToSeconds(a) > this.timeToSeconds(b) ? a : b);
 
+        const rawUrl = `gtfs-raw-viewer.html?file=stop_times&trip_id=${encodeURIComponent(tripIds.join(','))}`;
+        const infoIcon = this.infoIconLink(rawUrl, 'Lihat data stop_times');
+
         return `
             <div class='info-item mb-2'>
                 <div class='info-icon'>
@@ -312,7 +323,7 @@ export class RouteManager {
                 </div>
                 <div class='info-content'>
                     <div class='info-label'>Jam Operasi</div>
-                    <div class='info-value'>${this.formatOperatingHours(minStart, maxEnd)}</div>
+                    <div class='info-value'>${this.formatOperatingHours(minStart, maxEnd)}${infoIcon}</div>
                 </div>
             </div>
         `;
@@ -342,6 +353,8 @@ export class RouteManager {
             .sort((a, b) => a - b);
 
         const headwayText = headwayMinutes.length > 0 ? headwayMinutes.map(v => `${v} menit`).join(', ') : '-';
+        const rawUrl = `gtfs-raw-viewer.html?file=frequencies&trip_id=${encodeURIComponent(tripIds.join(','))}`;
+        const infoIcon = this.infoIconLink(rawUrl, 'Lihat data frequencies');
 
         return `
             <div class='info-item mb-2'>
@@ -350,7 +363,7 @@ export class RouteManager {
                 </div>
                 <div class='info-content'>
                     <div class='info-label'>Frekuensi</div>
-                    <div class='info-value'>${headwayText}</div>
+                    <div class='info-value'>${headwayText}${infoIcon}</div>
                 </div>
             </div>
         `;
@@ -369,6 +382,8 @@ export class RouteManager {
 
         const price = parseInt(fareAttr.price).toLocaleString('id-ID');
         const currency = fareAttr.currency_type === 'IDR' ? 'Rp' : (fareAttr.currency_type + ' ');
+        const rawUrl = `gtfs-raw-viewer.html?file=fare_attributes&fare_id=${encodeURIComponent(fareRule.fare_id)}&route_id=${encodeURIComponent(route.route_id)}&show_rules=1`;
+        const infoIcon = this.infoIconLink(rawUrl, 'Lihat data fare');
 
         return `
             <div class='info-item mb-2'>
@@ -377,7 +392,7 @@ export class RouteManager {
                 </div>
                 <div class='info-content'>
                     <div class='info-label'>Tarif</div>
-                    <div class='info-value'>${currency}${price}</div>
+                    <div class='info-value'>${currency}${price}${infoIcon}</div>
                 </div>
             </div>
         `;
@@ -406,6 +421,8 @@ export class RouteManager {
         }
 
         if (totalLength === 0) return '';
+        const rawUrl = `gtfs-raw-viewer.html?file=shapes&shape_id=${encodeURIComponent(mainShapeId)}`;
+        const infoIcon = this.infoIconLink(rawUrl, 'Lihat data shapes');
 
         return `
             <div class='info-item mb-2'>
@@ -414,7 +431,7 @@ export class RouteManager {
                 </div>
                 <div class='info-content'>
                     <div class='info-label'>Panjang Trayek</div>
-                    <div class='info-value'>${(totalLength/1000).toFixed(2)} km</div>
+                    <div class='info-value'>${(totalLength/1000).toFixed(2)} km${infoIcon}</div>
                 </div>
             </div>
         `;

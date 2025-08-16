@@ -81,11 +81,21 @@ export class UIManager {
                 <option value="osm">OSM</option>
                 <option value="satellite">Satelit</option>
             `;
+            // Restore saved base style
+            const savedStyle = localStorage.getItem('baseMapStyle') || 'positron';
+            bm.value = savedStyle;
+            window.transJakartaApp.modules.map.setBaseStyle(savedStyle);
             bm.onchange = () => {
                 const val = bm.value;
+                localStorage.setItem('baseMapStyle', val);
                 window.transJakartaApp.modules.map.setBaseStyle(val);
             };
             container.appendChild(bm);
+        } else {
+            // Ensure existing reflects saved value
+            const bm = document.getElementById('basemapSelector');
+            const savedStyle = localStorage.getItem('baseMapStyle');
+            if (bm && savedStyle && bm.value !== savedStyle) bm.value = savedStyle;
         }
 
         // Create route dropdown (lebih pendek)
