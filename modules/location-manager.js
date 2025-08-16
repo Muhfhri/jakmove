@@ -8,6 +8,7 @@ export class LocationManager {
         this.userToStopLine = null;
         this.nearestStopsMarkers = [];
         this.lastUserPos = null;
+        this.lastUserPosSmoothed = null;
         this.lastUserTime = null;
         this.lastUserSpeed = null;
         this.userCentered = false;
@@ -19,6 +20,10 @@ export class LocationManager {
         this._pendingNearest = false;
         this._pendingNearestMax = 6;
         this.arrivalStop = null; // halte yang sedang dicapai (untuk pesan arrival)
+        this._prevUserPos = null;
+        this._uiDebounceTimer = null;
+        this._uiDebounceMs = 200;
+        this._smoothAlphaBase = 0.25;
     }
 
     // Toggle live location
@@ -112,16 +117,38 @@ export class LocationManager {
         this.lastUserTime = now;
         this.lastUserSpeed = speed;
 
-        // Update map
-        this.updateUserMarker(lat, lon);
-        this.updateMapView(lat, lon);
-        this.updateUserRouteInfo(lat, lon);
+        // Low-pass smoothing for display/camera
+        const alpha = typeof speed === 'number' ? Math.min(0.45, Math.max(0.15, this._smoothAlphaBase + speed * 0.1)) : this._smoothAlphaBase;
+        if (!this.lastUserPosSmoothed) {
+            this.lastUserPosSmoothed = { lat, lon };
+        } else {
+            this.lastUserPosSmoothed = {
+                lat: this.lastUserPosSmoothed.lat * (1 - alpha) + lat * alpha,
+                lon: this.lastUserPosSmoothed.lon * (1 - alpha) + lon * alpha,
+            };
+        }
 
-        // Camera follow if locked
+        // Update map marker with smoothed position
+        this.updateUserMarker(this.lastUserPosSmoothed.lat, this.lastUserPosSmoothed.lon);
+        this.updateMapView(this.lastUserPosSmoothed.lat, this.lastUserPosSmoothed.lon);
+        this.scheduleLiveUIUpdate();
+
+        // Camera follow if locked + auto-tilt adaptif
         try {
             const mapManager = window.transJakartaApp.modules.map;
             if (mapManager && mapManager.isCameraLock()) {
-                mapManager.followUserCamera(lat, lon);
+                // Pitch adaptif berdasarkan kecepatan (m/s)
+                let pitch = 60;
+                if (typeof speed === 'number') {
+                    if (speed < 0.3) pitch = 30;
+                    else if (speed < 1.0) pitch = 45;
+                    else pitch = 60;
+                }
+                const currentPitch = mapManager.getMap()?.getPitch?.() || 0;
+                if (Math.abs(currentPitch - pitch) > 5) {
+                    mapManager.getMap().setPitch(pitch);
+                }
+                mapManager.followUserCamera(this.lastUserPosSmoothed.lat, this.lastUserPosSmoothed.lon);
             }
         } catch (e) {}
 
@@ -210,15 +237,21 @@ export class LocationManager {
         }
 
         if (nextStop) {
-            const jarakNext = this.haversine(userLat, userLon, 
-                parseFloat(nextStop.stop_lat), parseFloat(nextStop.stop_lon));
-            
-            // Handle arrival detection
-            this.handleArrivalDetection(userLat, userLon, currentStop, nextStop, jarakNext);
+            // Arrival detection must use RAW position for accuracy
+            const raw = this.lastUserPos || { lat: userLat, lon: userLon };
+            const jarakNextRaw = this.haversine(raw.lat, raw.lon, parseFloat(nextStop.stop_lat), parseFloat(nextStop.stop_lon));
+            this.handleArrivalDetection(raw.lat, raw.lon, currentStop, nextStop, jarakNextRaw);
         }
 
-        // Update popup content
-        this.updateUserPopupContent(userLat, userLon, currentStop, routeId, nextStop);
+        // Update popup content (UI can use smoothed userLat/userLon passed in)
+        const route = window.transJakartaApp.modules.gtfs.getRoutes()
+            .find(r => r.route_id === routeId);
+        
+        const popupContent = this.buildUserPopupContent(route, currentStop, nextStop, userLat, userLon);
+        const mapManager = window.transJakartaApp.modules.map;
+        if (mapManager && this.userMarker) {
+            mapManager.updateUserPopup(this.userMarker, popupContent);
+        }
     }
 
     // Handle arrival detection
@@ -564,6 +597,23 @@ export class LocationManager {
         this.arrivalStop = null;
     }
 
+    // Jadwalkan update UI popup user dengan debounce
+    scheduleLiveUIUpdate() {
+        if (!this.selectedRouteIdForUser || !this.selectedCurrentStopForUser) return;
+        if (this._uiDebounceTimer) clearTimeout(this._uiDebounceTimer);
+        this._uiDebounceTimer = setTimeout(() => {
+            const pos = this.lastUserPosSmoothed || this.lastUserPos;
+            if (pos) {
+                this.showUserRouteInfo(
+                    pos.lat,
+                    pos.lon,
+                    this.selectedCurrentStopForUser,
+                    this.selectedRouteIdForUser
+                );
+            }
+        }, this._uiDebounceMs);
+    }
+
     // Activate live service from a given stop and route
     activateLiveServiceFromStop(stop, routeId) {
         if (!stop || !routeId) return;
@@ -573,7 +623,7 @@ export class LocationManager {
         const lockBtn = document.getElementById('cameraLockBtn');
         if (lockBtn) lockBtn.style.display = '';
         if (this.lastUserPos && this.userMarker) {
-            this.showUserRouteInfo(this.lastUserPos.lat, this.lastUserPos.lon, stop, routeId);
+            this.scheduleLiveUIUpdate();
         }
     }
 } 
