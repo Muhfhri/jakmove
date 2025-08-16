@@ -754,8 +754,57 @@ export class RouteManager {
             const stops = this.getStopsForRoute(filteredTrips);
             const stopToRoutes = window.transJakartaApp.modules.gtfs.getStopToRoutes();
             mapManager.addStopsMarkers(stops, stopToRoutes, window.transJakartaApp.modules.gtfs.getRoutes());
+
+            // Prepare linear referencing for live layanan
+            this.prepareLinearRef(shapes, stops);
         }
     }
+
+    // Flatten shapes into single polyline and compute cumulative distances; project stops
+    prepareLinearRef(shapes, stops) {
+        // Flatten shapes (array of arrays of {lat,lng}) into one continuous polyline
+        const poly = [];
+        shapes.forEach(seg => { if (seg && seg.length) seg.forEach(p => poly.push({ lat: p.lat, lon: p.lng })); });
+        if (poly.length < 2) { this.linearRef = null; this.stopMeasureById = null; this.orderedStops = stops || []; return; }
+        const cum = [0];
+        for (let i = 1; i < poly.length; i++) {
+            cum[i] = cum[i - 1] + this.haversine(poly[i - 1].lat, poly[i - 1].lon, poly[i].lat, poly[i].lon);
+        }
+        // Helper project lat/lon onto segment i-1 -> i
+        const projectOnSegment = (i, lat, lon) => {
+            const ax = poly[i - 1].lon, ay = poly[i - 1].lat;
+            const bx = poly[i].lon, by = poly[i].lat;
+            const px = lon, py = lat;
+            const abx = bx - ax, aby = by - ay;
+            const apx = px - ax, apy = py - ay;
+            const ab2 = abx * abx + aby * aby;
+            if (ab2 === 0) return { t: 0, dist: cum[i - 1] };
+            let t = (apx * abx + apy * aby) / ab2;
+            t = Math.max(0, Math.min(1, t));
+            const projLat = ay + aby * t;
+            const projLon = ax + abx * t;
+            const segLen = this.haversine(ay, ax, projLat, projLon);
+            return { t, dist: cum[i - 1] + segLen };
+        };
+        // Project stop to nearest segment
+        const stopMeasureById = new Map();
+        const orderedStops = Array.isArray(stops) ? [...stops] : [];
+        orderedStops.forEach(stop => {
+            let best = { dist: Infinity };
+            for (let i = 1; i < poly.length; i++) {
+                const pr = projectOnSegment(i, parseFloat(stop.stop_lat), parseFloat(stop.stop_lon));
+                if (pr.dist < best.dist) best = pr;
+            }
+            stopMeasureById.set(stop.stop_id, best.dist);
+        });
+        this.linearRef = { poly, cum };
+        this.stopMeasureById = stopMeasureById;
+        this.orderedStops = orderedStops;
+    }
+
+    getLinearRef() { return this.linearRef || null; }
+    getStopMeasureById() { return this.stopMeasureById || new Map(); }
+    getOrderedStops() { return this.orderedStops || []; }
 
     // Get shapes for trips
     getShapesForTrips(trips) {

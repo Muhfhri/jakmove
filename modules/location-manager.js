@@ -257,6 +257,50 @@ export class LocationManager {
             }
         }
 
+        // Linear referencing progress (advance without 30m)
+        try {
+            const routes = window.transJakartaApp.modules.routes;
+            const linear = routes.getLinearRef && routes.getLinearRef();
+            const stopMeasureMap = routes.getStopMeasureById && routes.getStopMeasureById();
+            if (linear && stopMeasureMap && nextStop) {
+                // Project user onto polyline (smoothed for stability)
+                const poly = linear.poly, cum = linear.cum;
+                const pos = this.lastUserPosSmoothed || this.lastUserPos || { lat: userLat, lon: userLon };
+                let best = { dist: Infinity, idx: 1, measure: 0 };
+                for (let i = 1; i < poly.length; i++) {
+                    const pr = this._projectOnSegment(poly, cum, i, pos.lat, pos.lon);
+                    if (Math.abs(pr.measure - (best.measure || 0)) > 0 || pr.dist < best.dist) best = pr;
+                }
+                const userMeasure = best.measure;
+                const currMeasure = stopMeasureMap.get(currentStop.stop_id) || 0;
+                const nextMeasure = stopMeasureMap.get(nextStop.stop_id) || currMeasure + 1;
+                const gate = (currMeasure + nextMeasure) / 2;
+                // Bearing check roughly (optional)
+                let forward = true;
+                if (this._prevUserPosSmoothed) {
+                    const br = this._bearingDeg(this._prevUserPosSmoothed, pos);
+                    // If moving backward beyond 120°, consider not forward
+                    // but keep forgiving due to noise
+                    forward = true; // keep it permissive
+                }
+                const corridorOk = best.minDistToSeg <= 80; // within 80m corridor
+                if (corridorOk && forward && userMeasure > gate) {
+                    // Advance to nextStop without requiring <30m
+                    this.currentStopId = nextStop.stop_id;
+                    this.selectedCurrentStopForUser = nextStop;
+                    this.lastArrivedStopId = null;
+                    this.arrivalStop = null;
+                    // Shrink markers behind (notify MapManager if needed)
+                    try {
+                        const mapManager = window.transJakartaApp.modules.map;
+                        if (mapManager && typeof mapManager.updatePassedStopsVisual === 'function') {
+                            mapManager.updatePassedStopsVisual(userMeasure, stopMeasureMap);
+                        }
+                    } catch (e) {}
+                }
+            }
+        } catch (e) {}
+
         if (nextStop) {
             // Arrival detection must use RAW position for accuracy
             const raw = this.lastUserPos || { lat: userLat, lon: userLon };
@@ -646,6 +690,34 @@ export class LocationManager {
         if (this.lastUserPos && this.userMarker) {
             this.scheduleLiveUIUpdate();
         }
+    }
+
+    _bearingDeg(a, b) {
+        const toRad = d => d * Math.PI / 180;
+        const toDeg = r => r * 180 / Math.PI;
+        const y = Math.sin(toRad(b.lon - a.lon)) * Math.cos(toRad(b.lat));
+        const x = Math.cos(toRad(a.lat)) * Math.sin(toRad(b.lat)) - Math.sin(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.cos(toRad(b.lon - a.lon));
+        let brng = toDeg(Math.atan2(y, x));
+        return (brng + 360) % 360;
+    }
+
+    _projectOnSegment(poly, cum, i, lat, lon) {
+        const ax = poly[i - 1].lon, ay = poly[i - 1].lat;
+        const bx = poly[i].lon, by = poly[i].lat;
+        const px = lon, py = lat;
+        const abx = bx - ax, aby = by - ay;
+        const apx = px - ax, apy = py - ay;
+        const ab2 = abx * abx + aby * aby;
+        let t = 0;
+        if (ab2 > 0) t = Math.max(0, Math.min(1, (apx * abx + apy * aby) / ab2));
+        const projLat = ay + aby * t;
+        const projLon = ax + abx * t;
+        const segLen = this.haversine(ay, ax, projLat, projLon);
+        const measure = cum[i - 1] + segLen;
+        const dToA = this.haversine(py, px, ay, ax);
+        const dToB = this.haversine(py, px, by, bx);
+        const minDistToSeg = Math.min(dToA, dToB);
+        return { t, measure, dist: measure, minDistToSeg };
     }
 } 
  
