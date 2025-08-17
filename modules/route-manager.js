@@ -90,10 +90,17 @@ export class RouteManager {
             mainDropdown.value = this.selectedRouteId;
         }
 
-        // Map dropdown
-        if (window.updateMapRouteDropdown) {
-            window.updateMapRouteDropdown(this.selectedRouteId);
-        }
+        // Map dropdown via UI manager
+        try {
+            const ui = window.transJakartaApp.modules.ui;
+            if (ui && typeof ui.updateRouteDropdowns === 'function') {
+                ui.updateRouteDropdowns(this.selectedRouteId);
+            } else {
+                // Fallback direct
+                const mapDropdown = document.getElementById('mapRouteDropdown');
+                if (mapDropdown) mapDropdown.value = this.selectedRouteId;
+            }
+        } catch (e) {}
     }
 
     // Update variant dropdowns

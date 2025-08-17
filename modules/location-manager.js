@@ -26,6 +26,9 @@ export class LocationManager {
         this._uiDebounceMs = 200;
         this._smoothAlphaBase = 0.25;
         this._suspend = false;
+        this._lastNextDist = null;
+        this._lastNextStopId = null;
+        this._lastUIUpdateTs = 0;
     }
 
     // Toggle live location
@@ -284,7 +287,6 @@ export class LocationManager {
             const linear = routes.getLinearRef && routes.getLinearRef();
             const stopMeasureMap = routes.getStopMeasureById && routes.getStopMeasureById();
             if (linear && stopMeasureMap && nextStop) {
-                // Project user onto polyline (smoothed for stability)
                 const poly = linear.poly, cum = linear.cum;
                 const pos = this.lastUserPosSmoothed || this.lastUserPos || { lat: userLat, lon: userLon };
                 let best = { dist: Infinity, idx: 1, measure: 0 };
@@ -296,8 +298,7 @@ export class LocationManager {
                 const currMeasure = stopMeasureMap.get(currentStop.stop_id) || 0;
                 const nextMeasure = stopMeasureMap.get(nextStop.stop_id) || currMeasure + 1;
                 const gate = (currMeasure + nextMeasure) / 2;
-                // Bearing check roughly (permissive)
-                const corridorOk = best.minDistToSeg <= 80; // within 80m corridor
+                const corridorOk = best.minDistToSeg <= 80;
                 if (corridorOk && userMeasure > gate) {
                     this.currentStopId = nextStop.stop_id;
                     this.selectedCurrentStopForUser = nextStop;
@@ -313,18 +314,36 @@ export class LocationManager {
             }
         } catch (e) {}
 
+        // ETA & distance trend calculations
+        let jarakNext = null, etaText = '', trend = '→';
         if (nextStop) {
-            // Arrival detection must use RAW position for accuracy
-            const raw = this.lastUserPos || { lat: userLat, lon: userLon };
-            const jarakNextRaw = this.haversine(raw.lat, raw.lon, parseFloat(nextStop.stop_lat), parseFloat(nextStop.stop_lon));
-            this.handleArrivalDetection(raw.lat, raw.lon, currentStop, nextStop, jarakNextRaw);
+            const posSmooth = this.lastUserPosSmoothed || this.lastUserPos || { lat: userLat, lon: userLon };
+            jarakNext = this.haversine(posSmooth.lat, posSmooth.lon, parseFloat(nextStop.stop_lat), parseFloat(nextStop.stop_lon));
+            const nowTs = Date.now();
+            if (this._lastNextStopId === nextStop.stop_id && this._lastNextDist !== null) {
+                const delta = jarakNext - this._lastNextDist;
+                if (delta < -2) trend = '⬇️'; else if (delta > 2) trend = '⬆️'; else trend = '→';
+            }
+            this._lastNextDist = jarakNext;
+            this._lastNextStopId = nextStop.stop_id;
+            // ETA based on speed (fallback 1.2 m/s walking)
+            const spd = (typeof this.lastUserSpeed === 'number' && this.lastUserSpeed > 0.1) ? this.lastUserSpeed : 1.2;
+            const etaSec = Math.max(1, Math.round(jarakNext / spd));
+            if (etaSec < 60) etaText = `${etaSec}s`; else etaText = `${Math.floor(etaSec/60)}m ${etaSec%60}s`;
+            // Visual stability: skip UI update if distance change small and <1s
+            const dt = nowTs - (this._lastUIUpdateTs || 0);
+            if (Math.abs((jarakNext || 0) - (this._prevDistForUi || 0)) < 3 && dt < 1000) {
+                return; // keep last UI
+            }
+            this._lastUIUpdateTs = nowTs;
+            this._prevDistForUi = jarakNext;
         }
 
         // Update popup content (UI can use smoothed userLat/userLon passed in)
         const route = window.transJakartaApp.modules.gtfs.getRoutes()
             .find(r => r.route_id === routeId);
         
-        const popupContent = this.buildUserPopupContent(route, currentStop, nextStop, userLat, userLon, upcomingStops);
+        const popupContent = this.buildUserPopupContent(route, currentStop, nextStop, userLat, userLon, upcomingStops, { etaText, trend, jarakNext });
         const mapManager = window.transJakartaApp.modules.map;
         if (mapManager && this.userMarker) {
             mapManager.updateUserPopup(this.userMarker, popupContent);
@@ -366,7 +385,7 @@ export class LocationManager {
     }
 
     // Build user popup content
-    buildUserPopupContent(route, currentStop, nextStop, userLat, userLon, upcomingStops = []) {
+    buildUserPopupContent(route, currentStop, nextStop, userLat, userLon, upcomingStops = [], liveExtras = {}) {
         const badgeColor = route && route.route_color ? ('#' + route.route_color) : '#264697';
         const badgeText = route && route.route_short_name ? route.route_short_name : 'Unknown';
         
@@ -411,20 +430,34 @@ export class LocationManager {
                 }
             } catch (e) {}
 
+            // Accessibility icon for next stop if accessible
+            let accessIcon = '';
+            if (nextStop && nextStop.wheelchair_boarding === '1') {
+                accessIcon = `<span title='Ramah kursi roda' style='margin-left:6px;'>♿</span>`;
+            }
+
             // Breadcrumb 2 halte ke depan
             let breadcrumbHtml = '';
             if (upcomingStops && upcomingStops.length > 0) {
                 const chips = upcomingStops.map(s => `<span style='background:#eef2ff;color:#264697;border-radius:999px;padding:4px 10px;font-size:0.85em;font-weight:600;'>${s.stop_name}</span>`).join(' ');
                 breadcrumbHtml = `<div style='margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;'>${chips}</div>`;
             }
-            
+
+            // ETA & Trend from liveExtras
+            const etaText = liveExtras.etaText || '';
+            const trend = liveExtras.trend || '→';
+            const etaHtml = etaText ? `<span style='font-size:0.9em;color:#64748b;'>ETA ${etaText}</span>` : '';
+            const trendHtml = `<span style='font-size:0.9em;'>${trend}</span>`;
+             
             nextStopInfo = `
                 <div style='margin-bottom:6px;'>
                     <div class='text-muted' style='font-size:0.95em;font-weight:600;margin-bottom:2px;'>Halte Selanjutnya</div>
-                    <div style='font-size:1.1em;font-weight:bold;'>${nextStop.stop_name}</div>
+                    <div style='font-size:1.1em;font-weight:bold;display:flex;align-items:center;gap:6px;'>${nextStop.stop_name} ${accessIcon}</div>
                     <div style='margin-bottom:2px;display:flex;align-items:center;gap:8px;'>
                         <span style='font-weight:600;color:${distColor};'>${jarakNext < 1000 ? Math.round(jarakNext) + ' m' : (jarakNext/1000).toFixed(2) + ' km'}</span>
                         <span style='font-size:0.9em;color:#64748b;'>arah ${bearingDeg}</span>
+                        ${trendHtml}
+                        ${etaHtml}
                     </div>
                     ${nextStopServicesHtml}
                     ${breadcrumbHtml}

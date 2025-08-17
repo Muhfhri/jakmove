@@ -480,7 +480,16 @@ export class MapManager {
         this._ensureStyleReady(() => {
             const layerId = 'user-marker';
             const sourceId = 'user-source';
-            if (this.layers.has(layerId)) { if (this.map.getLayer(layerId)) this.map.removeLayer(layerId); if (this.map.getSource(sourceId)) this.map.removeSource(sourceId); this.layers.delete(layerId); }
+            if (this.map.getSource(sourceId)) {
+                // If exists, just update
+                const src = this.map.getSource(sourceId);
+                if (src && src.setData) src.setData({ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [lng, lat] } });
+                return 'user-marker';
+            }
+            if (this.layers.has(layerId)) {
+                const entry = this.layers.get(layerId);
+                if (entry && this.map.getLayer(entry.layerId)) return layerId;
+            }
             this.map.addSource(sourceId, { type: 'geojson', data: { type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [lng, lat] } } });
             this.map.addLayer({ id: layerId, type: 'circle', source: sourceId, paint: { 'circle-radius': 8, 'circle-color': '#007cbf', 'circle-stroke-color': '#fff', 'circle-stroke-width': 2 } });
             this.layers.set(layerId, { sourceId, layerId });
@@ -728,16 +737,16 @@ export class MapManager {
     followUserCamera(lat, lon, headingDeg, zoom = 17) {
         if (!this.map || !this._cameraLock) return;
         let bearing = typeof headingDeg === 'number' && !isNaN(headingDeg) ? headingDeg : this.map.getBearing();
-        // If no heading provided, try compute from last two user positions via LocationManager
-        try {
-            const loc = window.transJakartaApp?.modules?.location;
-            const last = loc?.lastUserPos;
-            const prev = loc?._prevUserPos;
-            if ((!headingDeg || isNaN(headingDeg)) && last && prev) {
-                bearing = this._followBearingFrom(prev.lat, prev.lon, lat, lon);
-            }
-        } catch (e) {}
-        this.map.easeTo({ center: [lon, lat], zoom, bearing, pitch: Math.max(this.map.getPitch(), 60), duration: 600, easing: t => t });
+        // Smooth bearing changes to avoid jitter
+        const currentBearing = this.map.getBearing();
+        const delta = Math.abs(((bearing - currentBearing + 540) % 360) - 180);
+        if (delta < 2) bearing = currentBearing;
+        // Smooth center update
+        const currentCenter = this.map.getCenter();
+        const dx = Math.abs(currentCenter.lng - lon);
+        const dy = Math.abs(currentCenter.lat - lat);
+        const smallMove = dx < 1e-5 && dy < 1e-5;
+        this.map.easeTo({ center: smallMove ? currentCenter : [lon, lat], zoom, bearing, pitch: Math.max(this.map.getPitch(), 60), duration: 600, easing: t => t });
     }
 
     _resumeAfterIdle() {
