@@ -75,24 +75,45 @@ export class UIManager {
             bm.id = 'basemapSelector';
             bm.className = 'form-select form-select-sm plus-jakarta-sans';
             bm.style.minWidth = '140px';
-            bm.style.maxWidth = '160px';
+            bm.style.maxWidth = '200px';
             bm.innerHTML = `
                 <option value="positron">Positron</option>
                 <option value="voyager">Voyager</option>
                 <option value="dark">Dark Matter</option>
-                <option value="osm">OSM</option>
                 <option value="streets">Streets</option>
                 <option value="topo">Topo</option>
                 <option value="gray">Gray</option>
                 <option value="opentopo">OpenTopo</option>
                 <option value="satellite">Satelit</option>
+                <option value="openmaptiles-streets">OpenMapTiles Streets</option>
+                <option value="openmaptiles-bright">OpenMapTiles Bright</option>
+                <option value="openmaptiles-dark">OpenMapTiles Dark</option>
+                <option value="openmaptiles-positron">OpenMapTiles Positron</option>
             `;
+            // Simpan default OpenMapTiles key jika ada dari konfigurasi
+            try {
+                const defaultOmtKey = 'RVJ0OE10B7aw0wl2Tdyl';
+                if (defaultOmtKey && !localStorage.getItem('openmaptilesKey')) {
+                    localStorage.setItem('openmaptilesKey', defaultOmtKey);
+                }
+            } catch (e) {}
             // Restore saved base style
             const savedStyle = localStorage.getItem('baseMapStyle') || 'positron';
-            bm.value = savedStyle;
-            window.transJakartaApp.modules.map.setBaseStyle(savedStyle);
+            // Fallback jika tersimpan OSM atau MapLibre3D
+            if (savedStyle === 'osm' || savedStyle === 'maplibre3d') {
+                localStorage.setItem('baseMapStyle', 'positron');
+            }
+            bm.value = localStorage.getItem('baseMapStyle') || 'positron';
+            window.transJakartaApp.modules.map.setBaseStyle(bm.value);
             bm.onchange = () => {
                 const val = bm.value;
+                if (val && val.startsWith('openmaptiles-')) {
+                    try {
+                        const suppliedKey = 'RVJ0OE10B7aw0wl2Tdyl';
+                        const stored = localStorage.getItem('openmaptilesKey');
+                        if (stored !== suppliedKey) localStorage.setItem('openmaptilesKey', suppliedKey);
+                    } catch (e) {}
+                }
                 localStorage.setItem('baseMapStyle', val);
                 window.transJakartaApp.modules.map.setBaseStyle(val);
             };
@@ -101,6 +122,9 @@ export class UIManager {
             // Ensure existing reflects saved value
             const bm = document.getElementById('basemapSelector');
             const savedStyle = localStorage.getItem('baseMapStyle');
+            if (savedStyle === 'osm' || savedStyle === 'maplibre3d') {
+                localStorage.setItem('baseMapStyle', 'positron');
+            }
             if (bm && savedStyle && bm.value !== savedStyle) bm.value = savedStyle;
         }
 

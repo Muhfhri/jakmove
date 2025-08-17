@@ -105,6 +105,16 @@ export class MapManager {
         else if (name === 'voyager') style = 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json';
         else if (name === 'dark') style = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
         else if (name === 'osm') style = 'https://demotiles.maplibre.org/style.json';
+        else if (name === 'maplibre3d') style = 'https://demotiles.maplibre.org/style.json';
+        else if (name.startsWith('openmaptiles-')) {
+            const key = localStorage.getItem('openmaptilesKey') || '';
+            const base = 'https://api.maptiler.com/maps';
+            if (name === 'openmaptiles-streets') style = `${base}/streets/style.json?key=${key}`;
+            else if (name === 'openmaptiles-bright') style = `${base}/bright/style.json?key=${key}`;
+            else if (name === 'openmaptiles-dark') style = `${base}/darkmatter/style.json?key=${key}`;
+            else if (name === 'openmaptiles-positron') style = `${base}/positron/style.json?key=${key}`;
+            else style = `${base}/streets/style.json?key=${key}`;
+        }
         else if (name === 'satellite') style = this._buildSatelliteStyle();
         else if (name === 'streets') style = this._buildRasterStyle(['https://services.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}'], 'Tiles © Esri');
         else if (name === 'topo') style = this._buildRasterStyle(['https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}'], 'Tiles © Esri');
@@ -137,6 +147,17 @@ export class MapManager {
                     this._activeRouteData.stopsSnapshot.routes
                 );
             }
+            
+            // If for some reason stops layer still missing, force re-render via RouteManager
+            try {
+                const hasStopsLayer = this.map.getLayer('stops-markers');
+                const routesMod = window.transJakartaApp?.modules?.routes;
+                const activeId = routesMod && routesMod.selectedRouteId;
+                if (!hasStopsLayer && activeId) {
+                    // Trigger a light reselect to rebuild layers
+                    routesMod.selectRoute(activeId);
+                }
+            } catch (e) {}
             
             // Re-add user marker if active
             const app = window.transJakartaApp;
