@@ -13,9 +13,7 @@ export class MapManager {
         this.userPopup = null;
         this._activeRouteData = null; // Simpan data rute aktif
         this._cameraLock = false; // camera follow user
-        this._followOffsetPx = [0, 150];
-        this._userDragging = false;
-        this._userRotating = false;
+        // No offset while locked; center always on user
     }
 
     init() {
@@ -82,11 +80,7 @@ export class MapManager {
             }
         });
 
-        // Track user interactions to let user control pan/zoom/rotate while locked
-        this.map.on('dragstart', () => { this._userDragging = true; });
-        this.map.on('dragend', () => { this._userDragging = false; this._recomputeFollowOffsetFromUser(); });
-        this.map.on('rotatestart', () => { this._userRotating = true; });
-        this.map.on('rotateend', () => { this._userRotating = false; });
+        // No drag tracking while lock; we will disable dragPan when locked
 
         this.map.on('zoomend', () => {
             if (window.radiusHalteActive && this.map.getZoom() >= 14) {
@@ -107,20 +101,7 @@ export class MapManager {
         });
     }
 
-    _recomputeFollowOffsetFromUser() {
-        try {
-            if (!this._cameraLock || !this.map) return;
-            const app = window.transJakartaApp;
-            const pos = app?.modules?.location?.lastUserPosSmoothed || app?.modules?.location?.lastUserPos;
-            if (!pos) return;
-            const p = this.map.project([pos.lon, pos.lat]);
-            const w = this.map.getCanvas().width;
-            const h = this.map.getCanvas().height;
-            const cx = w / 2, cy = h / 2;
-            // Keep user at current on-screen position by storing offset in pixels
-            this._followOffsetPx = [Math.round(p.x - cx), Math.round(p.y - cy)];
-        } catch (e) {}
-    }
+    // Removed offset recompute; center will stay on user while locked
 
     setBaseStyle(name) {
         this._styleName = name;
@@ -831,9 +812,18 @@ export class MapManager {
         if (this._cameraLock) {
             // Set initial 3D pitch for better perspective
             this.map.setPitch(60);
+            // Disable drag pan while locked so center stays on user
+            try { this.map.dragPan.disable(); } catch (e) {}
+            // Allow zoom and pitch via gestures
+            try { this.map.scrollZoom.enable(); } catch (e) {}
+            try { this.map.boxZoom.disable(); } catch (e) {}
+            try { this.map.dragRotate.disable(); } catch (e) {}
         } else {
             // Optionally relax pitch when unlocked
             this.map.setPitch(0);
+            // Re-enable interactions
+            try { this.map.dragPan.enable(); } catch (e) {}
+            try { this.map.dragRotate.enable(); } catch (e) {}
         }
     }
 
@@ -848,13 +838,11 @@ export class MapManager {
         return (brng + 360) % 360;
     }
 
-    followUserCamera(lat, lon, headingDeg, zoom = undefined) {
+    followUserCamera(lat, lon, headingDeg) {
         if (!this.map || !this._cameraLock) return;
-        // Respect user rotation while rotating
+        // Keep bearing aligned to heading; user controls only zoom/pitch
         let bearing = this.map.getBearing();
-        if (!this._userRotating && typeof headingDeg === 'number' && !isNaN(headingDeg)) {
-            bearing = headingDeg;
-        }
+        if (typeof headingDeg === 'number' && !isNaN(headingDeg)) bearing = headingDeg;
         // Smooth bearing changes to avoid jitter
         const currentBearing = this.map.getBearing();
         const delta = Math.abs(((bearing - currentBearing + 540) % 360) - 180);
@@ -864,11 +852,8 @@ export class MapManager {
         const dx = Math.abs(currentCenter.lng - lon);
         const dy = Math.abs(currentCenter.lat - lat);
         const smallMove = dx < 1e-5 && dy < 1e-5;
-        // Keep user's chosen zoom/pitch; only adjust center with offset and bearing if needed
-        const opts = { center: smallMove ? currentCenter : [lon, lat], bearing, duration: 450, easing: t => t };
-        // Apply persistent offset so user can “place” the popup anywhere via pan
-        if (Array.isArray(this._followOffsetPx)) opts.offset = this._followOffsetPx;
-        this.map.easeTo(opts);
+        // Keep user's chosen zoom/pitch; only adjust center & bearing
+        this.map.easeTo({ center: smallMove ? currentCenter : [lon, lat], bearing, duration: 400, easing: t => t });
     }
 
     _resumeAfterIdle() {
