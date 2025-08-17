@@ -4,6 +4,7 @@ export class RouteManager {
         this.selectedRouteId = null;
         this.selectedRouteVariant = null;
         this.lastRouteId = null;
+        this._cache = new Map(); // cache per route|variant
     }
 
     // Select a route
@@ -124,7 +125,7 @@ export class RouteManager {
 
         const routeInfo = this.buildRouteInfoHTML(route);
         title.innerHTML = routeInfo;
-        title.className = 'mb-3 fs-3 fw-bold plus-jakarta-sans';
+        title.className = 'fs-3 fw-bold plus-jakarta-sans';
 
         // Setup variant dropdown if needed
         this.setupVariantDropdown(route);
@@ -742,6 +743,31 @@ export class RouteManager {
             filteredTrips = trips;
             shapes = this.getShapesForTrips(filteredTrips);
         }
+
+        // Try use cache
+        const cacheKey = `${this.selectedRouteId}|${this.selectedRouteVariant || ''}`;
+        let cached = this._cache.get(cacheKey);
+        let stops;
+        if (cached && cached.shapes && cached.stops) {
+            shapes = cached.shapes;
+            stops = cached.stops;
+            // Restore linear ref
+            this.linearRef = cached.linearRef;
+            this.stopMeasureById = cached.stopMeasureById;
+            this.orderedStops = cached.orderedStops;
+        } else {
+            stops = this.getStopsForRoute(filteredTrips);
+            // Prepare linear referencing for live layanan
+            this.prepareLinearRef(shapes, stops);
+            // Save to cache
+            this._cache.set(cacheKey, {
+                shapes,
+                stops,
+                linearRef: this.linearRef,
+                stopMeasureById: this.stopMeasureById,
+                orderedStops: this.orderedStops
+            });
+        }
         
         // Update map
         const mapManager = window.transJakartaApp.modules.map;
@@ -751,12 +777,8 @@ export class RouteManager {
 
             mapManager.addRoutePolyline(this.selectedRouteId, shapes, route.route_color ? '#' + route.route_color : '#264697');
             
-            const stops = this.getStopsForRoute(filteredTrips);
             const stopToRoutes = window.transJakartaApp.modules.gtfs.getStopToRoutes();
             mapManager.addStopsMarkers(stops, stopToRoutes, window.transJakartaApp.modules.gtfs.getRoutes());
-
-            // Prepare linear referencing for live layanan
-            this.prepareLinearRef(shapes, stops);
         }
     }
 
@@ -835,7 +857,7 @@ export class RouteManager {
         const title = document.getElementById('stopsTitle');
         if (title) {
             title.textContent = 'Informasi layanan akan tampil di sini setelah anda memilihnya.';
-            title.className = 'mb-3 fs-3 fw-bold plus-jakarta-sans';
+            title.className = 'fs-3 fw-bold plus-jakarta-sans';
         }
     }
 

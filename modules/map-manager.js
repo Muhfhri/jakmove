@@ -232,6 +232,13 @@ export class MapManager {
             const hitLayerId = 'stops-hitbox';
             const sourceId = 'stops-source';
 
+            // Unbind previous handlers to avoid duplicates
+            if (this._onStopsClick) {
+                try { this.map.off('click', hitLayerId, this._onStopsClick); } catch (e) {}
+                try { this.map.off('mouseenter', hitLayerId, this._onStopsEnter); } catch (e) {}
+                try { this.map.off('mouseleave', hitLayerId, this._onStopsLeave); } catch (e) {}
+            }
+
             // Remove existing hitbox and marker layers before removing source
             if (this.map.getLayer(hitLayerId)) this.map.removeLayer(hitLayerId);
             if (this.map.getLayer(layerId)) this.map.removeLayer(layerId);
@@ -259,9 +266,14 @@ export class MapManager {
             this.map.addLayer({ id: hitLayerId, type: 'circle', source: sourceId, paint: { 'circle-radius': 12, 'circle-color': 'rgba(0,0,0,0)' } });
             this.layers.set(layerId, { sourceId, layerId });
             this.layers.set(hitLayerId, { sourceId, layerId: hitLayerId });
-            this.map.on('click', hitLayerId, (e) => { const f = e.features && e.features[0]; if (f) this.showStopPopup(f, e.lngLat); });
-            this.map.on('mouseenter', hitLayerId, () => { this.map.getCanvas().style.cursor = 'pointer'; });
-            this.map.on('mouseleave', hitLayerId, () => { this.map.getCanvas().style.cursor = ''; });
+
+            // Bind handlers once, store refs for off()
+            this._onStopsClick = (e) => { const f = e.features && e.features[0]; if (f) this.showStopPopup(f, e.lngLat); };
+            this._onStopsEnter = () => { this.map.getCanvas().style.cursor = 'pointer'; };
+            this._onStopsLeave = () => { this.map.getCanvas().style.cursor = ''; };
+            this.map.on('click', hitLayerId, this._onStopsClick);
+            this.map.on('mouseenter', hitLayerId, this._onStopsEnter);
+            this.map.on('mouseleave', hitLayerId, this._onStopsLeave);
             
             // Simpan data stops untuk re-add setelah ganti style
             if (!this._activeRouteData) this._activeRouteData = {};
@@ -368,7 +380,10 @@ export class MapManager {
                     e.stopPropagation();
                     e.preventDefault();
                     const routeId = badge.getAttribute('data-routeid');
+                    // Suspend updates to avoid lag while switching
+                    try { window.transJakartaApp.modules.location.suspendUpdates(true); } catch (e) {}
                     window.transJakartaApp.modules.routes.selectRoute(routeId);
+                    this._resumeAfterIdle();
                     if (this._currentPopup) { this._currentPopup.remove(); this._currentPopup = null; }
                 };
                 badge.addEventListener('click', handler);
@@ -431,7 +446,9 @@ export class MapManager {
             this.map.addSource(this._radiusSourceId, { type: 'geojson', data: { type: 'FeatureCollection', features } });
             this.map.addLayer({ id: this._radiusLayerId, type: 'circle', source: this._radiusSourceId, paint: { 'circle-radius': 5, 'circle-color': '#FF9800', 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 1.5 } });
 
-            this.map.on('click', this._radiusLayerId, (e) => { 
+            // Unbind previous click to avoid duplicates
+            if (this._onRadiusClick) { try { this.map.off('click', this._radiusLayerId, this._onRadiusClick); } catch (e) {} }
+            this._onRadiusClick = (e) => { 
                 const f = e.features && e.features[0]; 
                 if (!f) return;
                 // Auto-select service if only one service passes
@@ -439,23 +456,17 @@ export class MapManager {
                 const app = window.transJakartaApp;
                 if (routeIds.length === 1) {
                     const rid = routeIds[0];
-                    // Select route on map/UI
+                    // Suspend updates to avoid lag while switching
+                    try { app.modules.location.suspendUpdates(true); } catch (e) {}
                     app.modules.routes.selectRoute(rid);
-                    // If user location available, activate live layanan from this stop
-                    const loc = app.modules.location;
-                    if (loc && loc.lastUserPos) {
-                        loc.selectedRouteIdForUser = rid;
-                        const stop = app.modules.gtfs.getStops().find(s => s.stop_id === f.properties.stopId);
-                        if (stop) {
-                            loc.selectedCurrentStopForUser = stop;
-                            loc.showUserRouteInfo(loc.lastUserPos.lat, loc.lastUserPos.lon, stop, rid);
-                        }
-                    }
+                    // Resume after map idle
+                    this._resumeAfterIdle();
                 } else {
                     // Let user choose via popup badges
                     this.showStopPopup(f, e.lngLat);
                 }
-            });
+            };
+            this.map.on('click', this._radiusLayerId, this._onRadiusClick);
             this.map.getCanvas().style.cursor = 'pointer';
         });
     }
@@ -727,6 +738,14 @@ export class MapManager {
             }
         } catch (e) {}
         this.map.easeTo({ center: [lon, lat], zoom, bearing, pitch: Math.max(this.map.getPitch(), 60), duration: 600, easing: t => t });
+    }
+
+    _resumeAfterIdle() {
+        const resume = () => {
+            try { window.transJakartaApp.modules.location.suspendUpdates(false); } catch (e) {}
+            this.map.off('idle', resume);
+        };
+        this.map.on('idle', resume);
     }
 } 
  

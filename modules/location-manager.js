@@ -25,6 +25,7 @@ export class LocationManager {
         this._uiDebounceTimer = null;
         this._uiDebounceMs = 200;
         this._smoothAlphaBase = 0.25;
+        this._suspend = false;
     }
 
     // Toggle live location
@@ -95,6 +96,9 @@ export class LocationManager {
         this.clearNearestStopsMarkers();
     }
 
+    // Suspend/resume heavy UI updates (for fast route switch)
+    suspendUpdates(on = true) { this._suspend = !!on; }
+
     // Handle position update
     handlePositionUpdate(pos) {
         const lat = pos.coords.latitude;
@@ -130,6 +134,11 @@ export class LocationManager {
             };
         }
         this._prevUserPosSmoothed = prevSmooth;
+
+        if (this._suspend) {
+            // During suspend, do not update marker/camera/UI to avoid lag
+            return;
+        }
 
         // Update user marker with smoothed position
         this.updateUserMarker(this.lastUserPosSmoothed.lat, this.lastUserPosSmoothed.lon);
@@ -257,6 +266,18 @@ export class LocationManager {
             }
         }
 
+        // Derive 2 upcoming stops after nextStop for breadcrumb
+        let upcomingStops = [];
+        if (nextStop && stopTimes.length > 0) {
+            const idxNext = stopTimes.findIndex(st => st.stop_id === nextStop.stop_id);
+            const gtfsStops = window.transJakartaApp.modules.gtfs.getStops();
+            for (let k = idxNext + 1; k <= idxNext + 2 && k < stopTimes.length; k++) {
+                const sid = stopTimes[k].stop_id;
+                const sObj = gtfsStops.find(s => s.stop_id === sid);
+                if (sObj) upcomingStops.push(sObj);
+            }
+        }
+
         // Linear referencing progress (advance without 30m)
         try {
             const routes = window.transJakartaApp.modules.routes;
@@ -275,22 +296,13 @@ export class LocationManager {
                 const currMeasure = stopMeasureMap.get(currentStop.stop_id) || 0;
                 const nextMeasure = stopMeasureMap.get(nextStop.stop_id) || currMeasure + 1;
                 const gate = (currMeasure + nextMeasure) / 2;
-                // Bearing check roughly (optional)
-                let forward = true;
-                if (this._prevUserPosSmoothed) {
-                    const br = this._bearingDeg(this._prevUserPosSmoothed, pos);
-                    // If moving backward beyond 120°, consider not forward
-                    // but keep forgiving due to noise
-                    forward = true; // keep it permissive
-                }
+                // Bearing check roughly (permissive)
                 const corridorOk = best.minDistToSeg <= 80; // within 80m corridor
-                if (corridorOk && forward && userMeasure > gate) {
-                    // Advance to nextStop without requiring <30m
+                if (corridorOk && userMeasure > gate) {
                     this.currentStopId = nextStop.stop_id;
                     this.selectedCurrentStopForUser = nextStop;
                     this.lastArrivedStopId = null;
                     this.arrivalStop = null;
-                    // Shrink markers behind (notify MapManager if needed)
                     try {
                         const mapManager = window.transJakartaApp.modules.map;
                         if (mapManager && typeof mapManager.updatePassedStopsVisual === 'function') {
@@ -312,7 +324,7 @@ export class LocationManager {
         const route = window.transJakartaApp.modules.gtfs.getRoutes()
             .find(r => r.route_id === routeId);
         
-        const popupContent = this.buildUserPopupContent(route, currentStop, nextStop, userLat, userLon);
+        const popupContent = this.buildUserPopupContent(route, currentStop, nextStop, userLat, userLon, upcomingStops);
         const mapManager = window.transJakartaApp.modules.map;
         if (mapManager && this.userMarker) {
             mapManager.updateUserPopup(this.userMarker, popupContent);
@@ -354,7 +366,7 @@ export class LocationManager {
     }
 
     // Build user popup content
-    buildUserPopupContent(route, currentStop, nextStop, userLat, userLon) {
+    buildUserPopupContent(route, currentStop, nextStop, userLat, userLon, upcomingStops = []) {
         const badgeColor = route && route.route_color ? ('#' + route.route_color) : '#264697';
         const badgeText = route && route.route_short_name ? route.route_short_name : 'Unknown';
         
@@ -362,13 +374,27 @@ export class LocationManager {
         if (nextStop) {
             const jarakNext = this.haversine(userLat, userLon, 
                 parseFloat(nextStop.stop_lat), parseFloat(nextStop.stop_lon));
+            // Distance color indicator
+            let distColor = '#64748b';
+            if (jarakNext < 80) distColor = '#10b981'; else if (jarakNext < 200) distColor = '#f59e0b';
+            // Bearing indicator (deg)
+            let bearingDeg = '';
+            try {
+                const pos = this.lastUserPosSmoothed || this.lastUserPos || { lat: userLat, lon: userLon };
+                bearingDeg = Math.round(this._bearingDeg({ lat: pos.lat, lon: pos.lon }, { lat: parseFloat(nextStop.stop_lat), lon: parseFloat(nextStop.stop_lon) })) + '°';
+            } catch (e) {}
             
             // Layanan di halte berikutnya
             let nextStopServicesHtml = '';
             try {
                 const stopToRoutes = window.transJakartaApp.modules.gtfs.getStopToRoutes();
                 const routes = window.transJakartaApp.modules.gtfs.getRoutes();
-                const ids = stopToRoutes[nextStop.stop_id] ? Array.from(stopToRoutes[nextStop.stop_id]) : [];
+                let ids = stopToRoutes[nextStop.stop_id] ? Array.from(stopToRoutes[nextStop.stop_id]) : [];
+                // Sembunyikan layanan yang sama dengan rute aktif
+                const currentRouteId = route && route.route_id ? route.route_id : null;
+                if (currentRouteId) {
+                    ids = ids.filter(rid => rid !== currentRouteId);
+                }
                 const badges = ids.map(rid => {
                     const r = routes.find(rt => rt.route_id === rid);
                     if (!r) return '';
@@ -384,13 +410,24 @@ export class LocationManager {
                         </div>`;
                 }
             } catch (e) {}
+
+            // Breadcrumb 2 halte ke depan
+            let breadcrumbHtml = '';
+            if (upcomingStops && upcomingStops.length > 0) {
+                const chips = upcomingStops.map(s => `<span style='background:#eef2ff;color:#264697;border-radius:999px;padding:4px 10px;font-size:0.85em;font-weight:600;'>${s.stop_name}</span>`).join(' ');
+                breadcrumbHtml = `<div style='margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;'>${chips}</div>`;
+            }
             
             nextStopInfo = `
                 <div style='margin-bottom:6px;'>
                     <div class='text-muted' style='font-size:0.95em;font-weight:600;margin-bottom:2px;'>Halte Selanjutnya</div>
                     <div style='font-size:1.1em;font-weight:bold;'>${nextStop.stop_name}</div>
-                    <div style='margin-bottom:2px;'><b>Jarak:</b> ${jarakNext < 1000 ? Math.round(jarakNext) + ' m' : (jarakNext/1000).toFixed(2) + ' km'}</div>
+                    <div style='margin-bottom:2px;display:flex;align-items:center;gap:8px;'>
+                        <span style='font-weight:600;color:${distColor};'>${jarakNext < 1000 ? Math.round(jarakNext) + ' m' : (jarakNext/1000).toFixed(2) + ' km'}</span>
+                        <span style='font-size:0.9em;color:#64748b;'>arah ${bearingDeg}</span>
+                    </div>
                     ${nextStopServicesHtml}
+                    ${breadcrumbHtml}
                 </div>
             `;
         }
