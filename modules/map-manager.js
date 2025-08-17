@@ -384,10 +384,25 @@ export class MapManager {
 
         const wheelchairIcon = wheelchair ? `<span title="Ramah kursi roda" style="margin-left:6px;">♿</span>` : '';
 
+        // Intermodal icons and JakLingko badge
+        let interIconsHtml = '';
+        let jaklingkoHtml = '';
+        try {
+            const routesMod = window.transJakartaApp?.modules?.routes;
+            if (routesMod && typeof routesMod.buildIntermodalIconsForStop === 'function') {
+                interIconsHtml = routesMod.buildIntermodalIconsForStop({ stop_id: stopId, stop_name: stop.properties.stopName }) || '';
+            }
+            if (routesMod && typeof routesMod.shouldShowJaklingkoBadge === 'function' && routesMod.shouldShowJaklingkoBadge({ stop_id: stopId, stop_name: stop.properties.stopName })) {
+                jaklingkoHtml = `<img class='jaklingko-badge' src='https://transportforjakarta.or.id/wp-content/uploads/2024/10/jaklingko-w-AR0bObLen0c7yK8n-768x768.png' alt='JakLingko' title='Terintegrasi JakLingko'/>`;
+            }
+        } catch (e) {}
+
         const popupContent = `
             <div class="stop-popup plus-jakarta-sans" style="min-width: 220px; max-width: 280px; padding: 10px 12px;">
                 <div style="color: #333; padding: 6px 0; border-bottom: 1px solid #eee; margin-bottom: 6px; display:flex; align-items:center; gap:6px;">
                     <div style="font-size: 14px; font-weight: 600;">${stop.properties.stopName}</div>
+                    ${interIconsHtml}
+                    ${jaklingkoHtml}
                     ${wheelchairIcon}
                 </div>
                 ${jenisHtml}
@@ -455,6 +470,7 @@ export class MapManager {
             const stops = window.transJakartaApp.modules.gtfs.getStops();
             const stopToRoutes = window.transJakartaApp.modules.gtfs.getStopToRoutes();
             const features = stops.filter(s => s.stop_lat && s.stop_lon)
+                .filter(s => !(String(s.stop_id || '').startsWith('E') || String(s.stop_id || '').startsWith('H')))
                 .map(s => ({ s, d: this._haversine(centerLat, centerLng, parseFloat(s.stop_lat), parseFloat(s.stop_lon)) }))
                 .filter(o => o.d <= radius)
                 .map(o => ({
@@ -625,10 +641,25 @@ export class MapManager {
                 const wheelchair = (fullStop && fullStop.wheelchair_boarding === '1');
                 const wcIcon = wheelchair ? `<span title='Ramah kursi roda' style='margin-left:6px;'>♿</span>` : '';
 
+                // Intermodal icons and JakLingko badge
+                let interHtml = '';
+                let jlHtml = '';
+                try {
+                    const routesMod = window.transJakartaApp?.modules?.routes;
+                    if (routesMod && typeof routesMod.buildIntermodalIconsForStop === 'function') {
+                        interHtml = routesMod.buildIntermodalIconsForStop({ stop_id: s.stop_id, stop_name: s.stop_name }) || '';
+                    }
+                    if (routesMod && typeof routesMod.shouldShowJaklingkoBadge === 'function' && routesMod.shouldShowJaklingkoBadge({ stop_id: s.stop_id, stop_name: s.stop_name })) {
+                        jlHtml = `<img class='jaklingko-badge' src='https://transportforjakarta.or.id/wp-content/uploads/2024/10/jaklingko-w-AR0bObLen0c7yK8n-768x768.png' alt='JakLingko' title='Terintegrasi JakLingko'/>`;
+                    }
+                } catch (e) {}
+
                 const html = `
                     <div class='stop-popup plus-jakarta-sans' style='min-width: 220px; max-width: 280px; padding: 10px 12px;'>
                         <div style='color:#333;padding:6px 0;border-bottom:1px solid #eee;margin-bottom:6px;display:flex;align-items:center;gap:6px;'>
                             <div style='font-size:14px;font-weight:600;'>${s.stop_name}</div>
+                            ${interHtml}
+                            ${jlHtml}
                             ${wcIcon}
                         </div>
                         ${jenisLine}

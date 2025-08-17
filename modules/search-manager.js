@@ -58,9 +58,9 @@ export class SearchManager {
         const routes = window.transJakartaApp.modules.gtfs.getRoutes();
         const stopToRoutes = window.transJakartaApp.modules.gtfs.getStopToRoutes();
 
-        const foundStops = stops.filter(s => 
-            s.stop_name.toLowerCase().includes(query)
-        );
+        const foundStops = stops
+            .filter(s => s.stop_name.toLowerCase().includes(query))
+            .filter(s => !(String(s.stop_id || '').startsWith('E') || String(s.stop_id || '').startsWith('H')));
 
         let foundRoutes = routes.filter(r =>
             (r.route_short_name && r.route_short_name.toLowerCase().includes(query)) ||
@@ -180,31 +180,87 @@ export class SearchManager {
     createStopResultItem(stop, stopToRoutes, routes) {
         const li = document.createElement('li');
         li.className = 'list-group-item';
-        
-        li.innerHTML = `<div>${stop.stop_name} (${stop.stop_id})</div>`;
-        
-        if (stopToRoutes[stop.stop_id]) {
-            const badges = Array.from(stopToRoutes[stop.stop_id]).map(rid => {
-                const route = routes.find(r => r.route_id === rid);
-                if (route) {
-                    const badgeColor = route.route_color ? ('#' + route.route_color) : '#6c757d';
-                    return `<span class='badge badge-koridor-interaktif rounded-pill me-2' 
-                                style='background:${badgeColor};color:#fff;font-weight:bold;padding-left:1.1em;padding-right:1.1em;padding-top:0.35em;padding-bottom:0.35em;'>
-                                ${route.route_short_name}
-                            </span>`;
-                }
-                return '';
-            }).join('');
-            li.innerHTML += `<div class='mt-1'>${badges}</div>`;
+
+        // Header: name + intermodal icons (left), accessibility icon (right)
+        const header = document.createElement('div');
+        header.style.display = 'flex';
+        header.style.alignItems = 'center';
+        header.style.justifyContent = 'space-between';
+
+        const left = document.createElement('div');
+        left.style.display = 'flex';
+        left.style.alignItems = 'center';
+        left.style.gap = '6px';
+
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = stop.stop_name;
+        nameSpan.className = 'plus-jakarta-sans fw-semibold';
+        left.appendChild(nameSpan);
+
+        // Intermodal icons using RouteManager mapping
+        try {
+            const routesMgr = window.transJakartaApp.modules.routes;
+            const interHtml = routesMgr && routesMgr.buildIntermodalIconsForStop ? routesMgr.buildIntermodalIconsForStop(stop) : '';
+            if (interHtml) {
+                const iconsSpan = document.createElement('span');
+                iconsSpan.className = 'intermodal-icons';
+                iconsSpan.innerHTML = interHtml;
+                // Ensure icons are properly sized even outside .stop-header context
+                iconsSpan.querySelectorAll('img').forEach(img => {
+                    img.style.width = '16px';
+                    img.style.height = '16px';
+                    img.style.borderRadius = '50%';
+                    img.style.objectFit = 'cover';
+                    img.style.marginLeft = '4px';
+                });
+                left.appendChild(iconsSpan);
+            }
+        } catch (e) {}
+
+        const right = document.createElement('div');
+        if (stop.wheelchair_boarding === '1') {
+            right.innerHTML = '<iconify-icon icon="mdi:wheelchair-accessibility" inline></iconify-icon>';
+            right.title = 'Ramah kursi roda';
         }
-        
+
+        header.appendChild(left);
+        header.appendChild(right);
+        li.appendChild(header);
+
+        // Route badges: clickable to switch route
+        if (stopToRoutes[stop.stop_id]) {
+            const badgesWrap = document.createElement('div');
+            badgesWrap.className = 'mt-1';
+            Array.from(stopToRoutes[stop.stop_id]).forEach(rid => {
+                const route = routes.find(r => r.route_id === rid);
+                if (!route) return;
+                const badge = document.createElement('span');
+                const color = route.route_color ? ('#' + route.route_color) : '#6c757d';
+                badge.className = 'badge badge-koridor-interaktif rounded-pill me-2';
+                badge.style.background = color;
+                badge.style.color = '#fff';
+                badge.style.fontWeight = 'bold';
+                badge.style.padding = '0.35em 1.1em';
+                badge.textContent = route.route_short_name || route.route_id;
+                badge.setAttribute('data-routeid', route.route_id);
+                badge.style.cursor = 'pointer';
+                badge.addEventListener('click', (e) => {
+                    e.preventDefault(); e.stopPropagation();
+                    window.transJakartaApp.modules.routes.selectRoute(route.route_id);
+                    this.clearSearchResults();
+                });
+                badgesWrap.appendChild(badge);
+            });
+            li.appendChild(badgesWrap);
+        }
+
         li.onclick = () => {
             if (stop.stop_lat && stop.stop_lon) {
                 this.showStopOnMap(stop);
             }
             this.clearSearchResults();
         };
-        
+
         return li;
     }
 

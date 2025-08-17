@@ -5,6 +5,8 @@ export class RouteManager {
         this.selectedRouteVariant = null;
         this.lastRouteId = null;
         this._cache = new Map(); // cache per route|variant
+        // Manual intermodal mapping: key = stop_id or exact stop_name, value = array of modes ['MRT','LRT','KRL']
+        this._intermodalByStopKey = {};
     }
 
     // Select a route
@@ -79,6 +81,7 @@ export class RouteManager {
         
         // Update UI
         this.updateVariantDropdowns();
+        this.renderRouteInfo();
         this.showStopsByRoute(this.selectedRouteId);
     }
 
@@ -156,12 +159,18 @@ export class RouteManager {
         const serviceInfo = this.buildServiceInfoHTML(route, trips);
         
         return `
-            <div class='service-info-container'>
-                ${this.buildRouteBadgeHTML(route)}
-                ${this.buildRouteJurusanHTML(route)}
-                ${this.buildServiceTypeHTML(route)}
-                <div class='service-details'>
-                    ${serviceInfo}
+            <div class='route-info-card'>
+                <div class='route-info-header'>
+                    ${this.buildRouteBadgeHTML(route)}
+                    ${this.buildRouteJurusanHTML(route)}
+                    ${this.buildServiceTypeHTML(route)}
+                </div>
+                <div class='route-info-main'>
+                    <div class='route-info-details'>
+                        <div class='route-info-details-content'>
+                            ${serviceInfo}
+                        </div>
+                    </div>
                 </div>
             </div>
             ${variantDropdownHTML}
@@ -185,14 +194,12 @@ export class RouteManager {
         const badgeColor = route.route_color ? ('#' + route.route_color) : '#264697';
         
         return `
-            <div class='mb-3 text-center'>
-                <div class='route-badge-container'>
-                    <span class='badge badge-koridor-interaktif rounded-pill me-2' 
-                          style='background:${badgeColor};color:#fff;font-weight:bold;font-size:2rem !important;padding:0.8em 1.6em;box-shadow:0 4px 15px rgba(38,70,151,0.2);border-radius:2em;letter-spacing:2px;'>
-                        ${badgeText}
-                    </span>
-                    <div class='route-badge-subtitle'>Koridor TransJakarta</div>
-                </div>
+            <div class='route-badge-container'>
+                <span class='badge badge-koridor-interaktif rounded-pill me-2' 
+                      style='background:${badgeColor};color:#fff;font-weight:bold;font-size:2rem !important;padding:0.8em 1.6em;box-shadow:0 4px 15px rgba(38,70,151,0.2);border-radius:2em;letter-spacing:2px;'>
+                    ${badgeText}
+                </span>
+                <div class='route-badge-subtitle'>Koridor TransJakarta</div>
             </div>
         `;
     }
@@ -202,9 +209,7 @@ export class RouteManager {
         if (!route.route_long_name) return '';
         
         return `
-            <div class='mb-3 text-center'>
-                <h4 class='route-jurusan plus-jakarta-sans fw-bold'>${route.route_long_name}</h4>
-            </div>
+            <h4 class='route-jurusan plus-jakarta-sans fw-bold'>${route.route_long_name}</h4>
         `;
     }
 
@@ -245,12 +250,10 @@ export class RouteManager {
         }
 
         return `
-            <div class='mb-3 text-center'>
-                <span class='badge ${serviceBadgeClass} fs-6 px-3 py-2 rounded-pill'>
-                    <iconify-icon icon="mdi:bus" inline></iconify-icon>
-                    ${displayServiceType}
-                </span>
-            </div>
+            <span class='badge ${serviceBadgeClass} fs-6 px-3 py-2 rounded-pill'>
+                <iconify-icon icon="mdi:bus" inline></iconify-icon>
+                ${displayServiceType}
+            </span>
         `;
     }
 
@@ -451,7 +454,7 @@ export class RouteManager {
             <div class="variant-selector-stops">
                 <label class="form-label">
                     <iconify-icon icon="mdi:routes"></iconify-icon>
-                    Pilih Varian Trayek
+                    Pilih Varian Trayek (Default untuk semua)
                 </label>
                 <select id="stopsVariantDropdown" class="form-select plus-jakarta-sans">
                     <option value="">Default (Semua Varian)</option>
@@ -563,7 +566,7 @@ export class RouteManager {
                     .sort((a, b) => parseInt(a.stop_sequence) - parseInt(b.stop_sequence));
                 stopsForTrip.forEach(st => {
                     const stop = stops.find(s => s.stop_id === st.stop_id);
-                    if (stop) {
+                    if (stop && !this.isAccessStop(stop)) {
                         const key = stop.stop_id;
                         if (!halteMap.has(key)) halteMap.set(key, stop);
                     }
@@ -579,7 +582,7 @@ export class RouteManager {
                     .sort((a, b) => parseInt(a.stop_sequence) - parseInt(b.stop_sequence));
                 stopsForTrip.forEach(st => {
                     const stop = stops.find(s => s.stop_id === st.stop_id);
-                    if (stop) allStops.push(stop);
+                    if (stop && !this.isAccessStop(stop)) allStops.push(stop);
                 });
             });
             return allStops;
@@ -591,6 +594,11 @@ export class RouteManager {
         const ul = document.getElementById('stopsByRoute');
         if (!ul) return;
 
+        const directionTabs = document.getElementById('directionTabs');
+        if (directionTabs) {
+            directionTabs.innerHTML = `<h4 class='plus-jakarta-sans fw-bold mb-2'>Daftar Halte</h4>`;
+        }
+
         if (stops.length === 0) {
             ul.innerHTML = '<li class="list-group-item">Tidak ada halte ditemukan</li>';
             return;
@@ -599,8 +607,24 @@ export class RouteManager {
         ul.innerHTML = '';
         stops.forEach((stop, idx) => {
             const li = this.createStopListItem(stop, idx);
+            li.setAttribute('data-stop-id', stop.stop_id || '');
             ul.appendChild(li);
         });
+
+        // Setup click handler (event delegation) for switching routes via badges
+        if (!this._stopsListClickBound) {
+            ul.addEventListener('click', (e) => {
+                const badge = e.target.closest('.other-route-badge');
+                if (badge) {
+                    e.preventDefault(); e.stopPropagation();
+                    const routeId = badge.getAttribute('data-routeid');
+                    if (routeId) {
+                        window.transJakartaApp.modules.routes.selectRoute(routeId);
+                    }
+                }
+            });
+            this._stopsListClickBound = true;
+        }
     }
 
     // Create stop list item
@@ -617,25 +641,74 @@ export class RouteManager {
         const stopNumber = document.createElement('div');
         stopNumber.className = 'stop-number';
         stopNumber.textContent = (idx + 1).toString().padStart(2, '0');
+        // Use current route color for the number background
+        try {
+            const route = window.transJakartaApp.modules.gtfs.getRoutes().find(r => r.route_id === this.selectedRouteId);
+            const routeColor = route && route.route_color ? ('#' + route.route_color) : null;
+            if (routeColor) {
+                stopNumber.style.background = routeColor;
+            }
+        } catch (e) {}
         
         const stopName = document.createElement('div');
         stopName.className = 'stop-name';
         stopName.textContent = stop.stop_name;
         
-        // Coordinate link
+        // Intermodal icons next to stop name (manual mapping by stop_id or stop_name)
+        const interIconsHtml = this.buildIntermodalIconsForStop(stop);
+        const iconsSpan = document.createElement('span');
+        if (interIconsHtml) {
+            iconsSpan.className = 'intermodal-icons';
+            iconsSpan.innerHTML = interIconsHtml;
+        }
+        
+        // Accessibility icon (wheelchair)
+        const isAccessible = (stop.wheelchair_boarding === '1');
+        const wcIcon = document.createElement('span');
+        if (isAccessible) {
+            wcIcon.className = 'wc-icon';
+            wcIcon.title = 'Ramah kursi roda';
+            wcIcon.style.marginLeft = '6px';
+            wcIcon.innerHTML = '<iconify-icon icon="mdi:wheelchair-accessibility" inline></iconify-icon>';
+        }
+        
+        // Coordinate link (placed at the far left)
+        let coordLink = null;
         if (stop.stop_lat && stop.stop_lon) {
-            const coordLink = document.createElement('a');
+            coordLink = document.createElement('a');
             coordLink.href = `https://www.google.com/maps/search/?api=1&query=${stop.stop_lat},${stop.stop_lon}`;
             coordLink.target = '_blank';
             coordLink.rel = 'noopener';
             coordLink.className = 'coord-link';
             coordLink.title = 'Lihat di Google Maps';
             coordLink.innerHTML = `<iconify-icon icon="mdi:map-marker" style="color: #d9534f;"></iconify-icon>`;
-            stopHeader.appendChild(coordLink);
         }
         
-        stopHeader.appendChild(stopNumber);
-        stopHeader.appendChild(stopName);
+        // Name block combining name and intermodal icons
+        const nameBlock = document.createElement('div');
+        nameBlock.className = 'stop-title';
+        nameBlock.appendChild(stopName);
+        if (interIconsHtml) {
+            nameBlock.appendChild(iconsSpan);
+        }
+        // JakLingko badge when integrated (intermodal present) or many services
+        if (this.shouldShowJaklingkoBadge(stop)) {
+            const jl = document.createElement('img');
+            jl.src = 'https://transportforjakarta.or.id/wp-content/uploads/2024/10/jaklingko-w-AR0bObLen0c7yK8n-768x768.png';
+            jl.alt = 'JakLingko';
+            jl.title = 'Terintegrasi JakLingko';
+            jl.className = 'jaklingko-badge';
+            nameBlock.appendChild(jl);
+        }
+        
+        // Assemble header in required order: coord | name (with icons) | accessibility (wc)
+        const parts = [];
+        if (coordLink) parts.push(coordLink.outerHTML);
+        // include number after coord to ensure it is present
+        parts.push(stopNumber.outerHTML);
+        parts.push(nameBlock.outerHTML);
+        if (isAccessible) parts.push(wcIcon.outerHTML);
+        stopHeader.innerHTML = parts.join('');
         
         // Stop type badge
         const stopTypeBadge = this.createStopTypeBadge(stop);
@@ -693,7 +766,7 @@ export class RouteManager {
             const route = window.transJakartaApp.modules.gtfs.getRoutes().find(r => r.route_id === rid);
             if (route) {
                 let badgeColor = (route.route_color) ? ('#' + route.route_color) : '#6c757d';
-                otherRoutesBadges += `<span class='route-badge' style='background: ${badgeColor};' title='${route.route_long_name}'>${route.route_short_name}</span>`;
+                otherRoutesBadges += `<span class='badge badge-koridor-interaktif rounded-pill me-1 mb-1 other-route-badge' data-routeid='${route.route_id}' style='background:${badgeColor};color:#fff;font-weight:bold;font-size:0.8em;padding:4px 8px;' title='${route.route_long_name}'>${route.route_short_name}</span>`;
             }
         });
         
@@ -920,9 +993,66 @@ export class RouteManager {
         return R * c;
     }
 
+    formatDistance(meters) {
+        if (meters == null) return '';
+        if (meters < 1000) return `${meters} m`;
+        return `${(meters / 1000).toFixed(1)} km`;
+    }
+
+    // Access stop detector (E*/H*)
+    isAccessStop(stop) {
+        const id = (stop && stop.stop_id) ? String(stop.stop_id) : '';
+        return id.startsWith('E') || id.startsWith('H');
+    }
+
+    // Determine whether to show JakLingko badge near stop name
+    shouldShowJaklingkoBadge(stop) {
+        try {
+            // Intermodal mapping
+            const modes = this._intermodalByStopKey[stop.stop_id] || this._intermodalByStopKey[stop.stop_name];
+            const hasIntermodal = Array.isArray(modes) ? modes.length > 0 : !!modes;
+            // Count of services at stop
+            const stopToRoutes = window.transJakartaApp.modules.gtfs.getStopToRoutes();
+            const servicesCount = stopToRoutes[stop.stop_id] ? Array.from(stopToRoutes[stop.stop_id]).length : 0;
+            // Show if services >= 4, otherwise only when intermodal exists
+            return servicesCount >= 4 || hasIntermodal;
+        } catch (e) {
+            return false;
+        }
+    }
+
     // Reset function
     reset() {
         this.resetRoute();
+    }
+
+    // Configure manual intermodal mapping
+    setIntermodalMapping(mapping) {
+        this._intermodalByStopKey = mapping || {};
+        if (this.selectedRouteId) {
+            this.showStopsByRoute(this.selectedRouteId);
+        }
+    }
+
+    // Build intermodal icons HTML based on mapping
+    buildIntermodalIconsForStop(stop) {
+        if (!this._intermodalByStopKey) return '';
+        const modes = this._intermodalByStopKey[stop.stop_id] || this._intermodalByStopKey[stop.stop_name];
+        if (!modes) return '';
+        const arr = Array.isArray(modes) ? modes : [modes];
+        const iconUrlMap = {
+            'MRT': 'https://transportforjakarta.or.id/wp-content/uploads/2024/10/roundel-mrt-icon-w-mePn2LwZXQCglMGN-768x768.png',
+            'LRT': 'https://transportforjakarta.or.id/wp-content/uploads/2024/10/roundel-lrt-icon-w-AQEpaJBkWOcwoNrr-768x768.png',
+            'KRL': 'https://transportforjakarta.or.id/wp-content/uploads/2024/10/roundel-krl-icon-w-YBg4WpGk8phW4kOL-768x768.png'
+        };
+        return arr.map(m => {
+            const key = String(m).toUpperCase();
+            const url = iconUrlMap[key];
+            if (!url) return '';
+            const alt = key;
+            const cls = key.toLowerCase();
+            return `<img class="intermodal-icon-img ${cls}" src="${url}" alt="${alt}" title="${alt}"/>`;
+        }).join('');
     }
 } 
  

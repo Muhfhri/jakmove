@@ -5373,3 +5373,37 @@ body {
 #map.live-has-custom-marker .maplibregl-user-location-accuracy-circle,
 #map.live-has-custom-marker .maplibregl-user-location-heading { display: none !important; }
 
+.stops-section .stops-content {
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+    padding: 16px 18px;
+}
+
+[data-theme="dark"] .stops-section .stops-content {
+    background: #0f172a;
+    border: 1px solid #1e293b;
+}
+
+.stop-header .intermodal-icons {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 6px;
+}
+.stop-header .intermodal-icon {
+    font-size: 1.1rem;
+    color: #0ea5e9;
+}
+.stop-header .intermodal-icon.mrt { color: #0ea5e9; }
+.stop-header .intermodal-icon.lrt { color: #ef4444; }
+.stop-header .intermodal-icon.krl { color: #16a34a; }
+.stop-header .intermodal-icon-img { width: 18px; height: 18px; border-radius: 50%; object-fit: cover; box-shadow: 0 1px 2px rgba(0,0,0,0.15); }
+
+.stop-title { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
+.stop-title .stop-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stop-header .wc-icon iconify-icon { font-size: 18px; }
+
+.jaklingko-badge { width: 20px; height: 20px; border-radius: 50%; object-fit: cover; margin-left: 8px; filter: invert(1); }
+[data-theme="dark"] .jaklingko-badge { filter: none; }
+
