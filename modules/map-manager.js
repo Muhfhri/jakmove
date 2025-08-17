@@ -811,7 +811,7 @@ export class MapManager {
         if (!this.map) return;
         if (this._cameraLock) {
             // Set initial 3D pitch for better perspective
-            this.map.setPitch(60);
+            this.map.setPitch(78);
             // Disable drag pan while locked so center stays on user
             try { this.map.dragPan.disable(); } catch (e) {}
             // Allow zoom and pitch via gestures
@@ -854,7 +854,8 @@ export class MapManager {
         const dy = Math.abs(currentCenter.lat - lat);
         const smallMove = dx < 1e-5 && dy < 1e-5;
         // Keep user's chosen zoom/pitch; only adjust center & bearing
-        this.map.easeTo({ center: smallMove ? currentCenter : [lon, lat], bearing, duration: 400, easing: t => t });
+        // Offset ke bawah agar tampak lebih banyak area depan (sensasi 3D lebih terasa)
+        this.map.easeTo({ center: smallMove ? currentCenter : [lon, lat], bearing, offset: [0, 220], duration: 400, easing: t => t });
     }
 
     _resumeAfterIdle() {
