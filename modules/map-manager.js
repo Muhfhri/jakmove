@@ -816,14 +816,15 @@ export class MapManager {
             try { this.map.dragPan.disable(); } catch (e) {}
             // Allow zoom and pitch via gestures
             try { this.map.scrollZoom.enable(); } catch (e) {}
-            try { this.map.boxZoom.disable(); } catch (e) {}
-            try { this.map.dragRotate.disable(); } catch (e) {}
+            try { this.map.touchZoomRotate.enable(); } catch (e) {}
+            try { this.map.dragRotate.enable(); } catch (e) {}
         } else {
             // Optionally relax pitch when unlocked
             this.map.setPitch(0);
             // Re-enable interactions
             try { this.map.dragPan.enable(); } catch (e) {}
             try { this.map.dragRotate.enable(); } catch (e) {}
+            try { this.map.touchZoomRotate.enable(); } catch (e) {}
         }
     }
 
