@@ -300,10 +300,18 @@ export class LocationManager {
                 const gate = (currMeasure + nextMeasure) / 2;
                 const corridorOk = best.minDistToSeg <= 80;
                 if (corridorOk && userMeasure > gate) {
+                    // Trigger arrival card when passing gate (even if not <30m)
+                    if (this.lastArrivedStopId !== nextStop.stop_id) {
+                        this.arrivalStop = nextStop;
+                        this.lastArrivedStopId = nextStop.stop_id;
+                        if (this.arrivalTimer) { clearTimeout(this.arrivalTimer); this.arrivalTimer = null; }
+                        this.arrivalTimer = setTimeout(() => {
+                            this.lastArrivedStopId = null;
+                            this.arrivalStop = null;
+                        }, 10000);
+                    }
                     this.currentStopId = nextStop.stop_id;
                     this.selectedCurrentStopForUser = nextStop;
-                    this.lastArrivedStopId = null;
-                    this.arrivalStop = null;
                     try {
                         const mapManager = window.transJakartaApp.modules.map;
                         if (mapManager && typeof mapManager.updatePassedStopsVisual === 'function') {
@@ -316,9 +324,15 @@ export class LocationManager {
 
         // ETA & distance trend calculations
         let jarakNext = null, etaText = '', trend = '→';
+        let arrivalTrigger = false;
         if (nextStop) {
             const posSmooth = this.lastUserPosSmoothed || this.lastUserPos || { lat: userLat, lon: userLon };
             jarakNext = this.haversine(posSmooth.lat, posSmooth.lon, parseFloat(nextStop.stop_lat), parseFloat(nextStop.stop_lon));
+            // Always run arrival detection with RAW position before throttle
+            const rawPos = this.lastUserPos || { lat: userLat, lon: userLon };
+            const jarakNextRaw = this.haversine(rawPos.lat, rawPos.lon, parseFloat(nextStop.stop_lat), parseFloat(nextStop.stop_lon));
+            arrivalTrigger = (jarakNextRaw < 30 && this.lastArrivedStopId !== nextStop.stop_id);
+            this.handleArrivalDetection(rawPos.lat, rawPos.lon, currentStop, nextStop, jarakNextRaw);
             const nowTs = Date.now();
             if (this._lastNextStopId === nextStop.stop_id && this._lastNextDist !== null) {
                 const delta = jarakNext - this._lastNextDist;
@@ -326,13 +340,17 @@ export class LocationManager {
             }
             this._lastNextDist = jarakNext;
             this._lastNextStopId = nextStop.stop_id;
-            // ETA based on speed (fallback 1.2 m/s walking)
-            const spd = (typeof this.lastUserSpeed === 'number' && this.lastUserSpeed > 0.1) ? this.lastUserSpeed : 1.2;
-            const etaSec = Math.max(1, Math.round(jarakNext / spd));
-            if (etaSec < 60) etaText = `${etaSec}s`; else etaText = `${Math.floor(etaSec/60)}m ${etaSec%60}s`;
+            // ETA based on speed; if stopped, show 'Berhenti'
+            const spd = (typeof this.lastUserSpeed === 'number') ? this.lastUserSpeed : null; // m/s
+            if (spd === null || spd <= 0.1) {
+                etaText = 'Berhenti';
+            } else {
+                const etaSec = Math.max(1, Math.round(jarakNext / spd));
+                etaText = etaSec < 60 ? `${etaSec}s` : `${Math.floor(etaSec/60)}m ${etaSec%60}s`;
+            }
             // Visual stability: skip UI update if distance change small and <1s
             const dt = nowTs - (this._lastUIUpdateTs || 0);
-            if (Math.abs((jarakNext || 0) - (this._prevDistForUi || 0)) < 3 && dt < 1000) {
+            if (!arrivalTrigger && Math.abs((jarakNext || 0) - (this._prevDistForUi || 0)) < 3 && dt < 1000) {
                 return; // keep last UI
             }
             this._lastUIUpdateTs = nowTs;

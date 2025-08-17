@@ -315,14 +315,21 @@ export class MapManager {
 
         const routeIds = Array.isArray(stop.properties.routeIds) ? stop.properties.routeIds : [];
 
-        // Jenis halte
-        let jenisText = '';
+        // Jenis halte (tanpa label "Jenis:")
+        let jenisHtml = '';
         const stopId = stop.properties.stopId || '';
-        if (stopId.startsWith('B')) jenisText = 'Pengumpan';
-        else if (stopId.startsWith('G')) {
-            const s = window.transJakartaApp.modules.gtfs.getStops().find(x => x.stop_id === stopId);
-            if (s && s.platform_code) jenisText = `Platform ${s.platform_code}`; else jenisText = 'Platform';
-        } else jenisText = 'Koridor';
+        // Ambil data stop lengkap untuk platform_code dan wheelchair
+        const gtfsStop = window.transJakartaApp.modules.gtfs.getStops().find(x => x.stop_id === stopId);
+        const platformCode = gtfsStop && gtfsStop.platform_code ? gtfsStop.platform_code : '';
+        const wheelchair = (gtfsStop && gtfsStop.wheelchair_boarding === '1') || stop.properties.wheelchairBoarding === '1';
+        if (stopId.startsWith('B')) {
+            jenisHtml = `<div style="font-size: 12px; color: #facc15; font-weight: 600; margin-bottom: 6px;">Pengumpan</div>`;
+        } else if (stopId.startsWith('G')) {
+            const label = platformCode ? `Platform ${platformCode}` : 'Platform';
+            jenisHtml = `<div style="font-size: 12px; color: #64748b; margin-bottom: 6px;">${label}</div>`;
+        } else {
+            jenisHtml = '';
+        }
 
         // Layanan Lain (exclude current selected route)
         let layananLainHtml = '';
@@ -352,12 +359,15 @@ export class MapManager {
             return `<span class="badge badge-koridor-interaktif rounded-pill me-1 mb-1" style="background:${color};color:#fff;cursor:pointer;font-weight:bold;font-size:0.8em;padding:4px 8px;" data-routeid="${r.route_id}">${r.route_short_name}</span>`;
         }).join('');
 
+        const wheelchairIcon = wheelchair ? `<span title="Ramah kursi roda" style="margin-left:6px;">♿</span>` : '';
+
         const popupContent = `
             <div class="stop-popup plus-jakarta-sans" style="min-width: 220px; max-width: 280px; padding: 10px 12px;">
-                <div style="color: #333; padding: 6px 0; border-bottom: 1px solid #eee; margin-bottom: 6px;">
+                <div style="color: #333; padding: 6px 0; border-bottom: 1px solid #eee; margin-bottom: 6px; display:flex; align-items:center; gap:6px;">
                     <div style="font-size: 14px; font-weight: 600;">${stop.properties.stopName}</div>
+                    ${wheelchairIcon}
                 </div>
-                <div style="font-size: 12px; color: #495057; margin-bottom: 8px;">Jenis: ${jenisText}</div>
+                ${jenisHtml}
                 ${layananTersediaBadges ? `
                 <div>
                     <div style="font-size: 11px; color: #666; margin-bottom: 6px;">Layanan:</div>
@@ -582,11 +592,23 @@ export class MapManager {
                     const color = r.route_color ? ('#' + r.route_color) : '#6c757d';
                     return `<span class="badge badge-koridor-interaktif rounded-pill me-1 mb-1" style="background:${color};color:#fff;cursor:pointer;font-weight:bold;font-size:0.8em;padding:4px 8px;" data-routeid="${r.route_id}">${r.route_short_name}</span>`;
                 }).join('');
+                // Jenis + wheelchair
+                const fullStop = gtfs.getStops().find(x => x.stop_id === s.stop_id);
+                const platformCode = fullStop && fullStop.platform_code ? fullStop.platform_code : '';
+                const isFeeder = s.stop_id && s.stop_id.startsWith('B');
+                const jenisLine = isFeeder
+                    ? `<div style='font-size:12px;color:#facc15;font-weight:600;margin-bottom:6px;'>Pengumpan</div>`
+                    : (s.stop_id && s.stop_id.startsWith('G') ? `<div style='font-size:12px;color:#64748b;margin-bottom:6px;'>Platform ${platformCode || ''}</div>` : '');
+                const wheelchair = (fullStop && fullStop.wheelchair_boarding === '1');
+                const wcIcon = wheelchair ? `<span title='Ramah kursi roda' style='margin-left:6px;'>♿</span>` : '';
+
                 const html = `
                     <div class='stop-popup plus-jakarta-sans' style='min-width: 220px; max-width: 280px; padding: 10px 12px;'>
-                        <div style='color:#333;padding:6px 0;border-bottom:1px solid #eee;margin-bottom:6px;'>
+                        <div style='color:#333;padding:6px 0;border-bottom:1px solid #eee;margin-bottom:6px;display:flex;align-items:center;gap:6px;'>
                             <div style='font-size:14px;font-weight:600;'>${s.stop_name}</div>
+                            ${wcIcon}
                         </div>
+                        ${jenisLine}
                         ${distText ? `<div style='font-size:11px;color:#666;margin-bottom:6px;'>Jarak: ${distText}</div>` : ''}
                         ${badges ? `<div><div style='font-size:11px;color:#666;margin-bottom:6px;'>Layanan:</div><div class='nearest-services' style='display:flex;flex-wrap:wrap;gap:4px;'>${badges}</div></div>` : ''}
                     </div>`;
