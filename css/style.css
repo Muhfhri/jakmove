@@ -5368,3 +5368,8 @@ body {
 	color: #cbd5e1 !important;
 }
 
+/* Hide MapLibre GeolocateControl puck and accuracy circle when custom marker is active */
+#map.live-has-custom-marker .maplibregl-user-location-dot,
+#map.live-has-custom-marker .maplibregl-user-location-accuracy-circle,
+#map.live-has-custom-marker .maplibregl-user-location-heading { display: none !important; }
+
