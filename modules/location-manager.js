@@ -415,9 +415,13 @@ export class LocationManager {
         const badgeText = route && route.route_short_name ? route.route_short_name : 'Unknown';
         
         let nextStopInfo = '';
-        if (nextStop) {
+        // Determine display stop and title per arrival state
+        const isArriving = !!this.lastArrivedStopId && !!this.arrivalStop;
+        const displayStop = isArriving ? this.arrivalStop : nextStop;
+        const titleLabel = isArriving ? 'Halte Saat Ini' : 'Menuju Halte';
+        if (displayStop) {
             const jarakNext = this.haversine(userLat, userLon, 
-                parseFloat(nextStop.stop_lat), parseFloat(nextStop.stop_lon));
+                parseFloat(displayStop.stop_lat), parseFloat(displayStop.stop_lon));
             // Distance color indicator
             let distColor = '#64748b';
             if (jarakNext < 80) distColor = '#10b981'; else if (jarakNext < 200) distColor = '#f59e0b';
@@ -425,7 +429,7 @@ export class LocationManager {
             let bearingDeg = '';
             try {
                 const pos = this.lastUserPosSmoothed || this.lastUserPos || { lat: userLat, lon: userLon };
-                bearingDeg = Math.round(this._bearingDeg({ lat: pos.lat, lon: pos.lon }, { lat: parseFloat(nextStop.stop_lat), lon: parseFloat(nextStop.stop_lon) })) + '°';
+                bearingDeg = Math.round(this._bearingDeg({ lat: pos.lat, lon: pos.lon }, { lat: parseFloat(displayStop.stop_lat), lon: parseFloat(displayStop.stop_lon) })) + '°';
             } catch (e) {}
             
             // Layanan di halte berikutnya
@@ -433,7 +437,7 @@ export class LocationManager {
             try {
                 const stopToRoutes = window.transJakartaApp.modules.gtfs.getStopToRoutes();
                 const routes = window.transJakartaApp.modules.gtfs.getRoutes();
-                let ids = stopToRoutes[nextStop.stop_id] ? Array.from(stopToRoutes[nextStop.stop_id]) : [];
+                let ids = stopToRoutes[displayStop.stop_id] ? Array.from(stopToRoutes[displayStop.stop_id]) : [];
                 // Sembunyikan layanan yang sama dengan rute aktif
                 const currentRouteId = route && route.route_id ? route.route_id : null;
                 if (currentRouteId) {
@@ -449,7 +453,7 @@ export class LocationManager {
                 if (badges) {
                     nextStopServicesHtml = `
                         <div style='margin-top:4px;'>
-                            <div class='text-muted' style='font-size:0.9em;font-weight:600;margin-bottom:2px;'>Layanan di halte berikutnya</div>
+                            <div class='text-muted' style='font-size:0.9em;font-weight:600;margin-bottom:2px;'>Layanan di halte ${isArriving ? 'ini' : 'berikutnya'}</div>
                             <div style='display:flex;flex-wrap:wrap;gap:4px;'>${badges}</div>
                         </div>`;
                 }
@@ -457,7 +461,7 @@ export class LocationManager {
 
             // Accessibility icon for next stop if accessible
             let accessIcon = '';
-            if (nextStop && nextStop.wheelchair_boarding === '1') {
+            if (displayStop && displayStop.wheelchair_boarding === '1') {
                 accessIcon = `<span title='Ramah kursi roda' style='margin-left:6px;'>♿</span>`;
             }
 
@@ -476,8 +480,8 @@ export class LocationManager {
              
             nextStopInfo = `
                 <div style='margin-bottom:6px;'>
-                    <div class='text-muted' style='font-size:0.95em;font-weight:600;margin-bottom:2px;'>Halte Selanjutnya</div>
-                    <div style='font-size:1.1em;font-weight:bold;display:flex;align-items:center;gap:6px;'>${nextStop.stop_name} ${accessIcon}</div>
+                    <div class='text-muted' style='font-size:0.95em;font-weight:600;margin-bottom:2px;'>${titleLabel}</div>
+                    <div style='font-size:1.1em;font-weight:bold;display:flex;align-items:center;gap:6px;'>${displayStop.stop_name} ${accessIcon}</div>
                     <div style='margin-bottom:2px;display:flex;align-items:center;gap:8px;'>
                         <span style='font-weight:600;color:${distColor};'>${jarakNext < 1000 ? Math.round(jarakNext) + ' m' : (jarakNext/1000).toFixed(2) + ' km'}</span>
                         <span style='font-size:0.9em;color:#64748b;'>arah ${bearingDeg}</span>
