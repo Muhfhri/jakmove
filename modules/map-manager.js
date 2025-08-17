@@ -382,7 +382,13 @@ export class MapManager {
             return `<span class="badge badge-koridor-interaktif rounded-pill me-1 mb-1" style="background:${color};color:#fff;cursor:pointer;font-weight:bold;font-size:0.8em;padding:4px 8px;" data-routeid="${r.route_id}">${r.route_short_name}</span>`;
         }).join('');
 
-        const wheelchairIcon = wheelchair ? `<span title="Ramah kursi roda" style="margin-left:6px;">♿</span>` : '';
+        let wheelchairIcon = '';
+        try {
+            const settings = window.transJakartaApp.modules.settings;
+            if (wheelchair && (!settings || settings.isEnabled('showAccessibilityIcon'))) {
+                wheelchairIcon = `<span title="Ramah kursi roda" style="margin-left:6px;">♿</span>`;
+            }
+        } catch (e) { wheelchairIcon = wheelchair ? `<span title="Ramah kursi roda" style="margin-left:6px;">♿</span>` : ''; }
 
         // Intermodal icons and JakLingko badge
         let interIconsHtml = '';
@@ -461,7 +467,12 @@ export class MapManager {
         if (!shapes || shapes.length === 0) return;
         const bounds = new maplibregl.LngLatBounds();
         shapes.forEach(shape => shape.forEach(p => bounds.extend([p.lng, p.lat])));
-        this.map.fitBounds(bounds, { padding: 50, duration: 1000 });
+        let duration = 1000;
+        try {
+            const settings = window.transJakartaApp.modules.settings;
+            if (settings && settings.isEnabled('batterySaver')) duration = 0;
+        } catch (e) {}
+        this.map.fitBounds(bounds, { padding: 50, duration });
     }
 
     // Implement radius markers
@@ -639,7 +650,13 @@ export class MapManager {
                     ? `<div style='font-size:12px;color:#facc15;font-weight:600;margin-bottom:6px;'>Pengumpan</div>`
                     : (s.stop_id && s.stop_id.startsWith('G') ? `<div style='font-size:12px;color:#64748b;margin-bottom:6px;'>Platform ${platformCode || ''}</div>` : '');
                 const wheelchair = (fullStop && fullStop.wheelchair_boarding === '1');
-                const wcIcon = wheelchair ? `<span title='Ramah kursi roda' style='margin-left:6px;'>♿</span>` : '';
+                let wcIcon = '';
+                try {
+                    const settings = window.transJakartaApp.modules.settings;
+                    if (wheelchair && (!settings || settings.isEnabled('showAccessibilityIcon'))) {
+                        wcIcon = `<span title='Ramah kursi roda' style='margin-left:6px;'>♿</span>`;
+                    }
+                } catch (e) { wcIcon = wheelchair ? `<span title='Ramah kursi roda' style='margin-left:6px;'>♿</span>` : ''; }
 
                 // Intermodal icons and JakLingko badge
                 let interHtml = '';
@@ -721,7 +738,14 @@ export class MapManager {
     }
 
     setView(lat, lng, zoom = 16) {
-        if (this.map) this.map.flyTo({ center: [lng, lat], zoom, duration: 1000 });
+        if (this.map) {
+            let duration = 1000;
+            try {
+                const settings = window.transJakartaApp.modules.settings;
+                if (settings && settings.isEnabled('batterySaver')) duration = 0;
+            } catch (e) {}
+            this.map.flyTo({ center: [lng, lat], zoom, duration });
+        }
     }
 
     clearLayers() {
@@ -867,7 +891,12 @@ export class MapManager {
         const dx = Math.abs(currentCenter.lng - lon);
         const dy = Math.abs(currentCenter.lat - lat);
         const smallMove = dx < 1e-5 && dy < 1e-5;
-        this.map.easeTo({ center: smallMove ? currentCenter : [lon, lat], zoom, bearing, pitch: Math.max(this.map.getPitch(), 60), duration: 600, easing: t => t });
+        let duration = 600;
+        try {
+            const settings = window.transJakartaApp.modules.settings;
+            if (settings && settings.isEnabled('batterySaver')) duration = 0;
+        } catch (e) {}
+        this.map.easeTo({ center: smallMove ? currentCenter : [lon, lat], zoom, bearing, pitch: Math.max(this.map.getPitch(), 60), duration, easing: t => t });
     }
 
     _resumeAfterIdle() {

@@ -5407,3 +5407,52 @@ body {
 .jaklingko-badge { width: 20px; height: 20px; border-radius: 50%; object-fit: cover; margin-left: 8px; filter: invert(1); }
 [data-theme="dark"] .jaklingko-badge { filter: none; }
 
+.stop-popup .intermodal-icon-img { width: 16px; height: 16px; border-radius: 50%; object-fit: cover; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+.stop-popup .intermodal-icons { display: inline-flex; align-items: center; gap: 4px; }
+
+/* Battery Saver: reduce or disable animations/hover transitions */
+.battery-saver * { transition: none !important; animation: none !important; }
+.battery-saver .stop-item:hover { background: inherit !important; transform: none !important; }
+.battery-saver .route-info-card:hover { box-shadow: none !important; }
+.battery-saver .badge-koridor-interaktif:hover { box-shadow: none !important; transform: none !important; filter: none !important; }
+.battery-saver .coord-link:hover { transform: none !important; }
+
+/* AMOLED-friendly backgrounds in dark mode */
+[data-theme="dark"].battery-saver .modern-header,
+[data-theme="dark"].battery-saver .map-section,
+[data-theme="dark"].battery-saver .search-section,
+[data-theme="dark"].battery-saver .stops-section,
+[data-theme="dark"].battery-saver .electronic-cards-section,
+[data-theme="dark"].battery-saver .transjakarta-gtfs-section,
+[data-theme="dark"].battery-saver .modern-footer {
+	background: #000000 !important;
+	border-color: #111418 !important;
+	box-shadow: none !important;
+}
+[data-theme="dark"].battery-saver .stops-container,
+[data-theme="dark"].battery-saver .stops-list { background: #000000 !important; }
+[data-theme="dark"].battery-saver .section-title,
+[data-theme="dark"].battery-saver .route-jurusan,
+[data-theme="dark"].battery-saver .info-label,
+[data-theme="dark"].battery-saver .info-value,
+[data-theme="dark"].battery-saver .stop-name { color: #e5e7eb !important; }
+[data-theme="dark"].battery-saver .info-item { background: #050505 !important; border-color: #111418 !important; }
+
+/* Ensure popup readability in dark AMOLED */
+[data-theme="dark"].battery-saver .stop-popup { background: #0a0a0a !important; border-color: #111418 !important; }
+
+/* Fallback: enforce AMOLED even if data-theme not set correctly */
+.battery-saver.force-amoled .modern-header,
+.battery-saver.force-amoled .map-section,
+.battery-saver.force-amoled .search-section,
+.battery-saver.force-amoled .stops-section,
+.battery-saver.force-amoled .modern-footer { background: #000000 !important; border-color: #111418 !important; box-shadow: none !important; }
+
+/* Modern loading progress */
+.loading-content.modern { padding: 32px 28px; border-radius: 16px; }
+.progress.modern { height: 10px; border-radius: 999px; overflow: hidden; background: rgba(38,70,151,0.12); }
+.progress.modern .progress-bar { height: 100%; border-radius: 999px; background: linear-gradient(90deg,#264697,#4FA8DE); box-shadow: none; }
+.progress-logo { width: 72px; height: 72px; object-fit: contain; border-radius: 12px; }
+[data-theme="dark"] .progress.modern { background: rgba(79,168,222,0.15); }
+[data-theme="dark"] .progress.modern .progress-bar { background: linear-gradient(90deg,#4FA8DE,#87CEEB); }
+

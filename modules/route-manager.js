@@ -666,10 +666,13 @@ export class RouteManager {
         const isAccessible = (stop.wheelchair_boarding === '1');
         const wcIcon = document.createElement('span');
         if (isAccessible) {
-            wcIcon.className = 'wc-icon';
-            wcIcon.title = 'Ramah kursi roda';
-            wcIcon.style.marginLeft = '6px';
-            wcIcon.innerHTML = '<iconify-icon icon="mdi:wheelchair-accessibility" inline></iconify-icon>';
+            const settings = window.transJakartaApp.modules.settings;
+            if (!settings || settings.isEnabled('showAccessibilityIcon')) {
+                wcIcon.className = 'wc-icon';
+                wcIcon.title = 'Ramah kursi roda';
+                wcIcon.style.marginLeft = '6px';
+                wcIcon.innerHTML = '<iconify-icon icon="mdi:wheelchair-accessibility" inline></iconify-icon>';
+            }
         }
         
         // Coordinate link (placed at the far left)
@@ -1001,6 +1004,11 @@ export class RouteManager {
 
     // Access stop detector (E*/H*)
     isAccessStop(stop) {
+        // Allow user to disable access filtering
+        try {
+            const settings = window.transJakartaApp.modules.settings;
+            if (settings && !settings.isEnabled('filterAccessStops')) return false;
+        } catch (e) {}
         const id = (stop && stop.stop_id) ? String(stop.stop_id) : '';
         return id.startsWith('E') || id.startsWith('H');
     }
@@ -1008,6 +1016,8 @@ export class RouteManager {
     // Determine whether to show JakLingko badge near stop name
     shouldShowJaklingkoBadge(stop) {
         try {
+            const settings = window.transJakartaApp.modules.settings;
+            if (settings && !settings.isEnabled('showJaklingkoBadge')) return false;
             // Intermodal mapping
             const modes = this._intermodalByStopKey[stop.stop_id] || this._intermodalByStopKey[stop.stop_name];
             const hasIntermodal = Array.isArray(modes) ? modes.length > 0 : !!modes;
@@ -1036,6 +1046,10 @@ export class RouteManager {
 
     // Build intermodal icons HTML based on mapping
     buildIntermodalIconsForStop(stop) {
+        try {
+            const settings = window.transJakartaApp.modules.settings;
+            if (settings && !settings.isEnabled('showIntermodalIcons')) return '';
+        } catch (e) {}
         if (!this._intermodalByStopKey) return '';
         const modes = this._intermodalByStopKey[stop.stop_id] || this._intermodalByStopKey[stop.stop_name];
         if (!modes) return '';

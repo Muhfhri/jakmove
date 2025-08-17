@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TransJakarta Interactive Map - Peta Interaktif Koridor TransJakarta</title>
+    <title>JakMove - Smart Transit Experience</title>
     <meta name="description" content="Peta interaktif koridor TransJakarta dengan informasi halte, rute, dan fitur live location. Temukan halte terdekat dan rute optimal untuk perjalanan Anda.">
     <meta name="keywords" content="TransJakarta, peta interaktif, halte, koridor, BRT, Jakarta, transportasi umum">
     <meta name="author" content="TransJakarta Interactive Map">
     
     <!-- Open Graph Meta Tags -->
-    <meta property="og:title" content="TransJakarta Interactive Map">
+    <meta property="og:title" content="JakMove">
     <meta property="og:description" content="Peta interaktif koridor TransJakarta dengan informasi halte, rute, dan fitur live location">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://transjakarta-interactive-map.vercel.app/">
@@ -17,7 +17,7 @@
     
     <!-- Twitter Card Meta Tags -->
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="TransJakarta Interactive Map">
+    <meta name="twitter:title" content="JakMove">
     <meta name="twitter:description" content="Peta interaktif koridor TransJakarta dengan informasi halte, rute, dan fitur live location">
     <meta name="twitter:image" content="https://transjakarta-interactive-map.vercel.app/og-image.jpg">
     
@@ -42,12 +42,12 @@
     <nav class="navbar navbar-expand-lg sticky-top bg-white shadow-sm border-bottom" style="top: 0; z-index: 1030;">
         <div class="container-fluid px-4">
             <span class="navbar-brand plus-jakarta-sans fw-bold text-primary">
-                <img class="brand-title">
+                <img class="brand-title" alt="JakMove">
             </span>
             
             <!-- Desktop Navigation -->
             <div class="navbar-nav me-auto d-none d-lg-flex">
-                <a class="nav-link active d-flex align-items-center gap-2" href="index.html">
+                <a class="nav-link d-flex align-items-center gap-2" href="index.html">
                     <iconify-icon icon="mdi:map-marker-multiple"></iconify-icon>
                     <span>Peta Interaktif</span>
                 </a>
@@ -55,41 +55,58 @@
                     <iconify-icon icon="mdi:bus"></iconify-icon>
                     <span>Transportasi Jakarta</span>
                 </a>
-                <a class="nav-link d-flex align-items-center gap-2" href="tentang-pembuat.html">
-                    <iconify-icon icon="mdi:account"></iconify-icon>
+                <a class="nav-link active d-flex align-items-center gap-2" href="tentang-pembuat.html">
+                    <iconify-icon icon="mdi:account" inline></iconify-icon>
                     <span>Tentang Pembuat</span>
                 </a>
             </div>
             
             <!-- Mobile Toggle Button -->
             <button class="navbar-toggler custom-toggler d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#navbarOffcanvas" aria-controls="navbarOffcanvas" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="hamburger-line"></span>
-                <span class="hamburger-line"></span>
+                <div class="hamburger-line"></div>
+                <div class="hamburger-line"></div>
             </button>
         </div>
     </nav>
 
-    <!-- Mobile Navigation Offcanvas -->
-    <div class="offcanvas offcanvas-start" tabindex="-1" id="navbarOffcanvas" aria-labelledby="navbarOffcanvasLabel">
+    <!-- Offcanvas -->
+    <div class="offcanvas offcanvas-start" tabindex="-1" id="navbarOffcanvas">
         <div class="offcanvas-header">
-            <h5 class="offcanvas-title" id="navbarOffcanvasLabel">Menu</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+            <h5 class="offcanvas-title plus-jakarta-sans fw-bold text-primary" id="navbarOffcanvasLabel">
+                <img class="brand-title" alt="JakMove">
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
         </div>
         <div class="offcanvas-body">
-            <div class="navbar-nav">
-                <a class="nav-link active d-flex align-items-center gap-2" href="index.html">
-                    <iconify-icon icon="mdi:map-marker-multiple"></iconify-icon>
-                    <span>Peta Interaktif</span>
+            <nav class="nav-menu">
+                <a href="#" class="nav-menu-item active">
+                    <div class="nav-menu-icon">
+                        <iconify-icon icon="mdi:map-marker"></iconify-icon>
+                    </div>
+                    <div class="nav-menu-content">
+                        <div class="nav-menu-title">Peta Interaktif</div>
+                        <div class="nav-menu-desc">Jelajahi rute Transjakarta</div>
+                    </div>
                 </a>
-                <a class="nav-link d-flex align-items-center gap-2" href="transportasi-jakarta.html">
-                    <iconify-icon icon="mdi:bus"></iconify-icon>
-                    <span>Transportasi Jakarta</span>
+                <a href="transportasi-jakarta.html" class="nav-menu-item">
+                    <div class="nav-menu-icon">
+                        <iconify-icon icon="mdi:bus"></iconify-icon>
+                    </div>
+                    <div class="nav-menu-content">
+                        <div class="nav-menu-title">Transportasi Jakarta</div>
+                        <div class="nav-menu-desc">Info lengkap transportasi</div>
+                    </div>
                 </a>
-                <a class="nav-link d-flex align-items-center gap-2" href="tentang-pembuat.html">
-                    <iconify-icon icon="mdi:account"></iconify-icon>
-                    <span>Tentang Pembuat</span>
+                <a href="tentang-pembuat.html" class="nav-menu-item">
+                    <div class="nav-menu-icon">
+                        <iconify-icon icon="mdi:account" inline></iconify-icon>
+                    </div>
+                    <div class="nav-menu-content">
+                        <div class="nav-menu-title">Tentang Pembuat</div>
+                        <div class="nav-menu-desc">Informasi developer website</div>
+                    </div>
                 </a>
-            </div>
+            </nav>
         </div>
     </div>
 
@@ -155,18 +172,21 @@
     
     <!-- Progress Bar untuk Initial Loading -->
     <div id="loadingProgress" class="loading-modal" style="display: none;">
-        <div class="loading-content">
-            <div class="loading-header">
-                <h4>Memuat Aplikasi JakMove</h4>
-                <p>Mohon tunggu sebentar...</p>
+        <div class="loading-content modern">
+            <div class="loading-brand text-center mb-3">
+                <img id="light" class="progress-logo" alt="JakMove" />
             </div>
-            <div class="progress-container">
-                <div class="progress">
+            <div class="loading-header text-center">
+                <h4 class="mb-1">Memuat JakMove</h4>
+                <p class="mb-0">Mohon tunggu sebentar...</p>
+            </div>
+            <div class="progress-container mt-3">
+                <div class="progress modern">
                     <div id="progressBar" class="progress-bar" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
                 </div>
-                <div class="progress-info">
-                    <span id="progressPercent">0%</span>
-                    <span id="progressStatus">Menyiapkan aplikasi...</span>
+                <div class="progress-info d-flex align-items-center justify-content-between mt-2">
+                    <span id="progressStatus" class="small text-muted">Menyiapkan aplikasi...</span>
+                    <span id="progressPercent" class="fw-bold">0%</span>
                 </div>
             </div>
         </div>
@@ -212,6 +232,38 @@
                 </div>
             </div>
             <div id="searchResults" class="search-results"></div>
+
+            <!-- Settings Panel -->
+            <div class="mt-3" id="settingsPanel">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div class="fw-bold plus-jakarta-sans">Pengaturan</div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="toggleSettingsBtn">
+                        <iconify-icon icon="mdi:cog"></iconify-icon>
+                    </button>
+                </div>
+                <div id="settingsBody" class="mt-2" style="display:none;">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="settingShowIntermodal">
+                        <label class="form-check-label" for="settingShowIntermodal">Tampilkan ikon intermoda (MRT/LRT/KRL)</label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="settingShowJaklingko">
+                        <label class="form-check-label" for="settingShowJaklingko">Tampilkan badge JakLingko</label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="settingShowAccessibility">
+                        <label class="form-check-label" for="settingShowAccessibility">Tampilkan ikon aksesibilitas</label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="settingFilterAccess">
+                        <label class="form-check-label" for="settingFilterAccess">Sembunyikan halte akses (E/H)</label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="settingBatterySaver">
+                        <label class="form-check-label" for="settingBatterySaver">Mode hemat baterai (minim animasi & peta ringan)</label>
+                    </div>
+                </div>
+            </div>
         </div>
         
         <!-- Stops Section -->
@@ -229,7 +281,6 @@
             </div>
         </div>
     </div>
-    
     <!-- Modern Footer -->
     <footer class="modern-footer">
         <div class="container">
@@ -444,6 +495,168 @@
             localStorage.setItem(key, 'denied');
             locationModal.hide();
         });
+    });
+
+    // Settings UI wiring
+    document.addEventListener('DOMContentLoaded', function() {
+        const elShowIntermodal = document.getElementById('settingShowIntermodal');
+        const elShowJaklingko = document.getElementById('settingShowJaklingko');
+        const elShowAccessibility = document.getElementById('settingShowAccessibility');
+        const elFilterAccess = document.getElementById('settingFilterAccess');
+        const elBatterySaver = document.getElementById('settingBatterySaver');
+        const toggleBtn = document.getElementById('toggleSettingsBtn');
+        const body = document.getElementById('settingsBody');
+        const panel = document.getElementById('settingsPanel');
+        const darkSwitch = document.getElementById('darkSwitch');
+
+        if (toggleBtn && body) {
+            toggleBtn.addEventListener('click', () => {
+                body.style.display = (body.style.display === 'none') ? 'block' : 'none';
+            });
+        }
+        if (panel) { panel.style.position = 'relative'; panel.style.zIndex = 2; }
+
+        function refreshUI(app) {
+            // Re-render current route list to apply settings
+            try {
+                const routes = app.modules.routes;
+                const id = routes && routes.selectedRouteId;
+                if (id) {
+                    routes.renderRouteInfo();
+                    routes.showStopsByRoute(id);
+                }
+            } catch (e) {}
+            // Refresh search results based on current query
+            try {
+                const searchInput = document.getElementById('searchStop');
+                if (searchInput && searchInput.value) {
+                    app.modules.search.handleSearch(searchInput.value);
+                }
+            } catch (e) {}
+        }
+
+        function bindToggle(app, el, key) {
+            if (!el) return;
+            el.checked = !!app.modules.settings.get(key);
+            el.addEventListener('change', () => {
+                app.modules.settings.set(key, el.checked);
+                refreshUI(app);
+            });
+        }
+
+        // Wait for app + settings to be ready, then bind toggles
+        (function waitForSettings(){
+            const app = window.transJakartaApp;
+            if (!app || !app.modules || !app.modules.settings) { setTimeout(waitForSettings, 200); return; }
+            try {
+                bindToggle(app, elShowIntermodal, 'showIntermodalIcons');
+                bindToggle(app, elShowJaklingko, 'showJaklingkoBadge');
+                bindToggle(app, elShowAccessibility, 'showAccessibilityIcon');
+                bindToggle(app, elFilterAccess, 'filterAccessStops');
+                // Battery Saver binding with side-effects
+                if (elBatterySaver) {
+                    elBatterySaver.checked = !!app.modules.settings.get('batterySaver');
+                    // Apply initial state
+                    document.body.classList.toggle('battery-saver', elBatterySaver.checked);
+                    document.body.classList.toggle('force-amoled', elBatterySaver.checked);
+                    // Force dark theme if available
+                    try { if (elBatterySaver.checked) { document.documentElement.setAttribute('data-theme','dark'); } } catch (e) {}
+                    try {
+                        const mapMgr = app.modules.map;
+                        if (mapMgr && mapMgr.setBaseStyle) {
+                            if (elBatterySaver.checked) {
+                                mapMgr.setBaseStyle('dark');
+                            }
+                        }
+                    } catch (e) {}
+                    // Disable dark/light switch while battery saver ON
+                    try {
+                        if (darkSwitch) {
+                            darkSwitch.disabled = elBatterySaver.checked;
+                            if (elBatterySaver.checked) darkSwitch.checked = true;
+                        }
+                    } catch (e) {}
+                    // Show info card
+                    try {
+                        if (elBatterySaver.checked) {
+                            const container = document.getElementById('searchResults') || document.querySelector('.search-section');
+                            if (container && !document.getElementById('batterySaverInfo')) {
+                                const info = document.createElement('div');
+                                info.id = 'batterySaverInfo';
+                                info.className = 'alert alert-info mt-2';
+                                info.innerHTML = `<div class='d-flex align-items-center justify-content-between'>
+                                    <div><strong>Hemat Baterai aktif.</strong> Animasi dan efek visual dinonaktifkan, peta disederhanakan agar performa meningkat.</div>
+                                    <button type='button' class='btn-close' aria-label='Close'></button>
+                                </div>`;
+                                container.parentNode.insertBefore(info, container.nextSibling);
+                                const btn = info.querySelector('.btn-close');
+                                if (btn) btn.addEventListener('click', ()=> info.remove());
+                            }
+                        } else {
+                            const info = document.getElementById('batterySaverInfo');
+                            if (info) info.remove();
+                        }
+                    } catch (e) {}
+                    elBatterySaver.addEventListener('change', () => {
+                        app.modules.settings.set('batterySaver', elBatterySaver.checked);
+                        // Apply body class for CSS overrides
+                        document.body.classList.toggle('battery-saver', elBatterySaver.checked);
+                        document.body.classList.toggle('force-amoled', elBatterySaver.checked);
+                        try {
+                            if (elBatterySaver.checked) { document.documentElement.setAttribute('data-theme','dark'); }
+                        } catch (e) {}
+                        // Switch to the lightest basemap
+                        try {
+                            const mapMgr = app.modules.map;
+                            if (mapMgr && mapMgr.setBaseStyle) {
+                                if (elBatterySaver.checked) {
+                                    mapMgr.setBaseStyle('dark');
+                                } else {
+                                    const saved = localStorage.getItem('baseMapStyle') || 'positron';
+                                    mapMgr.setBaseStyle(saved);
+                                }
+                            }
+                        } catch (e) {}
+                        // Disable basemap selector when battery saver on
+                        try {
+                            const basemapSelect = document.getElementById('basemapSelector');
+                            if (basemapSelect) basemapSelect.disabled = elBatterySaver.checked;
+                        } catch (e) {}
+                        // Disable/enable dark switch accordingly
+                        try {
+                            if (darkSwitch) {
+                                darkSwitch.disabled = elBatterySaver.checked;
+                                if (elBatterySaver.checked) darkSwitch.checked = true;
+                            }
+                        } catch (e) {}
+                        // Info card
+                        try {
+                            const container = document.getElementById('searchResults') || document.querySelector('.search-section');
+                            const existing = document.getElementById('batterySaverInfo');
+                            if (elBatterySaver.checked) {
+                                if (container && !existing) {
+                                    const info = document.createElement('div');
+                                    info.id = 'batterySaverInfo';
+                                    info.className = 'alert alert-info mt-2';
+                                    info.innerHTML = `<div class='d-flex align-items-center justify-content-between'>
+                                        <div><strong>Hemat Baterai aktif.</strong> Animasi dan efek visual dinonaktifkan, peta disederhanakan agar performa meningkat.</div>
+                                        <button type='button' class='btn-close' aria-label='Close'></button>
+                                    </div>`;
+                                    container.parentNode.insertBefore(info, container.nextSibling);
+                                    const btn = info.querySelector('.btn-close');
+                                    if (btn) btn.addEventListener('click', ()=> info.remove());
+                                }
+                            } else if (existing) {
+                                existing.remove();
+                            }
+                        } catch (e) {}
+                        refreshUI(app);
+                    });
+                    // Disable basemap selector initially if needed
+                    try { const basemapSelect = document.getElementById('basemapSelector'); if (basemapSelect) basemapSelect.disabled = elBatterySaver.checked; } catch (e) {}
+                }
+            } catch (e) {}
+        })();
     });
     </script>
 </body>

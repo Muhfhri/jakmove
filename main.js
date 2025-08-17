@@ -6,6 +6,7 @@ import { StopManager } from './modules/stop-manager.js';
 import { SearchManager } from './modules/search-manager.js';
 import { LocationManager } from './modules/location-manager.js';
 import { UIManager } from './modules/ui-manager.js';
+import { SettingsManager } from './modules/settings-manager.js';
 
 class TransJakartaApp {
     constructor() {
@@ -22,11 +23,13 @@ class TransJakartaApp {
             this.modules.routes = new RouteManager();
             this.modules.stops = new StopManager();
             this.modules.search = new SearchManager();
+            this.modules.settings = new SettingsManager();
             this.modules.location = new LocationManager();
             this.modules.ui = new UIManager();
 
             // Load GTFS data
             await this.modules.gtfs.loadData();
+            this.modules.settings.init();
             
             // Initialize map
             this.modules.map.init();

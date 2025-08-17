@@ -2,6 +2,7 @@
 export class SearchManager {
     constructor() {
         this.searchResults = [];
+        this._debounceId = null;
     }
 
     // Handle search input
@@ -9,21 +10,21 @@ export class SearchManager {
         const resultsDiv = document.getElementById('searchResults');
         if (!resultsDiv) return;
 
-        resultsDiv.innerHTML = '';
-        
-        const q = query.trim().toLowerCase();
-        if (q.length < 1) return;
-
-        // Search for routes (single digit)
-        if (q.length === 1 && !isNaN(q)) {
-            this.searchRoutes(q, resultsDiv);
-            return;
-        }
-
-        if (q.length < 2) return;
-
-        // Search for stops and routes
-        this.searchStopsAndRoutes(q, resultsDiv);
+        // Debounce 250ms
+        clearTimeout(this._debounceId);
+        this._debounceId = setTimeout(() => {
+            resultsDiv.innerHTML = '';
+            const q = query.trim().toLowerCase();
+            if (q.length < 1) return;
+            // Search for routes (single digit)
+            if (q.length === 1 && !isNaN(q)) {
+                this.searchRoutes(q, resultsDiv);
+                return;
+            }
+            if (q.length < 2) return;
+            // Search for stops and routes
+            this.searchStopsAndRoutes(q, resultsDiv);
+        }, 250);
     }
 
     // Search routes by number
@@ -58,7 +59,7 @@ export class SearchManager {
         const routes = window.transJakartaApp.modules.gtfs.getRoutes();
         const stopToRoutes = window.transJakartaApp.modules.gtfs.getStopToRoutes();
 
-        const foundStops = stops
+        let foundStops = stops
             .filter(s => s.stop_name.toLowerCase().includes(query))
             .filter(s => !(String(s.stop_id || '').startsWith('E') || String(s.stop_id || '').startsWith('H')));
 
@@ -77,6 +78,14 @@ export class SearchManager {
         // Add routes results
         if (foundRoutes.length > 0) {
             this.addRoutesResults(foundRoutes, ul);
+        }
+
+        // If no exact matches for stops, try fuzzy matches (edit distance <= 1)
+        if (foundStops.length === 0 && query.length >= 3) {
+            const fuzzyStops = stops
+                .filter(s => !(String(s.stop_id || '').startsWith('E') || String(s.stop_id || '').startsWith('H')))
+                .filter(s => this.isFuzzyMatch(s.stop_name.toLowerCase(), query));
+            if (fuzzyStops.length > 0) foundStops = fuzzyStops;
         }
 
         // Add stops results
@@ -193,7 +202,7 @@ export class SearchManager {
         left.style.gap = '6px';
 
         const nameSpan = document.createElement('span');
-        nameSpan.textContent = stop.stop_name;
+        nameSpan.innerHTML = this.highlight(stop.stop_name);
         nameSpan.className = 'plus-jakarta-sans fw-semibold';
         left.appendChild(nameSpan);
 
@@ -218,10 +227,13 @@ export class SearchManager {
         } catch (e) {}
 
         const right = document.createElement('div');
-        if (stop.wheelchair_boarding === '1') {
-            right.innerHTML = '<iconify-icon icon="mdi:wheelchair-accessibility" inline></iconify-icon>';
-            right.title = 'Ramah kursi roda';
-        }
+        try {
+            const settings = window.transJakartaApp.modules.settings;
+            if (stop.wheelchair_boarding === '1' && (!settings || settings.isEnabled('showAccessibilityIcon'))) {
+                right.innerHTML = '<iconify-icon icon="mdi:wheelchair-accessibility" inline></iconify-icon>';
+                right.title = 'Ramah kursi roda';
+            }
+        } catch (e) {}
 
         header.appendChild(left);
         header.appendChild(right);
@@ -298,6 +310,52 @@ export class SearchManager {
     reset() {
         this.clearSearchResults();
         this.searchResults = [];
+    }
+
+    // Highlight query terms in a text
+    highlight(text) {
+        try {
+            const input = document.getElementById('searchStop');
+            if (!input) return text;
+            const q = (input.value || '').trim();
+            if (!q) return text;
+            const esc = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const re = new RegExp(`(${esc})`, 'ig');
+            return String(text).replace(re, '<mark>$1</mark>');
+        } catch (e) { return text; }
+    }
+
+    // Basic fuzzy match: allow edit distance <= 1 or prefix within 1 error
+    isFuzzyMatch(text, query) {
+        const t = String(text || '').toLowerCase();
+        const q = String(query || '').toLowerCase();
+        if (t.includes(q)) return true;
+        // Quick prefix check with one typo allowed
+        if (this.levenshtein(t.substring(0, q.length + 1), q) <= 1) return true;
+        // Full distance threshold 1 for short queries, 2 for longer
+        const thr = q.length >= 6 ? 2 : 1;
+        return this.levenshtein(t, q) <= thr;
+    }
+
+    levenshtein(a, b) {
+        const m = a.length, n = b.length;
+        if (m === 0) return n; if (n === 0) return m;
+        const dp = new Array(n + 1);
+        for (let j = 0; j <= n; j++) dp[j] = j;
+        for (let i = 1; i <= m; i++) {
+            let prev = dp[0]; dp[0] = i;
+            for (let j = 1; j <= n; j++) {
+                const temp = dp[j];
+                const cost = (a[i - 1] === b[j - 1]) ? 0 : 1;
+                dp[j] = Math.min(
+                    dp[j] + 1,       // deletion
+                    dp[j - 1] + 1,   // insertion
+                    prev + cost      // substitution
+                );
+                prev = temp;
+            }
+        }
+        return dp[n];
     }
 } 
  
