@@ -13,6 +13,9 @@ export class MapManager {
         this.userPopup = null;
         this._activeRouteData = null; // Simpan data rute aktif
         this._cameraLock = false; // camera follow user
+        this._followOffsetPx = [0, 150];
+        this._userDragging = false;
+        this._userRotating = false;
     }
 
     init() {
@@ -79,6 +82,12 @@ export class MapManager {
             }
         });
 
+        // Track user interactions to let user control pan/zoom/rotate while locked
+        this.map.on('dragstart', () => { this._userDragging = true; });
+        this.map.on('dragend', () => { this._userDragging = false; this._recomputeFollowOffsetFromUser(); });
+        this.map.on('rotatestart', () => { this._userRotating = true; });
+        this.map.on('rotateend', () => { this._userRotating = false; });
+
         this.map.on('zoomend', () => {
             if (window.radiusHalteActive && this.map.getZoom() >= 14) {
                 const c = this.map.getCenter();
@@ -96,6 +105,21 @@ export class MapManager {
                 this.removeHalteRadiusMarkers();
             }
         });
+    }
+
+    _recomputeFollowOffsetFromUser() {
+        try {
+            if (!this._cameraLock || !this.map) return;
+            const app = window.transJakartaApp;
+            const pos = app?.modules?.location?.lastUserPosSmoothed || app?.modules?.location?.lastUserPos;
+            if (!pos) return;
+            const p = this.map.project([pos.lon, pos.lat]);
+            const w = this.map.getCanvas().width;
+            const h = this.map.getCanvas().height;
+            const cx = w / 2, cy = h / 2;
+            // Keep user at current on-screen position by storing offset in pixels
+            this._followOffsetPx = [Math.round(p.x - cx), Math.round(p.y - cy)];
+        } catch (e) {}
     }
 
     setBaseStyle(name) {
@@ -824,9 +848,13 @@ export class MapManager {
         return (brng + 360) % 360;
     }
 
-    followUserCamera(lat, lon, headingDeg, zoom = 17) {
+    followUserCamera(lat, lon, headingDeg, zoom = undefined) {
         if (!this.map || !this._cameraLock) return;
-        let bearing = typeof headingDeg === 'number' && !isNaN(headingDeg) ? headingDeg : this.map.getBearing();
+        // Respect user rotation while rotating
+        let bearing = this.map.getBearing();
+        if (!this._userRotating && typeof headingDeg === 'number' && !isNaN(headingDeg)) {
+            bearing = headingDeg;
+        }
         // Smooth bearing changes to avoid jitter
         const currentBearing = this.map.getBearing();
         const delta = Math.abs(((bearing - currentBearing + 540) % 360) - 180);
@@ -836,7 +864,11 @@ export class MapManager {
         const dx = Math.abs(currentCenter.lng - lon);
         const dy = Math.abs(currentCenter.lat - lat);
         const smallMove = dx < 1e-5 && dy < 1e-5;
-        this.map.easeTo({ center: smallMove ? currentCenter : [lon, lat], zoom, bearing, pitch: Math.max(this.map.getPitch(), 60), duration: 600, easing: t => t });
+        // Keep user's chosen zoom/pitch; only adjust center with offset and bearing if needed
+        const opts = { center: smallMove ? currentCenter : [lon, lat], bearing, duration: 450, easing: t => t };
+        // Apply persistent offset so user can “place” the popup anywhere via pan
+        if (Array.isArray(this._followOffsetPx)) opts.offset = this._followOffsetPx;
+        this.map.easeTo(opts);
     }
 
     _resumeAfterIdle() {
