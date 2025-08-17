@@ -64,6 +64,8 @@ export class LocationManager {
         this.isActive = true;
         this.updateLiveLocationButton(true);
         this.showNearestStopsButton();
+        const mapEl = document.getElementById('map');
+        if (mapEl) mapEl.classList.add('live-has-custom-marker');
     }
 
     // Disable live location
@@ -80,9 +82,12 @@ export class LocationManager {
                 const lockBtn = document.getElementById('cameraLockBtn');
                 if (lockBtn) lockBtn.style.display = 'none';
                 mapManager.setCameraLock(false);
+                try { mapManager.clearNextStopLabel(); } catch (e) {}
             }
             this.userMarker = null;
         }
+        const mapEl = document.getElementById('map');
+        if (mapEl) mapEl.classList.remove('live-has-custom-marker');
         // Bersihkan timer arrival
         if (this.arrivalTimer) {
             clearTimeout(this.arrivalTimer);
@@ -365,6 +370,8 @@ export class LocationManager {
         const mapManager = window.transJakartaApp.modules.map;
         if (mapManager && this.userMarker) {
             mapManager.updateUserPopup(this.userMarker, popupContent);
+            // Render label halte berikutnya di peta
+            try { mapManager.updateNextStopLabel(nextStop); } catch (e) {}
         }
     }
 

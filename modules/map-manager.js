@@ -54,7 +54,9 @@ export class MapManager {
                 closeButton: false, 
                 closeOnClick: false, 
                 maxWidth: '350px',
-                className: 'custom-popup-transparent'
+                className: 'custom-popup-transparent',
+                anchor: 'top',
+                offset: [0, 20]
             });
 
             this.isInitialized = true;
@@ -533,7 +535,7 @@ export class MapManager {
         const coords = src._data.geometry && src._data.geometry.coordinates;
         if (!coords) return;
         if (!this.userPopup) return;
-        this.userPopup.setLngLat(coords).setHTML(html).addTo(this.map);
+        this.userPopup.setLngLat(coords).setOffset([0, 20]).setHTML(html).addTo(this.map);
     }
 
     addSearchResultMarker(lat, lng, title) {
@@ -732,6 +734,51 @@ export class MapManager {
         this._currentPopup = this.featurePopup.setLngLat([lng, lat]).setHTML(html).addTo(this.map);
         return this._currentPopup;
     }
+    
+    // Render/update label text untuk halte berikutnya di peta
+    updateNextStopLabel(nextStop) {
+        this._ensureStyleReady(() => {
+            const srcId = 'nextstop-label-source';
+            const layerId = 'nextstop-label';
+            if (!nextStop) {
+                if (this.map.getLayer(layerId)) this.map.removeLayer(layerId);
+                if (this.map.getSource(srcId)) this.map.removeSource(srcId);
+                this.layers.delete(layerId);
+                return;
+            }
+            const lng = parseFloat(nextStop.stop_lon);
+            const lat = parseFloat(nextStop.stop_lat);
+            const data = { type: 'FeatureCollection', features: [{ type: 'Feature', properties: { name: nextStop.stop_name }, geometry: { type: 'Point', coordinates: [lng, lat] } }] };
+            if (this.map.getSource(srcId)) {
+                const src = this.map.getSource(srcId);
+                if (src && src.setData) src.setData(data);
+            } else {
+                this.map.addSource(srcId, { type: 'geojson', data });
+            }
+            if (!this.map.getLayer(layerId)) {
+                this.map.addLayer({
+                    id: layerId,
+                    type: 'symbol',
+                    source: srcId,
+                    layout: {
+                        'text-field': ['get', 'name'],
+                        'text-size': 12,
+                        'text-font': ['Open Sans Semibold', 'Arial Unicode MS Bold'],
+                        'text-anchor': 'bottom',
+                        'text-offset': [0, -1.2]
+                    },
+                    paint: {
+                        'text-color': '#111111',
+                        'text-halo-color': '#ffffff',
+                        'text-halo-width': 1.2
+                    }
+                });
+                this.layers.set(layerId, { sourceId: srcId, layerId });
+            }
+        });
+    }
+    
+    clearNextStopLabel() { this.updateNextStopLabel(null); }
 
     setCameraLock(enabled) {
         this._cameraLock = !!enabled;
