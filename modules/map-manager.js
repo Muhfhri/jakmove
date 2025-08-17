@@ -13,7 +13,6 @@ export class MapManager {
         this.userPopup = null;
         this._activeRouteData = null; // Simpan data rute aktif
         this._cameraLock = false; // camera follow user
-        // No offset while locked; center always on user
     }
 
     init() {
@@ -80,8 +79,6 @@ export class MapManager {
             }
         });
 
-        // No drag tracking while lock; we will disable dragPan when locked
-
         this.map.on('zoomend', () => {
             if (window.radiusHalteActive && this.map.getZoom() >= 14) {
                 const c = this.map.getCenter();
@@ -100,8 +97,6 @@ export class MapManager {
             }
         });
     }
-
-    // Removed offset recompute; center will stay on user while locked
 
     setBaseStyle(name) {
         this._styleName = name;
@@ -811,20 +806,10 @@ export class MapManager {
         if (!this.map) return;
         if (this._cameraLock) {
             // Set initial 3D pitch for better perspective
-            this.map.setPitch(78);
-            // Disable drag pan while locked so center stays on user
-            try { this.map.dragPan.disable(); } catch (e) {}
-            // Allow zoom and pitch via gestures
-            try { this.map.scrollZoom.enable(); } catch (e) {}
-            try { this.map.touchZoomRotate.enable(); } catch (e) {}
-            try { this.map.dragRotate.enable(); } catch (e) {}
+            this.map.setPitch(60);
         } else {
             // Optionally relax pitch when unlocked
             this.map.setPitch(0);
-            // Re-enable interactions
-            try { this.map.dragPan.enable(); } catch (e) {}
-            try { this.map.dragRotate.enable(); } catch (e) {}
-            try { this.map.touchZoomRotate.enable(); } catch (e) {}
         }
     }
 
@@ -839,11 +824,9 @@ export class MapManager {
         return (brng + 360) % 360;
     }
 
-    followUserCamera(lat, lon, headingDeg) {
+    followUserCamera(lat, lon, headingDeg, zoom = 17) {
         if (!this.map || !this._cameraLock) return;
-        // Keep bearing aligned to heading; user controls only zoom/pitch
-        let bearing = this.map.getBearing();
-        if (typeof headingDeg === 'number' && !isNaN(headingDeg)) bearing = headingDeg;
+        let bearing = typeof headingDeg === 'number' && !isNaN(headingDeg) ? headingDeg : this.map.getBearing();
         // Smooth bearing changes to avoid jitter
         const currentBearing = this.map.getBearing();
         const delta = Math.abs(((bearing - currentBearing + 540) % 360) - 180);
@@ -853,9 +836,7 @@ export class MapManager {
         const dx = Math.abs(currentCenter.lng - lon);
         const dy = Math.abs(currentCenter.lat - lat);
         const smallMove = dx < 1e-5 && dy < 1e-5;
-        // Keep user's chosen zoom/pitch; only adjust center & bearing
-        // Offset ke bawah agar tampak lebih banyak area depan (sensasi 3D lebih terasa)
-        this.map.easeTo({ center: smallMove ? currentCenter : [lon, lat], bearing, offset: [0, 220], duration: 400, easing: t => t });
+        this.map.easeTo({ center: smallMove ? currentCenter : [lon, lat], zoom, bearing, pitch: Math.max(this.map.getPitch(), 60), duration: 600, easing: t => t });
     }
 
     _resumeAfterIdle() {
