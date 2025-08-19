@@ -281,20 +281,31 @@ export class SearchManager {
         const mapManager = window.transJakartaApp.modules.map;
         if (!mapManager) return;
 
-        // Remove previous search result marker
-        if (window.searchResultMarker) {
-            mapManager.removeSearchResultMarker();
-        }
-
         // Set map view to stop location
         mapManager.setView(parseFloat(stop.stop_lat), parseFloat(stop.stop_lon), 17);
 
-        // Add search result marker
-        window.searchResultMarker = mapManager.addSearchResultMarker(
-            parseFloat(stop.stop_lat), 
-            parseFloat(stop.stop_lon), 
-            stop.stop_name
-        );
+        // Show stop popup directly
+        try {
+            const f = {
+                properties: {
+                    stopId: stop.stop_id,
+                    stopName: stop.stop_name,
+                    stopType: mapManager.getStopType ? mapManager.getStopType(String(stop.stop_id)) : '',
+                    routeIds: (window.transJakartaApp.modules.gtfs.getStopToRoutes()[stop.stop_id] ? Array.from(window.transJakartaApp.modules.gtfs.getStopToRoutes()[stop.stop_id]) : [])
+                }
+            };
+            mapManager.showStopPopup(f, { lng: parseFloat(stop.stop_lon), lat: parseFloat(stop.stop_lat) });
+        } catch (e) {
+            // Fallback to marker if popup fails
+            if (window.searchResultMarker) {
+                mapManager.removeSearchResultMarker();
+            }
+            window.searchResultMarker = mapManager.addSearchResultMarker(
+                parseFloat(stop.stop_lat), 
+                parseFloat(stop.stop_lon), 
+                stop.stop_name
+            );
+        }
     }
 
     // Clear search results

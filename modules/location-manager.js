@@ -29,6 +29,13 @@ export class LocationManager {
         this._lastNextDist = null;
         this._lastNextStopId = null;
         this._lastUIUpdateTs = 0;
+        this._allowAutoStart = true; // guard agar live tidak auto-nyala setelah dimatikan manual
+        this._renderedUserPos = null; // posisi marker yang sedang dirender (untuk animasi)
+        this._userAnimReqId = null;
+        this._userAnimFrom = null;
+        this._userAnimTo = null;
+        this._userAnimStart = 0;
+        this._userAnimDurationMs = 450;
     }
 
     // Toggle live location
@@ -62,10 +69,23 @@ export class LocationManager {
         );
 
         this.isActive = true;
+        this._allowAutoStart = true;
         this.updateLiveLocationButton(true);
         this.showNearestStopsButton();
         const mapEl = document.getElementById('map');
         if (mapEl) mapEl.classList.add('live-has-custom-marker');
+        // Seed marker immediately if possible
+        try {
+            navigator.geolocation.getCurrentPosition((pos)=>{
+                try {
+                    const lat = pos.coords.latitude, lon = pos.coords.longitude;
+                    this.lastUserPos = { lat, lon };
+                    this.lastUserPosSmoothed = { lat, lon };
+                    this.updateUserMarker(lat, lon);
+                    this._renderedUserPos = { lat, lon };
+                } catch(_){}
+            }, ()=>{}, { enableHighAccuracy: true, maximumAge: 3000, timeout: 5000 });
+        } catch(_){}
     }
 
     // Disable live location
@@ -93,10 +113,14 @@ export class LocationManager {
             clearTimeout(this.arrivalTimer);
             this.arrivalTimer = null;
         }
+        if (this._uiDebounceTimer) { clearTimeout(this._uiDebounceTimer); this._uiDebounceTimer = null; }
+        if (this._userAnimReqId) { try { cancelAnimationFrame(this._userAnimReqId); } catch(e){} this._userAnimReqId = null; }
+        this._userAnimFrom = null; this._userAnimTo = null; this._renderedUserPos = null;
         this.lastArrivedStopId = null;
         this.arrivalStop = null;
         this.userCentered = false;
         this.isActive = false;
+        this._allowAutoStart = false;
         this.updateLiveLocationButton(false);
         this.hideNearestStopsButton();
 
@@ -149,7 +173,7 @@ export class LocationManager {
         }
 
         // Update user marker with smoothed position
-        this.updateUserMarker(this.lastUserPosSmoothed.lat, this.lastUserPosSmoothed.lon);
+        this.animateUserMarkerTo(this.lastUserPosSmoothed.lat, this.lastUserPosSmoothed.lon);
 
         // Camera follow if locked + auto-tilt adaptif
         let cameraLocked = false;
@@ -206,6 +230,7 @@ export class LocationManager {
 
     // Update user marker
     updateUserMarker(lat, lon) {
+        if (!this.isActive) return; // do nothing if live is OFF
         const mapManager = window.transJakartaApp.modules.map;
         if (!mapManager) return;
 
@@ -432,6 +457,20 @@ export class LocationManager {
                 bearingDeg = Math.round(this._bearingDeg({ lat: pos.lat, lon: pos.lon }, { lat: parseFloat(displayStop.stop_lat), lon: parseFloat(displayStop.stop_lon) })) + '°';
             } catch (e) {}
             
+            // Helper: stop-type icon for BRT/Pengumpan/Platform
+            const brtIconUrl = 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/26/JakIcon_BusBRT.svg/1200px-JakIcon_BusBRT.svg.png';
+            const feederIconUrl = 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8b/JakIcon_Bus_Light.svg/2048px-JakIcon_Bus_Light.svg.png';
+            const buildStopTypeIcon = (stopId) => {
+                const sid = String(stopId || '');
+                if (sid.startsWith('B')) {
+                    return `<img src="${feederIconUrl}" alt="Feeder" title="Pengumpan" style="width:14px;height:14px;object-fit:contain;"/>`;
+                }
+                if (sid.startsWith('G')) {
+                    return `<span title="Platform" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#64748b;vertical-align:middle;"></span>`;
+                }
+                return `<img src="${brtIconUrl}" alt="BRT" title="BRT" style="width:14px;height:14px;object-fit:contain;"/>`;
+            };
+            
             // Layanan di halte berikutnya
             let nextStopServicesHtml = '';
             try {
@@ -468,7 +507,10 @@ export class LocationManager {
             // Breadcrumb 2 halte ke depan
             let breadcrumbHtml = '';
             if (upcomingStops && upcomingStops.length > 0) {
-                const chips = upcomingStops.map(s => `<span style='background:#eef2ff;color:#264697;border-radius:999px;padding:4px 10px;font-size:0.85em;font-weight:600;'>${s.stop_name}</span>`).join(' ');
+                const chips = upcomingStops.map(s => {
+                    const ico = buildStopTypeIcon(s.stop_id);
+                    return `<span style='background:#eef2ff;color:#264697;border-radius:999px;padding:4px 10px;font-size:0.85em;font-weight:600;display:inline-flex;align-items:center;gap:6px;'>${ico}<span>${s.stop_name}</span></span>`;
+                }).join(' ');
                 breadcrumbHtml = `<div style='margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;'>${chips}</div>`;
             }
 
@@ -481,7 +523,7 @@ export class LocationManager {
             nextStopInfo = `
                 <div style='margin-bottom:6px;'>
                     <div class='text-muted' style='font-size:0.95em;font-weight:600;margin-bottom:2px;'>${titleLabel}</div>
-                    <div style='font-size:1.1em;font-weight:bold;display:flex;align-items:center;gap:6px;'>${displayStop.stop_name} ${accessIcon}</div>
+                    <div style='font-size:1.1em;font-weight:bold;display:flex;align-items:center;gap:6px;'>${buildStopTypeIcon(displayStop.stop_id)} <span>${displayStop.stop_name}</span> ${accessIcon}</div>
                     <div style='margin-bottom:2px;display:flex;align-items:center;gap:8px;'>
                         <span style='font-weight:600;color:${distColor};'>${jarakNext < 1000 ? Math.round(jarakNext) + ' m' : (jarakNext/1000).toFixed(2) + ' km'}</span>
                         <span style='font-size:0.9em;color:#64748b;'>arah ${bearingDeg}</span>
@@ -683,12 +725,44 @@ export class LocationManager {
                         e.preventDefault();
                         const rid = badge.getAttribute('data-routeid');
                         console.debug('[Nearest] service badge clicked:', rid, 'at stop', stop.stop_id);
-                        this.selectedRouteIdForUser = rid;
-                        this.selectedCurrentStopForUser = stop;
-                        if (this.userMarker && this.lastUserPos) {
-                            this.showUserRouteInfo(this.lastUserPos.lat, this.lastUserPos.lon, stop, rid);
-                        }
-                        window.transJakartaApp.modules.routes.selectRoute(rid);
+                        // Select route first (map refresh), then start live after refresh settles
+                        try { window.transJakartaApp.modules.routes.selectRoute(rid); } catch (err) {}
+                        setTimeout(() => {
+                            // Ensure Live Location is ON
+                            try { if (!this.isActive) this.enableLiveLocation(); } catch (err) {}
+                            // Activate live service from this stop and route
+                            try { this.activateLiveServiceFromStop(stop, rid); } catch (err) {}
+                            // If we don't have a marker/position yet, fetch once immediately
+                            const tryImmediateLive = () => {
+                                if (this.lastUserPos && this.userMarker) {
+                                    this.showUserRouteInfo(this.lastUserPos.lat, this.lastUserPos.lon, stop, rid);
+                                    return true;
+                                }
+                                return false;
+                            };
+                            if (!tryImmediateLive()) {
+                                try {
+                                    navigator.geolocation.getCurrentPosition(
+                                        (pos) => {
+                                            try {
+                                                const lat = pos.coords.latitude;
+                                                const lon = pos.coords.longitude;
+                                                this.lastUserPos = { lat, lon };
+                                                this.lastUserPosSmoothed = { lat, lon };
+                                                this.updateUserMarker(lat, lon);
+                                                this.showUserRouteInfo(lat, lon, stop, rid);
+                                            } catch (_) {
+                                                this.scheduleLiveUIUpdate();
+                                            }
+                                        },
+                                        () => { this.scheduleLiveUIUpdate(); },
+                                        { enableHighAccuracy: true, maximumAge: 3000, timeout: 5000 }
+                                    );
+                                } catch (_) {
+                                    this.scheduleLiveUIUpdate();
+                                }
+                            }
+                        }, 160);
                     };
                     badge.addEventListener('click', handler);
                     badge.addEventListener('touchstart', handler, { passive: false });
@@ -817,6 +891,54 @@ export class LocationManager {
         const dToB = this.haversine(py, px, by, bx);
         const minDistToSeg = Math.min(dToA, dToB);
         return { t, measure, dist: measure, minDistToSeg };
+    }
+
+    canAutoStartLive() { return !!this._allowAutoStart; }
+
+    animateUserMarkerTo(targetLat, targetLon) {
+        if (!this.isActive) return;
+        // Teleport on first draw or if marker not yet created
+        if (!this.userMarker) {
+            this.updateUserMarker(targetLat, targetLon);
+            this._renderedUserPos = { lat: targetLat, lon: targetLon };
+            return;
+        }
+        if (!this._renderedUserPos) {
+            this._renderedUserPos = { lat: targetLat, lon: targetLon };
+            this.updateUserMarker(targetLat, targetLon);
+            return;
+        }
+        // If jump too large, snap directly
+        try {
+            const jump = this.haversine(this._renderedUserPos.lat, this._renderedUserPos.lon, targetLat, targetLon);
+            if (jump > 150) {
+                this.updateUserMarker(targetLat, targetLon);
+                this._renderedUserPos = { lat: targetLat, lon: targetLon };
+                return;
+            }
+        } catch (e) {}
+        // Start/replace animation
+        if (this._userAnimReqId) { try { cancelAnimationFrame(this._userAnimReqId); } catch(e){} this._userAnimReqId = null; }
+        this._userAnimFrom = { lat: this._renderedUserPos.lat, lon: this._renderedUserPos.lon };
+        this._userAnimTo = { lat: targetLat, lon: targetLon };
+        this._userAnimStart = performance.now();
+        const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+        const step = (nowTs) => {
+            if (!this.isActive) { this._userAnimReqId = null; return; }
+            const elapsed = nowTs - this._userAnimStart;
+            const t = Math.max(0, Math.min(1, elapsed / this._userAnimDurationMs));
+            const k = easeOutCubic(t);
+            const lat = this._userAnimFrom.lat + (this._userAnimTo.lat - this._userAnimFrom.lat) * k;
+            const lon = this._userAnimFrom.lon + (this._userAnimTo.lon - this._userAnimFrom.lon) * k;
+            this.updateUserMarker(lat, lon);
+            this._renderedUserPos = { lat, lon };
+            if (t < 1) {
+                this._userAnimReqId = requestAnimationFrame(step);
+            } else {
+                this._userAnimReqId = null;
+            }
+        };
+        this._userAnimReqId = requestAnimationFrame(step);
     }
 } 
  
