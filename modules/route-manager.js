@@ -684,12 +684,18 @@ export class RouteManager {
             coordLink.rel = 'noopener';
             coordLink.className = 'coord-link';
             coordLink.title = 'Buka di Google Maps';
+            // Ensure no background on the link container
+            coordLink.style.background = 'transparent';
+            coordLink.style.border = 'none';
+            coordLink.style.padding = '0';
+            coordLink.style.display = 'inline-flex';
+            coordLink.style.alignItems = 'center';
             // Use BRT/Feeder icon instead of map marker
             const brtIconUrl = 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/26/JakIcon_BusBRT.svg/1200px-JakIcon_BusBRT.svg.png';
             const feederIconUrl = 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8b/JakIcon_Bus_Light.svg/2048px-JakIcon_Bus_Light.svg.png';
             const sid = String(stop.stop_id || '');
             const iconUrl = sid.startsWith('B') ? feederIconUrl : brtIconUrl;
-            coordLink.innerHTML = `<img src="${iconUrl}" alt="Map" title="Buka di Google Maps" style="width:16px;height:16px;object-fit:contain;"/>`;
+            coordLink.innerHTML = `<img src="${iconUrl}" alt="Map" title="Buka di Google Maps" style="width:20px;height:20px;object-fit:contain;background:transparent;"/>`;
         }
         
         // Name block combining name and intermodal icons
