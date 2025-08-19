@@ -476,6 +476,14 @@ export class LocationManager {
                 }
                 return `<img src="${brtIconUrl}" alt="BRT" title="BRT" style="width:14px;height:14px;object-fit:contain;"/>`;
             };
+            // Header icon: always show BRT bus for H/G, feeder bus for B
+            const buildHeaderIcon = (stopId) => {
+                const sid = String(stopId || '');
+                if (sid.startsWith('B')) {
+                    return `<img src="${feederIconUrl}" alt="Feeder" title="Pengumpan" style="width:14px;height:14px;object-fit:contain;"/>`;
+                }
+                return `<img src="${brtIconUrl}" alt="BRT" title="BRT" style="width:14px;height:14px;object-fit:contain;"/>`;
+            };
             
             // Layanan di halte berikutnya
             let nextStopServicesHtml = '';
@@ -536,34 +544,23 @@ export class LocationManager {
                 };
                 const ds = this.arrivalStop ? this.arrivalStop : displayStop;
                 const key = ds ? buildKey(ds) : null;
-                if (key) {
+                if (key && route && route.route_id) {
                     const cluster = allStops.filter(s => buildKey(s) === key);
-                    const codeToSet = new Map();
-                    cluster.forEach(cs => {
-                        const cid = String(cs.stop_id || '');
-                        if (cid.startsWith('G')) {
-                            const code = String(cs.platform_code || '').trim();
-                            const rids = stopToRoutes[cid] ? Array.from(stopToRoutes[cid]) : [];
-                            if (code) {
-                                let st = codeToSet.get(code); if (!st) { st = new Set(); codeToSet.set(code, st); }
-                                rids.forEach(r => st.add(String(r)));
-                            }
-                        }
-                    });
                     const routes = gtfs.getRoutes();
-                    const grayDot = `<span title="Platform" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#64748b;vertical-align:middle;"></span>`;
-                    const rows = Array.from(codeToSet.entries()).sort((a,b)=>a[0].localeCompare(b[0])).map(([code, set]) => {
-                        const badges = Array.from(set).map(rid => {
-                            const r = routes.find(rt => String(rt.route_id) === String(rid));
-                            if (!r) return '';
-                            const color = r.route_color ? `#${r.route_color}` : '#6c757d';
-                            const shortName = r.route_short_name || rid;
-                            return `<span class="badge live-platform-badge" data-routeid="${r.route_id}" style="background:${color};color:#fff;font-weight:700;font-size:0.72em;padding:3px 7px;border-radius:9999px;cursor:pointer;margin-right:6px;margin-bottom:6px;">${shortName}</span>`;
-                        }).join('');
-                        return `<div style='margin-top:6px;'><div style='font-weight:600;color:#475569;'>${grayDot} Platform ${code}</div><div style='display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;'>${badges}</div></div>`;
+                    // Only platforms relevant to current route (direction-aligned)
+                    const relevantPlatforms = cluster.filter(cs => String(cs.stop_id||'').startsWith('G') && (stopToRoutes[cs.stop_id] ? Array.from(stopToRoutes[cs.stop_id]).map(String).includes(String(route.route_id)) : false));
+                    const rows = relevantPlatforms.map(cs => {
+                        const code = String(cs.platform_code || '').trim();
+                        if (!code) return '';
+                        const r = routes.find(rt => String(rt.route_id) === String(route.route_id));
+                        if (!r) return '';
+                        const color = r.route_color ? `#${r.route_color}` : '#6c757d';
+                        const badge = `<span class="badge live-platform-badge" data-routeid="${r.route_id}" style="background:${color};color:#fff;font-weight:700;font-size:0.72em;padding:3px 7px;border-radius:9999px;cursor:pointer;">${r.route_short_name || r.route_id}</span>`;
+                        const grayDot = `<span title="Platform" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#64748b;vertical-align:middle;"></span>`;
+                        return `<div style='margin-top:6px;display:flex;align-items:center;gap:8px;'><div style='font-weight:600;color:#475569;'>${grayDot} Platform ${code}</div><div>${badge}</div></div>`;
                     }).join('');
                     if (rows) {
-                        platformHtml = `<div style='margin-top:8px;'><div style='font-size:11px;color:#666;margin-bottom:4px;'>Per Platform</div>${rows}</div>`;
+                        platformHtml = `<div style='margin-top:8px;'><div style='font-size:11px;color:#666;margin-bottom:4px;'>Platform (arah ini)</div>${rows}</div>`;
                     }
                 }
             } catch (e) {}
@@ -577,7 +574,7 @@ export class LocationManager {
             nextStopInfo = `
                 <div style='margin-bottom:6px;'>
                     <div class='text-muted' style='font-size:0.95em;font-weight:600;margin-bottom:2px;'>${titleLabel}</div>
-                    <div style='font-size:1.1em;font-weight:bold;display:flex;align-items:center;gap:6px;'>${buildStopTypeIcon(displayStop.stop_id)} <span>${displayStop.stop_name}</span> ${accessIcon}</div>
+                    <div style='font-size:1.1em;font-weight:bold;display:flex;align-items:center;gap:6px;'>${buildHeaderIcon(displayStop.stop_id)} <span>${displayStop.stop_name}</span> ${accessIcon}</div>
                     <div style='margin-bottom:2px;display:flex;align-items:center;gap:8px;'>
                         <span style='font-weight:600;color:${distColor};'>${jarakNext < 1000 ? Math.round(jarakNext) + ' m' : (jarakNext/1000).toFixed(2) + ' km'}</span>
                         <span style='font-size:0.9em;color:#64748b;'>arah ${bearingDeg}</span>
@@ -1012,7 +1009,8 @@ export class LocationManager {
                     try {
                         const loc = this;
                         if (loc && !loc.isActive && loc.canAutoStartLive && loc.canAutoStartLive()) loc.enableLiveLocation();
-                        const gtStop = this._lastLiveStopForPopup;
+                        const baseStop = this._lastLiveStopForPopup;
+                        const gtStop = this.resolveStopForRoute(baseStop, rid) || baseStop;
                         if (gtStop) {
                             loc.activateLiveServiceFromStop(gtStop, rid);
                             if (loc.lastUserPos && loc.userMarker) {
@@ -1037,6 +1035,36 @@ export class LocationManager {
             el.querySelectorAll('.live-platform-badge').forEach(b => b.addEventListener('click', onClick));
             el.querySelectorAll('.badge-koridor-interaktif').forEach(b => b.addEventListener('click', onClick));
         } catch(_){ }
+    }
+
+    // Find the most appropriate stop in this cluster that serves the given route
+    resolveStopForRoute(stop, routeId) {
+        try {
+            if (!stop || !routeId) return stop;
+            const gtfs = window.transJakartaApp.modules.gtfs;
+            const allStops = gtfs.getStops() || [];
+            const stopToRoutes = gtfs.getStopToRoutes() || {};
+            const norm = (n) => String(n || '').trim().replace(/\s+/g, ' ');
+            const buildKey = (s) => {
+                const sid = String(s.stop_id || '');
+                if (s.parent_station) return String(s.parent_station);
+                if (sid.startsWith('H')) return sid;
+                return `NAME:${norm(s.stop_name)}`;
+            };
+            const key = buildKey(stop);
+            const cluster = allStops.filter(s => buildKey(s) === key);
+            // Prefer a platform (G) that explicitly serves routeId
+            const firstG = cluster.find(s => String(s.stop_id||'').startsWith('G') && (stopToRoutes[s.stop_id] || stopToRoutes[s.stop_id] === undefined));
+            const gForRoute = cluster.find(s => String(s.stop_id||'').startsWith('G') && (stopToRoutes[s.stop_id] ? Array.from(stopToRoutes[s.stop_id]).map(String).includes(String(routeId)) : false));
+            if (gForRoute) return gForRoute;
+            // Else choose a non-access stop that serves the route
+            const anyForRoute = cluster.find(s => !String(s.stop_id||'').startsWith('E') && (stopToRoutes[s.stop_id] ? Array.from(stopToRoutes[s.stop_id]).map(String).includes(String(routeId)) : false));
+            if (anyForRoute) return anyForRoute;
+            // Fallback: return original
+            return stop;
+        } catch (e) {
+            return stop;
+        }
     }
 } 
  
