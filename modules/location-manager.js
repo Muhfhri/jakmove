@@ -812,8 +812,46 @@ export class LocationManager {
                         e.preventDefault();
                         const rid = badge.getAttribute('data-routeid');
                         console.debug('[Nearest] service badge clicked:', rid, 'at stop', stop.stop_id);
-                        // Select route only; do not start live from nearest popup
+                        // Select route first, then start Live tracking from this stop
                         try { window.transJakartaApp.modules.routes.selectRoute(rid); } catch (err) {}
+                        setTimeout(() => {
+                            try {
+                                // Ensure Live Location is ON
+                                if (!this.isActive && this.canAutoStartLive && this.canAutoStartLive()) this.enableLiveLocation();
+                                // Activate live service from this stop and route
+                                this.activateLiveServiceFromStop(stop, rid);
+                                // If we don't have a marker/position yet, fetch once immediately
+                                const tryImmediateLive = () => {
+                                    if (this.lastUserPos && this.userMarker) {
+                                        this.showUserRouteInfo(this.lastUserPos.lat, this.lastUserPos.lon, stop, rid);
+                                        return true;
+                                    }
+                                    return false;
+                                };
+                                if (!tryImmediateLive()) {
+                                    try {
+                                        navigator.geolocation.getCurrentPosition(
+                                            (pos) => {
+                                                try {
+                                                    const lat = pos.coords.latitude;
+                                                    const lon = pos.coords.longitude;
+                                                    this.lastUserPos = { lat, lon };
+                                                    this.lastUserPosSmoothed = { lat, lon };
+                                                    this.updateUserMarker(lat, lon);
+                                                    this.showUserRouteInfo(lat, lon, stop, rid);
+                                                } catch (_) {
+                                                    this.scheduleLiveUIUpdate();
+                                                }
+                                            },
+                                            () => { this.scheduleLiveUIUpdate(); },
+                                            { enableHighAccuracy: true, maximumAge: 3000, timeout: 5000 }
+                                        );
+                                    } catch (_) {
+                                        this.scheduleLiveUIUpdate();
+                                    }
+                                }
+                            } catch (err) {}
+                        }, 160);
                         // Close popup
                         try { const mm = window.transJakartaApp.modules.map; if (mm) mm.closePopup(); } catch(_){}
                     };

@@ -1538,8 +1538,6 @@ export class MapManager {
                             const gtStop = this._findPlatformStopBy(code, lat, lng);
                             if (gtStop) {
                                 loc.activateLiveServiceFromStop(gtStop, routeId);
-                                // Hide user marker to avoid duplicate visuals
-                                try { this.setUserMarkerVisible(false); } catch(_){}
                                 if (loc.lastUserPos && loc.userMarker) {
                                     loc.showUserRouteInfo(loc.lastUserPos.lat, loc.lastUserPos.lon, gtStop, routeId);
                                 } else {
@@ -1550,7 +1548,6 @@ export class MapManager {
                                                 loc.lastUserPos = { lat: plat, lon: plon };
                                                 loc.lastUserPosSmoothed = { lat: plat, lon: plon };
                                                 loc.updateUserMarker(plat, plon);
-                                                try { this.setUserMarkerVisible(false); } catch(_){}
                                                 loc.showUserRouteInfo(plat, plon, gtStop, routeId);
                                             } catch(_) { loc.scheduleLiveUIUpdate(); }
                                         }, ()=>{ try { loc.scheduleLiveUIUpdate(); } catch(_){} }, { enableHighAccuracy: true, maximumAge: 3000, timeout: 5000 });
