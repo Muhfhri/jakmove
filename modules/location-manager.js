@@ -274,7 +274,7 @@ export class LocationManager {
     // Show user route info
     showUserRouteInfo(userLat, userLon, currentStop, routeId) {
         const trips = window.transJakartaApp.modules.gtfs.getTrips()
-            .filter(t => t.route_id === routeId);
+            .filter(t => String(t.route_id) === String(routeId));
         
         let nextStop = null;
         let minSeq = Infinity;
@@ -283,17 +283,17 @@ export class LocationManager {
 
         for (const trip of trips) {
             const stTimes = window.transJakartaApp.modules.gtfs.getStopTimes()
-                .filter(st => st.trip_id === trip.trip_id)
+                .filter(st => String(st.trip_id) === String(trip.trip_id))
                 .sort((a, b) => parseInt(a.stop_sequence) - parseInt(b.stop_sequence));
             
-            const idx = stTimes.findIndex(st => st.stop_id === currentStop.stop_id);
+            const idx = stTimes.findIndex(st => String(st.stop_id) === String(currentStop.stop_id));
             if (idx !== -1) {
                 if (idx < stTimes.length - 1) {
                     const nextSt = stTimes[idx + 1];
                     if (parseInt(nextSt.stop_sequence) < minSeq) {
                         minSeq = parseInt(nextSt.stop_sequence);
                         nextStop = window.transJakartaApp.modules.gtfs.getStops()
-                            .find(s => s.stop_id === nextSt.stop_id);
+                            .find(s => String(s.stop_id) === String(nextSt.stop_id));
                         tripUsed = trip;
                         stopTimes = stTimes;
                     }
@@ -304,11 +304,11 @@ export class LocationManager {
         // Derive 2 upcoming stops after nextStop for breadcrumb
         let upcomingStops = [];
         if (nextStop && stopTimes.length > 0) {
-            const idxNext = stopTimes.findIndex(st => st.stop_id === nextStop.stop_id);
+            const idxNext = stopTimes.findIndex(st => String(st.stop_id) === String(nextStop.stop_id));
             const gtfsStops = window.transJakartaApp.modules.gtfs.getStops();
             for (let k = idxNext + 1; k <= idxNext + 2 && k < stopTimes.length; k++) {
                 const sid = stopTimes[k].stop_id;
-                const sObj = gtfsStops.find(s => s.stop_id === sid);
+                const sObj = gtfsStops.find(s => String(s.stop_id) === String(sid));
                 if (sObj) upcomingStops.push(sObj);
             }
         }
@@ -391,7 +391,7 @@ export class LocationManager {
 
         // Update popup content (UI can use smoothed userLat/userLon passed in)
         const route = window.transJakartaApp.modules.gtfs.getRoutes()
-            .find(r => r.route_id === routeId);
+            .find(r => String(r.route_id) === String(routeId));
         
         const popupContent = this.buildUserPopupContent(route, currentStop, nextStop, userLat, userLon, upcomingStops, { etaText, trend, jarakNext });
         const mapManager = window.transJakartaApp.modules.map;
@@ -434,7 +434,7 @@ export class LocationManager {
         if (!mapManager || !this.userMarker) return;
 
         const route = window.transJakartaApp.modules.gtfs.getRoutes()
-            .find(r => r.route_id === routeId);
+            .find(r => String(r.route_id) === String(routeId));
         
         const popupContent = this.buildUserPopupContent(route, currentStop, nextStop, userLat, userLon);
         mapManager.updateUserPopup(this.userMarker, popupContent);
@@ -495,10 +495,10 @@ export class LocationManager {
                 // Sembunyikan layanan yang sama dengan rute aktif
                 const currentRouteId = route && route.route_id ? route.route_id : null;
                 if (currentRouteId) {
-                    ids = ids.filter(rid => rid !== currentRouteId);
+                    ids = ids.filter(rid => String(rid) !== String(currentRouteId));
                 }
                 const badges = ids.map(rid => {
-                    const r = routes.find(rt => rt.route_id === rid);
+                    const r = routes.find(rt => String(rt.route_id) === String(rid));
                     if (!r) return '';
                     const color = r.route_color ? ('#' + r.route_color) : '#6c757d';
                     const label = r.route_short_name || r.route_id;
@@ -721,7 +721,7 @@ export class LocationManager {
 
             const routeIds = stopToRoutes[stop.stop_id] ? Array.from(stopToRoutes[stop.stop_id]) : [];
             const badges = routeIds.map(rid => {
-                const r = routes.find(rt => rt.route_id === rid);
+                const r = routes.find(rt => String(rt.route_id) === String(rid));
                 if (!r) return '';
                 const color = r.route_color ? ('#' + r.route_color) : '#6c757d';
                 return `<span class="badge badge-koridor-interaktif rounded-pill me-1 mb-1" style="background:${color};color:#fff;cursor:pointer;font-weight:bold;font-size:0.8em;padding:4px 8px;" data-routeid="${r.route_id}">${r.route_short_name}</span>`;
