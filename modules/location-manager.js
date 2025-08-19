@@ -301,6 +301,33 @@ export class LocationManager {
             }
         }
 
+        // If nextStop not found directly, derive by majority across trips of this route
+        if (!nextStop) {
+            try {
+                const gtfs = window.transJakartaApp.modules.gtfs;
+                const allStops = gtfs.getStops();
+                const tripsAll = gtfs.getTrips().filter(t => String(t.route_id) === String(routeId));
+                const stAll = gtfs.getStopTimes();
+                const tidSet = new Set(tripsAll.map(t => String(t.trip_id)));
+                const byTrip = new Map();
+                stAll.forEach(st => { const tid = String(st.trip_id); if (tidSet.has(tid)) { if (!byTrip.has(tid)) byTrip.set(tid, []); byTrip.get(tid).push(st); } });
+                const currId = String(currentStop.stop_id);
+                const counts = new Map();
+                for (const arr of byTrip.values()) {
+                    const sorted = arr.slice().sort((a,b)=>parseInt(a.stop_sequence)-parseInt(b.stop_sequence));
+                    const idx = sorted.findIndex(x => String(x.stop_id) === currId);
+                    if (idx !== -1 && idx < sorted.length - 1) {
+                        const nid = String(sorted[idx+1].stop_id);
+                        counts.set(nid, (counts.get(nid) || 0) + 1);
+                    }
+                }
+                let bestId = '';
+                let bestC = -1;
+                counts.forEach((c,id)=>{ if (c>bestC) { bestC=c; bestId=id; } });
+                if (bestId) nextStop = allStops.find(s => String(s.stop_id) === bestId) || null;
+            } catch (e) {}
+        }
+
         // Derive 2 upcoming stops after nextStop for breadcrumb
         let upcomingStops = [];
         if (nextStop && stopTimes.length > 0) {
@@ -844,11 +871,14 @@ export class LocationManager {
     // Activate live service from a given stop and route
     activateLiveServiceFromStop(stop, routeId) {
         if (!stop || !routeId) return;
+        // Resolve to the most appropriate stop in this cluster for the given route
+        let resolved = this.resolveStopForRoute(stop, routeId) || stop;
         this.selectedRouteIdForUser = routeId;
-        this.selectedCurrentStopForUser = stop;
+        this.selectedCurrentStopForUser = resolved;
         // Show lock button when live layanan active
         const lockBtn = document.getElementById('cameraLockBtn');
         if (lockBtn) lockBtn.style.display = '';
+        // Trigger UI update when possible
         if (this.lastUserPos && this.userMarker) {
             this.scheduleLiveUIUpdate();
         }
