@@ -276,6 +276,39 @@ export class LocationManager {
         const trips = window.transJakartaApp.modules.gtfs.getTrips()
             .filter(t => String(t.route_id) === String(routeId));
         
+        // Resolve currentStop to a cluster member that actually appears in stop_times for this route
+        const gtfs = window.transJakartaApp.modules.gtfs;
+        const allStops = gtfs.getStops();
+        const stopTimesAll = gtfs.getStopTimes();
+        const norm = (n) => String(n || '').trim().replace(/\s+/g, ' ');
+        const buildKey = (s) => {
+            const sid = String(s.stop_id || '');
+            if (s.parent_station) return String(s.parent_station);
+            if (sid.startsWith('H')) return sid;
+            return `NAME:${norm(s.stop_name)}`;
+        };
+        const currKey = buildKey(currentStop);
+        const cluster = allStops.filter(s => buildKey(s) === currKey);
+        const routeTripIds = new Set(trips.map(t => String(t.trip_id)));
+        const byTrip = new Map();
+        stopTimesAll.forEach(st => { const tid = String(st.trip_id); if (routeTripIds.has(tid)) { if (!byTrip.has(tid)) byTrip.set(tid, []); byTrip.get(tid).push(st); } });
+        const appearsInRoute = (sid) => {
+            for (const arr of byTrip.values()) {
+                if (arr.some(st => String(st.stop_id) === String(sid))) return true;
+            }
+            return false;
+        };
+        let effectiveStop = currentStop;
+        // Prefer platform with same platform_code when available
+        const currCode = String(currentStop.platform_code || '').trim();
+        const preferred = cluster.find(s => currCode && String(s.platform_code || '').trim() === currCode && appearsInRoute(s.stop_id));
+        if (preferred) effectiveStop = preferred; else {
+            const anyMatch = cluster.find(s => appearsInRoute(s.stop_id));
+            if (anyMatch) effectiveStop = anyMatch;
+        }
+        // Keep selection consistent for subsequent updates
+        try { if (this.selectedCurrentStopForUser && String(this.selectedCurrentStopForUser.stop_id) !== String(effectiveStop.stop_id)) this.selectedCurrentStopForUser = effectiveStop; } catch(_){}
+        
         let nextStop = null;
         let minSeq = Infinity;
         let tripUsed = null;
@@ -286,7 +319,7 @@ export class LocationManager {
                 .filter(st => String(st.trip_id) === String(trip.trip_id))
                 .sort((a, b) => parseInt(a.stop_sequence) - parseInt(b.stop_sequence));
             
-            const idx = stTimes.findIndex(st => String(st.stop_id) === String(currentStop.stop_id));
+            const idx = stTimes.findIndex(st => String(st.stop_id) === String(effectiveStop.stop_id));
             if (idx !== -1) {
                 if (idx < stTimes.length - 1) {
                     const nextSt = stTimes[idx + 1];
@@ -304,27 +337,31 @@ export class LocationManager {
         // If nextStop not found directly, derive by majority across trips of this route
         if (!nextStop) {
             try {
-                const gtfs = window.transJakartaApp.modules.gtfs;
-                const allStops = gtfs.getStops();
-                const tripsAll = gtfs.getTrips().filter(t => String(t.route_id) === String(routeId));
-                const stAll = gtfs.getStopTimes();
-                const tidSet = new Set(tripsAll.map(t => String(t.trip_id)));
-                const byTrip = new Map();
-                stAll.forEach(st => { const tid = String(st.trip_id); if (tidSet.has(tid)) { if (!byTrip.has(tid)) byTrip.set(tid, []); byTrip.get(tid).push(st); } });
-                const currId = String(currentStop.stop_id);
+                const tidSet = new Set(trips.map(t => String(t.trip_id)));
+                const byTrip2 = new Map();
+                stopTimesAll.forEach(st => { const tid = String(st.trip_id); if (tidSet.has(tid)) { if (!byTrip2.has(tid)) byTrip2.set(tid, []); byTrip2.get(tid).push(st); } });
+                const currId = String(effectiveStop.stop_id);
                 const counts = new Map();
-                for (const arr of byTrip.values()) {
+                const tripByNext = new Map();
+                for (const [tid, arr] of byTrip2.entries()) {
                     const sorted = arr.slice().sort((a,b)=>parseInt(a.stop_sequence)-parseInt(b.stop_sequence));
                     const idx = sorted.findIndex(x => String(x.stop_id) === currId);
                     if (idx !== -1 && idx < sorted.length - 1) {
-                        const nid = String(sorted[idx+1].stop_id);
-                        counts.set(nid, (counts.get(nid) || 0) + 1);
+                        const nextId = String(sorted[idx+1].stop_id);
+                        counts.set(nextId, (counts.get(nextId) || 0) + 1);
+                        if (!tripByNext.has(nextId)) tripByNext.set(nextId, tid);
                     }
                 }
-                let bestId = '';
-                let bestC = -1;
-                counts.forEach((c,id)=>{ if (c>bestC) { bestC=c; bestId=id; } });
-                if (bestId) nextStop = allStops.find(s => String(s.stop_id) === bestId) || null;
+                let bestNextId = '';
+                let bestCount = -1;
+                counts.forEach((c, id) => { if (c > bestCount) { bestCount = c; bestNextId = id; } });
+                if (bestNextId) {
+                    nextStop = allStops.find(s => String(s.stop_id) === bestNextId) || null;
+                    const tid = tripByNext.get(bestNextId);
+                    if (tid) {
+                        stopTimes = stopTimesAll.filter(st => String(st.trip_id) === tid).sort((a,b)=>parseInt(a.stop_sequence)-parseInt(b.stop_sequence));
+                    }
+                }
             } catch (e) {}
         }
 
@@ -354,7 +391,7 @@ export class LocationManager {
                     if (Math.abs(pr.measure - (best.measure || 0)) > 0 || pr.dist < best.dist) best = pr;
                 }
                 const userMeasure = best.measure;
-                const currMeasure = stopMeasureMap.get(currentStop.stop_id) || 0;
+                const currMeasure = stopMeasureMap.get(effectiveStop.stop_id) || 0;
                 const nextMeasure = stopMeasureMap.get(nextStop.stop_id) || currMeasure + 1;
                 const gate = (currMeasure + nextMeasure) / 2;
                 const corridorOk = best.minDistToSeg <= 80;
