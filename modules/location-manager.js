@@ -472,7 +472,8 @@ export class LocationManager {
                     return `<img src="${feederIconUrl}" alt="Feeder" title="Pengumpan" style="width:14px;height:14px;object-fit:contain;"/>`;
                 }
                 if (sid.startsWith('G')) {
-                    return `<span title="Platform" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#64748b;vertical-align:middle;"></span>`;
+                    // Show BRT icon for platform in breadcrumbs
+                    return `<img src="${brtIconUrl}" alt="BRT" title="BRT" style="width:14px;height:14px;object-fit:contain;"/>`;
                 }
                 return `<img src="${brtIconUrl}" alt="BRT" title="BRT" style="width:14px;height:14px;object-fit:contain;"/>`;
             };
@@ -531,38 +532,8 @@ export class LocationManager {
             // Platform section (for BRT clusters) with route badges per platform
             let platformHtml = '';
             try {
-                const gtfs = window.transJakartaApp.modules.gtfs;
-                const allStops = gtfs.getStops();
-                const stopToRoutes = gtfs.getStopToRoutes();
-                const byId = new Map(allStops.map(s => [String(s.stop_id || ''), s]));
-                const norm = (n) => String(n || '').trim().replace(/\s+/g, ' ');
-                const buildKey = (s) => {
-                    const sid = String(s.stop_id || '');
-                    if (s.parent_station) return String(s.parent_station);
-                    if (sid.startsWith('H')) return sid;
-                    return `NAME:${norm(s.stop_name)}`;
-                };
-                const ds = this.arrivalStop ? this.arrivalStop : displayStop;
-                const key = ds ? buildKey(ds) : null;
-                if (key && route && route.route_id) {
-                    const cluster = allStops.filter(s => buildKey(s) === key);
-                    const routes = gtfs.getRoutes();
-                    // Only platforms relevant to current route (direction-aligned)
-                    const relevantPlatforms = cluster.filter(cs => String(cs.stop_id||'').startsWith('G') && (stopToRoutes[cs.stop_id] ? Array.from(stopToRoutes[cs.stop_id]).map(String).includes(String(route.route_id)) : false));
-                    const rows = relevantPlatforms.map(cs => {
-                        const code = String(cs.platform_code || '').trim();
-                        if (!code) return '';
-                        const r = routes.find(rt => String(rt.route_id) === String(route.route_id));
-                        if (!r) return '';
-                        const color = r.route_color ? `#${r.route_color}` : '#6c757d';
-                        const badge = `<span class="badge live-platform-badge" data-routeid="${r.route_id}" style="background:${color};color:#fff;font-weight:700;font-size:0.72em;padding:3px 7px;border-radius:9999px;cursor:pointer;">${r.route_short_name || r.route_id}</span>`;
-                        const grayDot = `<span title="Platform" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#64748b;vertical-align:middle;"></span>`;
-                        return `<div style='margin-top:6px;display:flex;align-items:center;gap:8px;'><div style='font-weight:600;color:#475569;'>${grayDot} Platform ${code}</div><div>${badge}</div></div>`;
-                    }).join('');
-                    if (rows) {
-                        platformHtml = `<div style='margin-top:8px;'><div style='font-size:11px;color:#666;margin-bottom:4px;'>Platform (arah ini)</div>${rows}</div>`;
-                    }
-                }
+                // Removed in live popup: no Per Platform list here per request
+                platformHtml = '';
             } catch (e) {}
 
             // ETA & Trend from liveExtras
@@ -583,7 +554,6 @@ export class LocationManager {
                     </div>
                     ${nextStopServicesHtml}
                     ${breadcrumbHtml}
-                    ${platformHtml}
                 </div>
             `;
         }
@@ -1003,37 +973,11 @@ export class LocationManager {
                 const target = e.currentTarget;
                 const rid = target && target.getAttribute('data-routeid');
                 if (!rid) return;
-                // Select route, then start live from last cached live stop
+                // Select route only; live starts via platform popup, not union services in live
                 try { window.transJakartaApp.modules.routes.selectRoute(rid); } catch(_){ }
-                setTimeout(() => {
-                    try {
-                        const loc = this;
-                        if (loc && !loc.isActive && loc.canAutoStartLive && loc.canAutoStartLive()) loc.enableLiveLocation();
-                        const baseStop = this._lastLiveStopForPopup;
-                        const gtStop = this.resolveStopForRoute(baseStop, rid) || baseStop;
-                        if (gtStop) {
-                            loc.activateLiveServiceFromStop(gtStop, rid);
-                            if (loc.lastUserPos && loc.userMarker) {
-                                loc.showUserRouteInfo(loc.lastUserPos.lat, loc.lastUserPos.lon, gtStop, rid);
-                            } else {
-                                try {
-                                    navigator.geolocation.getCurrentPosition((pos)=>{
-                                        try {
-                                            const lat = pos.coords.latitude, lon = pos.coords.longitude;
-                                            loc.lastUserPos = { lat, lon };
-                                            loc.lastUserPosSmoothed = { lat, lon };
-                                            loc.updateUserMarker(lat, lon);
-                                            loc.showUserRouteInfo(lat, lon, gtStop, rid);
-                                        } catch(_){ loc.scheduleLiveUIUpdate(); }
-                                    }, ()=>{ try { loc.scheduleLiveUIUpdate(); } catch(_){} }, { enableHighAccuracy: true, maximumAge: 3000, timeout: 5000 });
-                                } catch(_){ try { loc.scheduleLiveUIUpdate(); } catch(_){} }
-                            }
-                        }
-                    } catch(_){ }
-                }, 160);
             };
+            // No union badge live start; restrict to platform badges if any exist
             el.querySelectorAll('.live-platform-badge').forEach(b => b.addEventListener('click', onClick));
-            el.querySelectorAll('.badge-koridor-interaktif').forEach(b => b.addEventListener('click', onClick));
         } catch(_){ }
     }
 

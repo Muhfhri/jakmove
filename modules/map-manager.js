@@ -908,51 +908,9 @@ export class MapManager {
                     e.stopPropagation();
                     e.preventDefault();
                     const routeId = badge.getAttribute('data-routeid');
-                    // Select route first
+                    // Select route only from union services
                     try { window.transJakartaApp.modules.routes.selectRoute(routeId); } catch (e) {}
-                    // After brief delay, enable live and show live UI from this stop
-                    setTimeout(() => {
-                        try {
-                            const loc = window.transJakartaApp.modules.location;
-                            if (loc && !loc.isActive && loc.canAutoStartLive && loc.canAutoStartLive()) loc.enableLiveLocation();
-                            const gtfsStop = (function(){
-                                try {
-                                    const gt = window.transJakartaApp.modules.gtfs;
-                                    const all = gt.getStops();
-                                    const id = String(stop.properties.stopId||'');
-                                    return all.find(s => String(s.stop_id||'') === id);
-                                } catch (_) { return null; }
-                            })();
-                            if (loc && gtfsStop) {
-                                loc.activateLiveServiceFromStop(gtfsStop, routeId);
-                                const tryImmediate = () => {
-                                    if (loc.lastUserPos && loc.userMarker) {
-                                        loc.showUserRouteInfo(loc.lastUserPos.lat, loc.lastUserPos.lon, gtfsStop, routeId);
-                                        return true;
-                                    }
-                                    return false;
-                                };
-                                if (!tryImmediate()) {
-                                    try {
-                                        navigator.geolocation.getCurrentPosition(
-                                            (pos) => {
-                                                try {
-                                                    const lat = pos.coords.latitude, lon = pos.coords.longitude;
-                                                    loc.lastUserPos = { lat, lon };
-                                                    loc.lastUserPosSmoothed = { lat, lon };
-                                                    loc.updateUserMarker(lat, lon);
-                                                    loc.showUserRouteInfo(lat, lon, gtfsStop, routeId);
-                                                } catch (_) { loc.scheduleLiveUIUpdate(); }
-                                            },
-                                            () => { try { loc.scheduleLiveUIUpdate(); } catch(_){} },
-                                            { enableHighAccuracy: true, maximumAge: 3000, timeout: 5000 }
-                                        );
-                                    } catch (_) { try { loc.scheduleLiveUIUpdate(); } catch(_){} }
-                                }
-                            }
-                        } catch (e) {}
-                        this._resumeAfterIdle();
-                    }, 160);
+                    this._resumeAfterIdle();
                     if (this._currentPopup) { this._currentPopup.remove(); this._currentPopup = null; }
                 };
                 badge.addEventListener('click', handler);
@@ -1468,6 +1426,99 @@ export class MapManager {
                     try { window.transJakartaApp.modules.location.suspendUpdates(true); } catch (e) {}
                     window.transJakartaApp.modules.routes.selectRoute(routeId);
                     this._resumeAfterIdle();
+                    if (this._currentPopup) { this._currentPopup.remove(); this._currentPopup = null; }
+                };
+                badge.addEventListener('click', handler);
+                badge.addEventListener('touchstart', handler, { passive: false });
+            });
+        }, 50);
+    }
+
+    // Control user marker visibility (avoid duplicate visuals during live popup)
+    setUserMarkerVisible(visible) {
+        try {
+            if (this.map.getLayer('user-marker')) {
+                this.map.setPaintProperty('user-marker', 'circle-opacity', visible ? 1 : 0);
+            }
+        } catch (e) {}
+    }
+
+    _findPlatformStopBy(code, lat, lng) {
+        try {
+            const gt = window.transJakartaApp.modules.gtfs;
+            const all = gt.getStops() || [];
+            const cand = all.filter(s => String(s.stop_id||'').startsWith('G') && String(s.platform_code||'').trim() === String(code||'').trim());
+            if (cand.length === 0) return null;
+            let best = cand[0];
+            let bestD = Infinity;
+            for (const s of cand) {
+                const d = Math.hypot((parseFloat(s.stop_lat)-lat), (parseFloat(s.stop_lon)-lng));
+                if (d < bestD) { bestD = d; best = s; }
+            }
+            return best;
+        } catch (e) { return null; }
+    }
+
+    navigateToPlatformAndShow(code, lat, lng, routeIds) {
+        const routes = window.transJakartaApp.modules.gtfs.getRoutes();
+        // Focus map to platform location
+        try { this.setView(lat, lng, Math.max(this.map.getZoom() || 16, 18)); } catch (e) {}
+        // Build badges
+        const badges = (routeIds || []).map(rid => {
+            const r = routes.find(rt => String(rt.route_id) === String(rid));
+            if (!r) return '';
+            const color = r.route_color ? `#${r.route_color}` : '#6c757d';
+            return `<span class="badge badge-koridor-interaktif" style="background:${color};color:#fff;font-weight:600;font-size:0.72em;padding:3px 7px;margin-right:6px;margin-bottom:6px;" data-routeid="${r.route_id}">${r.route_short_name}</span>`;
+        }).join('');
+        const title = code ? `Platform ${code}` : 'Platform';
+        const html = `
+            <div class="stop-popup plus-jakarta-sans" style="min-width:220px;max-width:300px;padding:10px 12px;">
+                <div style="color:#333;padding:6px 0;border-bottom:1px solid #eee;margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+                    <div style="font-size:13px;font-weight:700;">${title}</div>
+                </div>
+                <div style="font-size:11px;color:#666;margin-bottom:6px;">Layanan pada platform ini</div>
+                <div style="display:flex;flex-wrap:wrap;gap:4px;">${badges}</div>
+            </div>`;
+        this.showHtmlPopupAt(lng, lat, html);
+        // Bind route badge clicks to start live tracking from this platform
+        setTimeout(() => {
+            const el = this._currentPopup && this._currentPopup.getElement();
+            if (!el) return;
+            el.querySelectorAll('.badge-koridor-interaktif').forEach(badge => {
+                const handler = (e) => {
+                    e.stopPropagation(); e.preventDefault();
+                    const routeId = badge.getAttribute('data-routeid');
+                    // Select route first
+                    try { window.transJakartaApp.modules.routes.selectRoute(routeId); } catch (e) {}
+                    setTimeout(() => {
+                        try {
+                            const loc = window.transJakartaApp.modules.location;
+                            if (loc && !loc.isActive && loc.canAutoStartLive && loc.canAutoStartLive()) loc.enableLiveLocation();
+                            const gtStop = this._findPlatformStopBy(code, lat, lng);
+                            if (gtStop) {
+                                loc.activateLiveServiceFromStop(gtStop, routeId);
+                                // Hide user marker to avoid duplicate visuals
+                                try { this.setUserMarkerVisible(false); } catch(_){}
+                                if (loc.lastUserPos && loc.userMarker) {
+                                    loc.showUserRouteInfo(loc.lastUserPos.lat, loc.lastUserPos.lon, gtStop, routeId);
+                                } else {
+                                    try {
+                                        navigator.geolocation.getCurrentPosition((pos)=>{
+                                            try {
+                                                const plat = pos.coords.latitude, plon = pos.coords.longitude;
+                                                loc.lastUserPos = { lat: plat, lon: plon };
+                                                loc.lastUserPosSmoothed = { lat: plat, lon: plon };
+                                                loc.updateUserMarker(plat, plon);
+                                                try { this.setUserMarkerVisible(false); } catch(_){}
+                                                loc.showUserRouteInfo(plat, plon, gtStop, routeId);
+                                            } catch(_) { loc.scheduleLiveUIUpdate(); }
+                                        }, ()=>{ try { loc.scheduleLiveUIUpdate(); } catch(_){} }, { enableHighAccuracy: true, maximumAge: 3000, timeout: 5000 });
+                                    } catch(_) { try { loc.scheduleLiveUIUpdate(); } catch(_){} }
+                                }
+                            }
+                        } catch (e) {}
+                        this._resumeAfterIdle();
+                    }, 160);
                     if (this._currentPopup) { this._currentPopup.remove(); this._currentPopup = null; }
                 };
                 badge.addEventListener('click', handler);
