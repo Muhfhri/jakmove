@@ -838,16 +838,57 @@ export class MapManager {
 							btn.textContent = expanded ? 'Sembunyikan' : `Tampilkan semua (${blocks.length})`;
 						});
 					}
-					// Bind per-route click to select route
+					// Bind per-route click to select route and start Live from this platform
 					const onRouteClick = (ev) => {
 						try { ev.preventDefault(); ev.stopPropagation(); } catch (e) {}
 						const target = ev.currentTarget;
 						if (!target) return;
 						const rid = target.getAttribute('data-routeid');
 						if (!rid) return;
+						// Determine platform context
+						const host = target.closest('.pf-block');
+						const code = host ? host.getAttribute('data-code') : '';
+						const platLat = host ? parseFloat(host.getAttribute('data-lat')) : NaN;
+						const platLng = host ? parseFloat(host.getAttribute('data-lng')) : NaN;
 						try { window.transJakartaApp.modules.location.suspendUpdates(true); } catch (e) {}
-						window.transJakartaApp.modules.routes.selectRoute(rid);
-						this._resumeAfterIdle();
+						// Select route first
+						try { window.transJakartaApp.modules.routes.selectRoute(rid); } catch (e) {}
+						// After brief delay, enable live and start from this platform
+						setTimeout(() => {
+							try {
+								const loc = window.transJakartaApp.modules.location;
+								if (loc && !loc.isActive && loc.canAutoStartLive && loc.canAutoStartLive()) loc.enableLiveLocation();
+								const gtStop = this._findPlatformStopBy(code, platLat, platLng);
+								if (loc && gtStop) {
+									loc.activateLiveServiceFromStop(gtStop, rid);
+									const tryImmediate = () => {
+										if (loc.lastUserPos && loc.userMarker) {
+											loc.showUserRouteInfo(loc.lastUserPos.lat, loc.lastUserPos.lon, gtStop, rid);
+											return true;
+										}
+										return false;
+									};
+									if (!tryImmediate()) {
+										try {
+											navigator.geolocation.getCurrentPosition(
+												(pos) => {
+													try {
+														const lat = pos.coords.latitude, lon = pos.coords.longitude;
+														loc.lastUserPos = { lat, lon };
+														loc.lastUserPosSmoothed = { lat, lon };
+														loc.updateUserMarker(lat, lon);
+														loc.showUserRouteInfo(lat, lon, gtStop, rid);
+													} catch (_) { loc.scheduleLiveUIUpdate(); }
+												},
+												() => { try { loc.scheduleLiveUIUpdate(); } catch(_){} },
+												{ enableHighAccuracy: true, maximumAge: 3000, timeout: 5000 }
+											);
+										} catch (_) { try { loc.scheduleLiveUIUpdate(); } catch(_){} }
+									}
+								}
+							} catch (e) {}
+							this._resumeAfterIdle();
+						}, 160);
 						if (this._currentPopup) { this._currentPopup.remove(); this._currentPopup = null; }
 					};
 					container.querySelectorAll('.pf-next-item').forEach(el => {

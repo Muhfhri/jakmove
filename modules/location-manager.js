@@ -697,6 +697,7 @@ export class LocationManager {
 
         const allStops = window.transJakartaApp.modules.gtfs.getStops().filter(s => s.stop_lat && s.stop_lon);
         const sortedByDistance = allStops
+            .filter(s => { const id = String(s.stop_id||''); return !(id.startsWith('G') || id.startsWith('E')); })
             .map(s => ({ stop: s, d: this.haversine(userLat, userLon, parseFloat(s.stop_lat), parseFloat(s.stop_lon)) }))
             .sort((a, b) => a.d - b.d)
             .slice(0, maxStops);
@@ -747,44 +748,10 @@ export class LocationManager {
                         e.preventDefault();
                         const rid = badge.getAttribute('data-routeid');
                         console.debug('[Nearest] service badge clicked:', rid, 'at stop', stop.stop_id);
-                        // Select route first (map refresh), then start live after refresh settles
+                        // Select route only; do not start live from nearest popup
                         try { window.transJakartaApp.modules.routes.selectRoute(rid); } catch (err) {}
-                        setTimeout(() => {
-                            // Ensure Live Location is ON
-                            try { if (!this.isActive) this.enableLiveLocation(); } catch (err) {}
-                            // Activate live service from this stop and route
-                            try { this.activateLiveServiceFromStop(stop, rid); } catch (err) {}
-                            // If we don't have a marker/position yet, fetch once immediately
-                            const tryImmediateLive = () => {
-                                if (this.lastUserPos && this.userMarker) {
-                                    this.showUserRouteInfo(this.lastUserPos.lat, this.lastUserPos.lon, stop, rid);
-                                    return true;
-                                }
-                                return false;
-                            };
-                            if (!tryImmediateLive()) {
-                                try {
-                                    navigator.geolocation.getCurrentPosition(
-                                        (pos) => {
-                                            try {
-                                                const lat = pos.coords.latitude;
-                                                const lon = pos.coords.longitude;
-                                                this.lastUserPos = { lat, lon };
-                                                this.lastUserPosSmoothed = { lat, lon };
-                                                this.updateUserMarker(lat, lon);
-                                                this.showUserRouteInfo(lat, lon, stop, rid);
-                                            } catch (_) {
-                                                this.scheduleLiveUIUpdate();
-                                            }
-                                        },
-                                        () => { this.scheduleLiveUIUpdate(); },
-                                        { enableHighAccuracy: true, maximumAge: 3000, timeout: 5000 }
-                                    );
-                                } catch (_) {
-                                    this.scheduleLiveUIUpdate();
-                                }
-                            }
-                        }, 160);
+                        // Close popup
+                        try { const mm = window.transJakartaApp.modules.map; if (mm) mm.closePopup(); } catch(_){}
                     };
                     badge.addEventListener('click', handler);
                     badge.addEventListener('touchstart', handler, { passive: false });
