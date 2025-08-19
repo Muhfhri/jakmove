@@ -807,7 +807,7 @@ export class MapManager {
 					return `<div class=\"pf-next-item\" data-routeid=\"${r.route_id}\" style=\"display:flex;align-items:center;gap:8px;margin:2px 0;cursor:pointer;\"><span class=\"badge\" data-routeid=\"${r.route_id}\" style=\"background:${color};color:#fff;font-weight:700;font-size:0.72em;padding:3px 7px;border-radius:9999px;\">${shortName}</span><span class=\"next-name\" style=\"color:#111827;\">${nextName || '-'}</span></div>`;
 				}).join('');
 				return `
-				<div class=\"pf-block\" data-pf=\"${idx}\" style=\"margin:8px 0;\">\n\t\t\t\t\t<div class=\"pf-row\" style=\"font-weight:600;color:#475569;\">Platform ${p.code}</div>\n\t\t\t\t\t<div class=\"pf-next\">${perRoute}</div>\n\t\t\t\t\t<div class=\"pf-actions\" style=\"margin-top:6px;\"><button class=\"pf-open btn btn-sm btn-outline-secondary\" data-code=\"${p.code}\" data-lat=\"${p.lat}\" data-lng=\"${p.lng}\" data-rids=\"${encodeURIComponent(JSON.stringify(p.routeIds||[]))}\" style=\"padding:3px 8px;font-size:11px;\">Lihat</button></div>\n\t\t\t\t</div>`;
+				<div class=\"pf-block\" data-pf=\"${idx}\" data-code=\"${p.code}\" data-lat=\"${p.lat}\" data-lng=\"${p.lng}\" style=\"margin:8px 0;\">\n\t\t\t\t\t\t<div class=\"pf-row\" style=\"font-weight:600;color:#475569;\">Platform ${p.code}<\/div>\n\t\t\t\t\t\t<div class=\"pf-next\">${perRoute}<\/div>\n\t\t\t\t\t\t<div class=\"pf-actions\" style=\"margin-top:6px;\"><button class=\"pf-open btn btn-sm btn-outline-secondary\" data-code=\"${p.code}\" data-lat=\"${p.lat}\" data-lng=\"${p.lng}\" data-rids=\"${encodeURIComponent(JSON.stringify(p.routeIds||[]))}\" style=\"padding:3px 8px;font-size:11px;\">Lihat<\/button><\/div>\n\t\t\t\t\t<\/div>`;
 			}).join('');
 			// Collapse logic: show first 2 rows, toggle to show all
 			const total = platformMap.length;
@@ -913,7 +913,7 @@ export class MapManager {
 			}, 60);
 		}
 
-        const wheelchairIcon = wheelchair ? `<iconify-icon icon=\"mdi:wheelchair-accessibility\" inline></iconify-icon>` : '';
+        const wheelchairIconHtml = wheelchair ? `<iconify-icon icon=\"fontisto:paralysis-disability\" inline></iconify-icon>` : '';
 
         const popupContent = `
             <div class=\"stop-popup plus-jakarta-sans\" style=\"min-width: 220px; max-width: 330px; padding: 10px 12px;\">
@@ -922,7 +922,7 @@ export class MapManager {
                         ${(() => { try { const rm = window.transJakartaApp.modules.routes; const stopObj = window.transJakartaApp.modules.gtfs.getStops().find(s => String(s.stop_id) === String(stop.properties.stopId)); if (!rm || !stopObj) return ''; const html = rm.buildIntermodalIconsForStop ? rm.buildIntermodalIconsForStop(stopObj) : ''; return html || ''; } catch(e){ return ''; } })()}
                         ${(() => { try { const rm = window.transJakartaApp.modules.routes; const stopObj = window.transJakartaApp.modules.gtfs.getStops().find(s => String(s.stop_id) === String(stop.properties.stopId)); if (!rm || !stopObj) return ''; if (rm.shouldShowJaklingkoBadge && rm.shouldShowJaklingkoBadge(stopObj)) { return '<img class="jaklingko-badge" src="https://transportforjakarta.or.id/wp-content/uploads/2024/10/jaklingko-w-AR0bObLen0c7yK8n-768x768.png" alt="JakLingko" title="Terintegrasi JakLingko" />'; } return ''; } catch(e){ return ''; } })()}
                     </div>
-                    ${wheelchairIcon}
+                    ${wheelchairIconHtml}
                 </div>
                 <div class=\"popup-scroll\" style=\"max-height:56vh;overflow:auto;\">
                 ${jenisHtml}
@@ -1252,8 +1252,23 @@ export class MapManager {
     removeMarker(id) {
         const entry = this.layers.get(id);
         if (!entry) return;
-        if (this.map.getLayer(entry.layerId)) this.map.removeLayer(entry.layerId);
-        if (this.map.getSource(entry.sourceId)) this.map.removeSource(entry.sourceId);
+        const sourceId = entry.sourceId;
+        const layerId = entry.layerId;
+        // Remove the target layer first
+        try { if (layerId && this.map.getLayer(layerId)) this.map.removeLayer(layerId); } catch (e) {}
+        // Only remove the source if no other registered layers still reference it
+        if (sourceId) {
+            const stillUsing = Array.from(this.layers.entries()).some(([key, e]) => {
+                if (!e || key === id) return false;
+                const same = e.sourceId === sourceId;
+                if (!same) return false;
+                try { return !!(e.layerId && this.map.getLayer(e.layerId)); } catch (_) { return false; }
+            });
+            if (!stillUsing) {
+                try { if (this.map.getSource(sourceId)) this.map.removeSource(sourceId); } catch (e) {}
+            }
+        }
+        // Cleanup registry
         this.layers.delete(id);
     }
 

@@ -73,6 +73,7 @@ export class LocationManager {
         this._allowAutoStart = true;
         this.updateLiveLocationButton(true);
         this.showNearestStopsButton();
+        this.updateLockButtonVisibility();
         const mapEl = document.getElementById('map');
         if (mapEl) mapEl.classList.add('live-has-custom-marker');
         // Seed marker immediately if possible
@@ -124,6 +125,7 @@ export class LocationManager {
         this._allowAutoStart = false;
         this.updateLiveLocationButton(false);
         this.hideNearestStopsButton();
+        this.updateLockButtonVisibility();
 
         // Remove nearest stops markers
         this.clearNearestStopsMarkers();
@@ -273,8 +275,10 @@ export class LocationManager {
 
     // Show user route info
     showUserRouteInfo(userLat, userLon, currentStop, routeId) {
+        console.debug('[Live] showUserRouteInfo called:', { stop: currentStop?.stop_id, route: routeId, userPos: { lat: userLat, lon: userLon } });
         const trips = window.transJakartaApp.modules.gtfs.getTrips()
             .filter(t => String(t.route_id) === String(routeId));
+        console.debug('[Live] trips found for route:', trips.length);
         
         // Resolve currentStop to a cluster member that actually appears in stop_times for this route
         const gtfs = window.transJakartaApp.modules.gtfs;
@@ -289,6 +293,7 @@ export class LocationManager {
         };
         const currKey = buildKey(currentStop);
         const cluster = allStops.filter(s => buildKey(s) === currKey);
+        console.debug('[Live] cluster for stop:', cluster.length, 'stops');
         const routeTripIds = new Set(trips.map(t => String(t.trip_id)));
         const byTrip = new Map();
         stopTimesAll.forEach(st => { const tid = String(st.trip_id); if (routeTripIds.has(tid)) { if (!byTrip.has(tid)) byTrip.set(tid, []); byTrip.get(tid).push(st); } });
@@ -306,6 +311,7 @@ export class LocationManager {
             const anyMatch = cluster.find(s => appearsInRoute(s.stop_id));
             if (anyMatch) effectiveStop = anyMatch;
         }
+        console.debug('[Live] effective stop resolved:', effectiveStop?.stop_id, 'from original:', currentStop?.stop_id);
         // Keep selection consistent for subsequent updates
         try { if (this.selectedCurrentStopForUser && String(this.selectedCurrentStopForUser.stop_id) !== String(effectiveStop.stop_id)) this.selectedCurrentStopForUser = effectiveStop; } catch(_){}
         
@@ -334,8 +340,11 @@ export class LocationManager {
             }
         }
 
+        console.debug('[Live] nextStop found:', nextStop?.stop_id, nextStop?.stop_name);
+
         // If nextStop not found directly, derive by majority across trips of this route
         if (!nextStop) {
+            console.debug('[Live] No direct nextStop found, trying fallback method...');
             try {
                 const tidSet = new Set(trips.map(t => String(t.trip_id)));
                 const byTrip2 = new Map();
@@ -361,9 +370,14 @@ export class LocationManager {
                     if (tid) {
                         stopTimes = stopTimesAll.filter(st => String(st.trip_id) === tid).sort((a,b)=>parseInt(a.stop_sequence)-parseInt(b.stop_sequence));
                     }
+                    console.debug('[Live] Fallback nextStop found:', nextStop?.stop_id, nextStop?.stop_name);
                 }
-            } catch (e) {}
+            } catch (e) {
+                console.debug('[Live] Fallback method failed:', e);
+            }
         }
+
+        console.debug('[Live] Final nextStop:', nextStop?.stop_id, nextStop?.stop_name, 'stopTimes length:', stopTimes.length);
 
         // Derive 2 upcoming stops after nextStop for breadcrumb
         let upcomingStops = [];
@@ -580,7 +594,7 @@ export class LocationManager {
             // Accessibility icon for next stop if accessible
             let accessIcon = '';
             if (displayStop && displayStop.wheelchair_boarding === '1') {
-                accessIcon = `<span title='Ramah kursi roda' style='margin-left:6px;'>♿</span>`;
+                accessIcon = `<span title='Ramah kursi roda' style='margin-left:6px;'><iconify-icon icon="fontisto:paralysis-disability" inline></iconify-icon></span>`;
             }
 
             // Breadcrumb 2 halte ke depan
@@ -755,6 +769,8 @@ export class LocationManager {
         console.debug('[Nearest] showMultipleNearestStops lat/lon/max:', userLat, userLon, maxStops);
         const stopManager = window.transJakartaApp.modules.stops;
         if (!stopManager) return;
+        // Ensure lock button is hidden until a service is explicitly chosen
+        this.updateLockButtonVisibility();
 
         // Clear previous markers
         this.clearNearestStopsMarkers();
@@ -816,41 +832,57 @@ export class LocationManager {
                         try { window.transJakartaApp.modules.routes.selectRoute(rid); } catch (err) {}
                         setTimeout(() => {
                             try {
-                                // Ensure Live Location is ON
-                                if (!this.isActive && this.canAutoStartLive && this.canAutoStartLive()) this.enableLiveLocation();
+                                console.debug('[Nearest] Starting Live from badge click');
+                                // Force enable Live Location 
+                                if (!this.isActive) {
+                                    console.debug('[Nearest] Enabling Live Location');
+                                    this.enableLiveLocation();
+                                }
                                 // Activate live service from this stop and route
                                 this.activateLiveServiceFromStop(stop, rid);
+                                // Visibility is handled centrally
+                                this.updateLockButtonVisibility();
                                 // If we don't have a marker/position yet, fetch once immediately
                                 const tryImmediateLive = () => {
                                     if (this.lastUserPos && this.userMarker) {
+                                        console.debug('[Nearest] Showing Live UI immediately');
                                         this.showUserRouteInfo(this.lastUserPos.lat, this.lastUserPos.lon, stop, rid);
                                         return true;
                                     }
                                     return false;
                                 };
                                 if (!tryImmediateLive()) {
+                                    console.debug('[Nearest] Getting user position for Live UI');
                                     try {
                                         navigator.geolocation.getCurrentPosition(
                                             (pos) => {
                                                 try {
                                                     const lat = pos.coords.latitude;
                                                     const lon = pos.coords.longitude;
+                                                    console.debug('[Nearest] Got position, updating marker and showing Live UI');
                                                     this.lastUserPos = { lat, lon };
                                                     this.lastUserPosSmoothed = { lat, lon };
                                                     this.updateUserMarker(lat, lon);
                                                     this.showUserRouteInfo(lat, lon, stop, rid);
                                                 } catch (_) {
+                                                    console.debug('[Nearest] Error in position callback, scheduling update');
                                                     this.scheduleLiveUIUpdate();
                                                 }
                                             },
-                                            () => { this.scheduleLiveUIUpdate(); },
+                                            (err) => { 
+                                                console.debug('[Nearest] Geolocation error:', err);
+                                                this.scheduleLiveUIUpdate(); 
+                                            },
                                             { enableHighAccuracy: true, maximumAge: 3000, timeout: 5000 }
                                         );
                                     } catch (_) {
+                                        console.debug('[Nearest] Geolocation API error, scheduling update');
                                         this.scheduleLiveUIUpdate();
                                     }
                                 }
-                            } catch (err) {}
+                            } catch (err) {
+                                console.debug('[Nearest] Error in badge click handler:', err);
+                            }
                         }, 160);
                         // Close popup
                         try { const mm = window.transJakartaApp.modules.map; if (mm) mm.closePopup(); } catch(_){}
@@ -946,16 +978,20 @@ export class LocationManager {
     // Activate live service from a given stop and route
     activateLiveServiceFromStop(stop, routeId) {
         if (!stop || !routeId) return;
+        console.debug('[Live] activateLiveServiceFromStop called:', stop.stop_id, routeId);
         // Resolve to the most appropriate stop in this cluster for the given route
         let resolved = this.resolveStopForRoute(stop, routeId) || stop;
+        console.debug('[Live] resolved stop:', resolved.stop_id);
         this.selectedRouteIdForUser = routeId;
         this.selectedCurrentStopForUser = resolved;
-        // Show lock button when live layanan active
-        const lockBtn = document.getElementById('cameraLockBtn');
-        if (lockBtn) lockBtn.style.display = '';
+        // Update lock button visibility based on selection state
+        this.updateLockButtonVisibility();
         // Trigger UI update when possible
         if (this.lastUserPos && this.userMarker) {
+            console.debug('[Live] triggering immediate UI update');
             this.scheduleLiveUIUpdate();
+        } else {
+            console.debug('[Live] no user position yet, waiting for geolocation');
         }
     }
 
@@ -1057,6 +1093,7 @@ export class LocationManager {
     resolveStopForRoute(stop, routeId) {
         try {
             if (!stop || !routeId) return stop;
+            console.debug('[Live] resolveStopForRoute called:', stop.stop_id, routeId);
             const gtfs = window.transJakartaApp.modules.gtfs;
             const allStops = gtfs.getStops() || [];
             const stopToRoutes = gtfs.getStopToRoutes() || {};
@@ -1069,18 +1106,50 @@ export class LocationManager {
             };
             const key = buildKey(stop);
             const cluster = allStops.filter(s => buildKey(s) === key);
+            console.debug('[Live] cluster size:', cluster.length, 'for stop:', stop.stop_id);
+            
+            // Check if original stop serves the route
+            const originalRoutes = stopToRoutes[stop.stop_id] || [];
+            const originalServesRoute = Array.from(originalRoutes).some(r => String(r) === String(routeId));
+            console.debug('[Live] original stop serves route:', originalServesRoute);
+            if (originalServesRoute) return stop;
+            
             // Prefer a platform (G) that explicitly serves routeId
-            const firstG = cluster.find(s => String(s.stop_id||'').startsWith('G') && (stopToRoutes[s.stop_id] || stopToRoutes[s.stop_id] === undefined));
             const gForRoute = cluster.find(s => String(s.stop_id||'').startsWith('G') && (stopToRoutes[s.stop_id] ? Array.from(stopToRoutes[s.stop_id]).map(String).includes(String(routeId)) : false));
-            if (gForRoute) return gForRoute;
+            if (gForRoute) {
+                console.debug('[Live] found platform serving route:', gForRoute.stop_id);
+                return gForRoute;
+            }
             // Else choose a non-access stop that serves the route
             const anyForRoute = cluster.find(s => !String(s.stop_id||'').startsWith('E') && (stopToRoutes[s.stop_id] ? Array.from(stopToRoutes[s.stop_id]).map(String).includes(String(routeId)) : false));
-            if (anyForRoute) return anyForRoute;
+            if (anyForRoute) {
+                console.debug('[Live] found any stop serving route:', anyForRoute.stop_id);
+                return anyForRoute;
+            }
             // Fallback: return original
+            console.debug('[Live] no better stop found, using original:', stop.stop_id);
             return stop;
         } catch (e) {
+            console.debug('[Live] resolveStopForRoute error:', e);
             return stop;
         }
+    }
+
+    // Centralized control for camera lock button visibility
+    updateLockButtonVisibility() {
+        try {
+            const btn = document.getElementById('cameraLockBtn');
+            if (!btn) return;
+            const shouldShow = !!(this.isActive && this.selectedRouteIdForUser && this.selectedCurrentStopForUser);
+            btn.style.display = shouldShow ? '' : 'none';
+            if (!shouldShow) {
+                const mapManager = window.transJakartaApp.modules.map;
+                if (mapManager) mapManager.setCameraLock(false);
+                btn.classList.remove('btn-success');
+                btn.classList.add('btn-primary');
+                btn.innerHTML = '<iconify-icon icon="mdi:compass" inline></iconify-icon> <span class="d-none d-md-inline">Lock</span>';
+            }
+        } catch (_) {}
     }
 } 
  

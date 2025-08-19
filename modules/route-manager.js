@@ -671,7 +671,7 @@ export class RouteManager {
                 wcIcon.className = 'wc-icon';
                 wcIcon.title = 'Ramah kursi roda';
                 wcIcon.style.marginLeft = '6px';
-                wcIcon.innerHTML = '<iconify-icon icon="mdi:wheelchair-accessibility" inline></iconify-icon>';
+                wcIcon.innerHTML = '<iconify-icon icon="fontisto:paralysis-disability" inline></iconify-icon>';
             }
         }
         
@@ -683,8 +683,13 @@ export class RouteManager {
             coordLink.target = '_blank';
             coordLink.rel = 'noopener';
             coordLink.className = 'coord-link';
-            coordLink.title = 'Lihat di Google Maps';
-            coordLink.innerHTML = `<iconify-icon icon="mdi:map-marker" style="color: #d9534f;"></iconify-icon>`;
+            coordLink.title = 'Buka di Google Maps';
+            // Use BRT/Feeder icon instead of map marker
+            const brtIconUrl = 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/26/JakIcon_BusBRT.svg/1200px-JakIcon_BusBRT.svg.png';
+            const feederIconUrl = 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8b/JakIcon_Bus_Light.svg/2048px-JakIcon_Bus_Light.svg.png';
+            const sid = String(stop.stop_id || '');
+            const iconUrl = sid.startsWith('B') ? feederIconUrl : brtIconUrl;
+            coordLink.innerHTML = `<img src="${iconUrl}" alt="Map" title="Buka di Google Maps" style="width:16px;height:16px;object-fit:contain;"/>`;
         }
         
         // Name block combining name and intermodal icons
@@ -726,6 +731,37 @@ export class RouteManager {
         `;
         
         li.appendChild(stopContainer);
+
+        // Make stop name clickable to open on our map with popup
+        try {
+            const nameEl = li.querySelector('.stop-name');
+            if (nameEl) {
+                nameEl.style.cursor = 'pointer';
+                nameEl.addEventListener('click', (e) => {
+                    e.preventDefault(); e.stopPropagation();
+                    try {
+                        const mapManager = window.transJakartaApp.modules.map;
+                        if (!mapManager) return;
+                        // Center map
+                        if (stop.stop_lat && stop.stop_lon) {
+                            mapManager.setView(parseFloat(stop.stop_lat), parseFloat(stop.stop_lon), 17);
+                        }
+                        // Build pseudo feature similar to search
+                        const stopToRoutes = window.transJakartaApp.modules.gtfs.getStopToRoutes();
+                        const f = {
+                            properties: {
+                                stopId: stop.stop_id,
+                                stopName: stop.stop_name,
+                                stopType: mapManager.getStopType ? mapManager.getStopType(String(stop.stop_id)) : '',
+                                routeIds: (stopToRoutes[stop.stop_id] ? Array.from(stopToRoutes[stop.stop_id]) : [])
+                            }
+                        };
+                        // Show popup
+                        mapManager.showStopPopup(f, { lng: parseFloat(stop.stop_lon), lat: parseFloat(stop.stop_lat) });
+                    } catch(_) {}
+                });
+            }
+        } catch(_) {}
         
         // Event handlers
         li.onclick = (e) => {
