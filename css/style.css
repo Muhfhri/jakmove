@@ -140,11 +140,9 @@ border: 1.5px solid #b91c1c;
 background: #e6f0ff;
 }
 .badge-koridor-interaktif {
-    font-size: 0.9rem !important;
-    padding: 0.4em 0.8em !important;
-    font-weight: 600 !important;
-    letter-spacing: 0.3px !important;
-    transition: all 0.3s ease !important;
+    font-size: 0.95rem;
+    padding: 0.45em 0.85em;
+    line-height: 1.15;
 }
 
 .badge-koridor-interaktif:hover {
@@ -2196,8 +2194,8 @@ color: #4FA8DE;
 /* Responsive untuk mobile */
 @media (max-width: 768px) {
     .badge-koridor-interaktif {
-        font-size: 0.8rem !important;
-        padding: 0.3em 0.6em !important;
+        font-size: 0.9rem;
+        padding: 0.4em 0.75em;
     }
     
     .route-badge-container .badge-koridor-interaktif {
@@ -5540,5 +5538,19 @@ body.no-scroll { overflow: hidden; height: 100vh; }
 	.badge-koridor-interaktif {
 		min-height: 1.5em;
 	}
+}
+
+/* Make badges larger on mobile (global + map popups) */
+@media (max-width: 768px) {
+	.badge-koridor-interaktif,
+	.stop-popup .badge-koridor-interaktif,
+	.leaflet-popup-content .badge-koridor-interaktif,
+	.maplibregl-popup-content .badge-koridor-interaktif {
+		font-size: 0.92rem !important;
+		padding: 0.36em 0.7em !important;
+		min-height: 1.55em;
+	}
+	/* Allow a bit wider badge in category route list on mobile so text doesn't truncate too early */
+	.category-routes .list-group-item .badge { max-width: 90px; }
 }
 
