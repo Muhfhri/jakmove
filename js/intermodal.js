@@ -29,7 +29,13 @@
 			'Stasiun Jatinegara': ['KRL'],
 			'Juanda': ['KRL'],
 			'Matraman Baru': ['KRL'],
-			'Cikoko': ['LRT'],
+			'Cikoko Arah Timur': ['LRT', 'KRL'],
+			'Cikoko Arah Barat': ['LRT'],
+			'Cawang': ['LRT'],
+			'Tamini Square 1': ['LRT'],
+			'Jasamarga Toll Road Maintenance': ['LRT'],
+			'Rasuna Said': ['LRT'],
+			'Setiabudi': ['LRT'],
 			'Kuningan': ['LRT'],
 		};
 		try {

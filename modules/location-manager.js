@@ -37,6 +37,7 @@ export class LocationManager {
         this._userAnimStart = 0;
         this._userAnimDurationMs = 450;
         this._lastLiveStopForPopup = null;
+        this._liveOrigin = null; // 'nearest' when live started from nearest flow
     }
 
     // Toggle live location
@@ -126,6 +127,7 @@ export class LocationManager {
         this.updateLiveLocationButton(false);
         this.hideNearestStopsButton();
         this.updateLockButtonVisibility();
+        this._liveOrigin = null;
 
         // Remove nearest stops markers
         this.clearNearestStopsMarkers();
@@ -839,6 +841,7 @@ export class LocationManager {
                                     this.enableLiveLocation();
                                 }
                                 // Activate live service from this stop and route
+                                this._liveOrigin = 'nearest';
                                 this.activateLiveServiceFromStop(stop, rid);
                                 // Visibility is handled centrally
                                 this.updateLockButtonVisibility();
@@ -1140,7 +1143,7 @@ export class LocationManager {
         try {
             const btn = document.getElementById('cameraLockBtn');
             if (!btn) return;
-            const shouldShow = !!(this.isActive && this.selectedRouteIdForUser && this.selectedCurrentStopForUser);
+            const shouldShow = !!(this.isActive && this.selectedRouteIdForUser && this.selectedCurrentStopForUser && this._liveOrigin === 'nearest');
             btn.style.display = shouldShow ? '' : 'none';
             if (!shouldShow) {
                 const mapManager = window.transJakartaApp.modules.map;

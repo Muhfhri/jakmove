@@ -17,7 +17,7 @@ export class MapManager {
 
     init() {
         if (this.isInitialized) return;
-
+        
         try {
             this.map = new maplibregl.Map({
                 container: 'map',
@@ -44,15 +44,15 @@ export class MapManager {
             });
 
             this.setupMapEvents();
-            this.featurePopup = new maplibregl.Popup({
-                closeButton: true,
-                closeOnClick: false,
+            this.featurePopup = new maplibregl.Popup({ 
+                closeButton: true, 
+                closeOnClick: false, 
                 maxWidth: '350px',
                 className: 'custom-popup-transparent'
             });
-            this.userPopup = new maplibregl.Popup({
-                closeButton: false,
-                closeOnClick: false,
+            this.userPopup = new maplibregl.Popup({ 
+                closeButton: false, 
+                closeOnClick: false, 
                 maxWidth: '350px',
                 className: 'custom-popup-transparent',
                 anchor: 'top',
@@ -70,7 +70,7 @@ export class MapManager {
 
     setupMapEvents() {
         this.map.on('load', () => { console.log('Map loaded'); });
-
+        
         // Close feature popup when clicking outside
         this.map.on('click', (e) => {
             if (this._currentPopup && !e.originalEvent.target.closest('.maplibregl-popup')) {
@@ -87,7 +87,7 @@ export class MapManager {
                 this.removeHalteRadiusMarkers();
             }
         });
-
+        
         this.map.on('moveend', () => {
             if (window.radiusHalteActive && this.map.getZoom() >= 14) {
                 const c = this.map.getCenter();
@@ -127,23 +127,23 @@ export class MapManager {
         else style = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json';
 
         this.map.setStyle(style);
-
+        
         // Reset layer-bound handler flags so they rebind after style reload
         this._stopsHandlersBound = false;
         // Reset icon load promise for new style
         this._stopIconsPromise = null;
-
+        
         // Re-add layers after style change
         const readd = () => {
             // Re-add route polyline if exists
             if (this._activeRouteData) {
                 this.addRoutePolyline(
-                    this._activeRouteData.routeId,
-                    this._activeRouteData.shapes,
+                    this._activeRouteData.routeId, 
+                    this._activeRouteData.shapes, 
                     this._activeRouteData.color
                 );
             }
-
+            
             // Re-add stops markers if exists (snapshot stored)
             if (this._activeRouteData && this._activeRouteData.stopsSnapshot) {
                 this.addStopsMarkers(
@@ -154,7 +154,7 @@ export class MapManager {
             }
             // Move overlay layers above
             this._ensureOverlaysOnTop();
-
+            
             // If for some reason stops layer still missing, force re-render via RouteManager
             try {
                 const hasStopsLayer = this.map.getLayer('stops-markers');
@@ -165,7 +165,7 @@ export class MapManager {
                     routesMod.selectRoute(activeId);
                 }
             } catch (e) {}
-
+            
             // Re-add user marker if active
             const app = window.transJakartaApp;
             try {
@@ -175,7 +175,7 @@ export class MapManager {
                     this.addUserMarker(p.lat, p.lon);
                 }
             } catch (e) {}
-
+            
             // Re-add radius markers if active
             try {
             if (window.radiusHalteActive && this.map.getZoom() >= 14) {
@@ -183,7 +183,503 @@ export class MapManager {
                 this.showHalteRadius(center.lng, center.lat, 300);
             }
             } catch (e) {}
+            
+            this.map.off('idle', readd);
+        };
+        this.map.on('idle', readd);
+    }
 
+    _ensureOverlaysOnTop() {
+        try {
+            if (this.map.getLayer('stops-markers')) this.map.moveLayer('stops-markers');
+            if (this.map.getLayer('stops-hitbox')) this.map.moveLayer('stops-hitbox');
+            if (this.map.getLayer('platform-dots')) this.map.moveLayer('platform-dots');
+            if (this.map.getLayer('platform-hitbox')) this.map.moveLayer('platform-hitbox');
+            if (this.map.getLayer(this._radiusLayerId)) this.map.moveLayer(this._radiusLayerId);
+            if (this.map.getLayer('radius-platform-dots')) this.map.moveLayer('radius-platform-dots');
+        } catch (e) {}
+    }
+
+    _buildSatelliteStyle() {
+        return {
+            version: 8,
+            sources: {
+                esri: { type: 'raster', tiles: ['https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], tileSize: 256, attribution: 'Tiles © Esri' }
+            },
+            layers: [ { id: 'esri', type: 'raster', source: 'esri' } ]
+        };
+    }
+
+    _buildRasterStyle(tiles, attribution) {
+        return {
+            version: 8,
+            sources: {
+                base: { type: 'raster', tiles, tileSize: 256, attribution }
+            },
+            layers: [ { id: 'base', type: 'raster', source: 'base' } ]
+        };
+    }
+
+    _removeRouteLayers() {
+        Array.from(this.layers.keys()).filter(id => id.startsWith('route-')).forEach(id => {
+            const ent = this.layers.get(id);
+            if (ent) {
+                if (this.map.getLayer(ent.layerId)) this.map.removeLayer(ent.layerId);
+                if (this.map.getSource(ent.sourceId)) this.map.removeSource(ent.sourceId);
+                this.layers.delete(id);
+            }
+        });
+    }
+
+    _ensureStyleReady(callback) {
+        if (!this.map) return;
+        if (this.map.isStyleLoaded()) {
+            callback();
+        } else {
+            const onceCb = () => {
+                this.map.off('idle', onceCb);
+                callback();
+            };
+            this.map.on('idle', onceCb);
+        }
+    }
+
+    // Build grouped stop features:
+    // - Hide access stops (E/H)
+    // - Merge platform (G*) stops with the same stop_name into one feature
+    // - Union routeIds and collect platform codes for popup
+    _buildGroupedStopFeatures(stops, stopToRoutes) {
+		console.debug('[Grouping] _buildGroupedStopFeatures called with', stops.length, 'stops');
+		const normalizeName = (n) => String(n || '').trim().replace(/\s+/g, ' ');
+		// Load all GTFS stops for full clustering
+		let allStops = [];
+		try { allStops = window.transJakartaApp.modules.gtfs.getStops() || []; } catch (e) {}
+		const idToStop = new Map(allStops.map(s => [String(s.stop_id || ''), s]));
+		// Build parent-based clusters from all stops
+		const parentToChildren = new Map();
+		for (const s of allStops) {
+			if (!s) continue;
+			const sid = String(s.stop_id || '');
+			if (sid.startsWith('E')) continue; // exclude access from cluster children
+			let key = '';
+			if (s.parent_station) {
+				key = String(s.parent_station);
+			} else if (sid.startsWith('H')) {
+				key = sid; // parent itself
+			} else {
+				// fallback by normalized name (for feeder/non-parented)
+				key = `NAME:${normalizeName(s.stop_name)}`;
+			}
+			if (!parentToChildren.has(key)) parentToChildren.set(key, []);
+			parentToChildren.get(key).push(s);
+		}
+		console.debug('[Grouping] parentToChildren built with', parentToChildren.size, 'groups');
+		// Build features for clusters referenced by provided subset
+		const seenKeys = new Set();
+		const features = [];
+		for (const s of stops) {
+			if (!s) continue;
+			const sid = String(s.stop_id || '');
+			let key = '';
+			if (s.parent_station) key = String(s.parent_station);
+			else if (sid.startsWith('H')) key = sid;
+			else key = `NAME:${normalizeName(s.stop_name)}`;
+			if (seenKeys.has(key)) continue;
+			seenKeys.add(key);
+			const cluster = parentToChildren.get(key) || [];
+			if (cluster.length === 0) continue;
+			const ids = [];
+			const nonAccess = [];
+			let parentStop = null;
+			for (const cs of cluster) {
+				const cid = String(cs.stop_id || '');
+				if (cid.startsWith('E')) continue;
+				ids.push(cid);
+				if (cid.startsWith('H')) parentStop = cs;
+				if (cs.stop_lat && cs.stop_lon) nonAccess.push(cs);
+			}
+			if (ids.length === 0) continue;
+			// Geometry: prefer parent H position; else average
+			let lat = 0, lon = 0;
+			if (parentStop && parentStop.stop_lat && parentStop.stop_lon) {
+				lat = parseFloat(parentStop.stop_lat); lon = parseFloat(parentStop.stop_lon);
+			} else if (nonAccess.length) {
+				const lats = nonAccess.map(x => parseFloat(x.stop_lat));
+				const lons = nonAccess.map(x => parseFloat(x.stop_lon));
+				lat = lats.reduce((a,b)=>a+b,0) / lats.length;
+				lon = lons.reduce((a,b)=>a+b,0) / lons.length;
+			}
+			// Aggregate routes and platform mapping
+			const routeIdSet = new Set();
+			const platformCodes = new Set();
+			const platformCodeToRouteIds = new Map();
+			let anyWheelchair = false;
+			let hasFeeder = false;
+			let hasNonFeeder = false;
+			let firstCode = '';
+			let firstDesc = '';
+			for (const cs of cluster) {
+				const cid = String(cs.stop_id || '');
+				if (cid.startsWith('E')) continue;
+				const rids = stopToRoutes[cid] ? Array.from(stopToRoutes[cid]) : [];
+				rids.forEach(r => routeIdSet.add(String(r)));
+				if (!firstCode && cs.stop_code) firstCode = String(cs.stop_code);
+				if (!firstDesc && cs.stop_desc) firstDesc = String(cs.stop_desc);
+				if (String(cs.wheelchair_boarding || '0') === '1') anyWheelchair = true;
+				if (cid.startsWith('B')) hasFeeder = true; else hasNonFeeder = true;
+				if (cid.startsWith('G')) {
+					const code = String(cs.platform_code || '').trim();
+					if (code) {
+						platformCodes.add(code);
+						let set = platformCodeToRouteIds.get(code);
+						if (!set) { set = new Set(); platformCodeToRouteIds.set(code, set); }
+						rids.forEach(r => set.add(String(r)));
+					}
+				}
+			}
+			const platformMap = Array.from(platformCodeToRouteIds.entries()).map(([code, set]) => ({ code, routeIds: Array.from(set) })).sort((a,b)=>a.code.localeCompare(b.code));
+			features.push({
+				type: 'Feature',
+				properties: {
+					stopId: ids[0],
+					stopName: normalizeName(s.stop_name || (parentStop && parentStop.stop_name)),
+					stopType: (hasFeeder && !hasNonFeeder) ? 'Pengumpan' : 'Koridor',
+					routeIds: Array.from(routeIdSet),
+					platformCodes: Array.from(platformCodes).sort(),
+					platformMap,
+					wheelchairBoarding: anyWheelchair ? '1' : '0',
+					stopCode: firstCode,
+					stopDesc: firstDesc
+				},
+				geometry: { type: 'Point', coordinates: [lon, lat] }
+			});
+		}
+		return features;
+    }
+
+    addRoutePolyline(routeId, shapes, color = '#264697') {
+        if (!this.map || !shapes || shapes.length === 0) return;
+        this._ensureStyleReady(() => {
+            // Remove previous route layers to avoid stacking
+            this._removeRouteLayers();
+
+            const layerId = `route-${routeId}`;
+            const sourceId = `source-${routeId}`;
+
+            const routeFeatures = shapes.map(shape => ({
+                type: 'Feature', properties: { routeId, color }, geometry: { type: 'LineString', coordinates: shape.map(p => [p.lng, p.lat]) }
+            }));
+            const routeSource = { type: 'geojson', data: { type: 'FeatureCollection', features: routeFeatures } };
+
+            if (this.map.getSource(sourceId)) this.map.removeSource(sourceId);
+            this.map.addSource(sourceId, routeSource);
+            if (this.map.getLayer(layerId)) this.map.removeLayer(layerId);
+            this.map.addLayer({ id: layerId, type: 'line', source: sourceId, layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': color, 'line-width': 4, 'line-opacity': 0.8 } });
+            this.layers.set(layerId, { sourceId, layerId });
+            
+            // Simpan data rute aktif untuk re-add setelah ganti style
+            this._activeRouteData = { routeId, shapes, color, ...(this._activeRouteData || {}) };
+            
+            // Ensure overlays appear above the new polyline
+            this._ensureOverlaysOnTop();
+            
+            this.fitBoundsToRoute(shapes);
+        });
+    }
+
+    // Ensure custom stop icons are loaded into the style once per style load
+    _ensureStopIconsLoaded() {
+        if (!this.map) return Promise.resolve();
+        if (this._stopIconsPromise) return this._stopIconsPromise;
+        const entries = [
+            { name: 'tj-stop-brt', url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/26/JakIcon_BusBRT.svg/1200px-JakIcon_BusBRT.svg.png' },
+            { name: 'tj-stop-feeder', url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8b/JakIcon_Bus_Light.svg/2048px-JakIcon_Bus_Light.svg.png' }
+        ];
+        const loadOne = (name, url) => {
+            return new Promise((resolve) => {
+                try {
+                    if (this.map.hasImage && this.map.hasImage(name)) { resolve(true); return; }
+                    this.map.loadImage(url, (err, img) => {
+                        if (err || !img) { resolve(false); return; }
+                        try {
+                            // Double-check before add to avoid races
+                            if (this.map.hasImage && this.map.hasImage(name)) { resolve(true); return; }
+                            this.map.addImage(name, img);
+                        } catch (e) {
+                            // Ignore duplicate image errors
+                        }
+                        resolve(true);
+                    });
+                } catch (e) { resolve(false); }
+            });
+        };
+        this._stopIconsPromise = Promise.all(entries.map(e => loadOne(e.name, e.url))).then(() => {});
+        return this._stopIconsPromise;
+    }
+
+    addStopsMarkers(stops, stopToRoutes, routes) {
+        if (!this.map || !stops || stops.length === 0) return;
+        this._ensureStyleReady(() => {
+            const layerId = 'stops-markers';
+            const hitLayerId = 'stops-hitbox';
+            const sourceId = 'stops-source';
+
+            const stopFeatures = this._buildGroupedStopFeatures(stops, stopToRoutes);
+            const data = { type: 'FeatureCollection', features: stopFeatures };
+            if (this.map.getSource(sourceId)) {
+                try { this.map.getSource(sourceId).setData(data); } catch (e) {}
+            } else {
+                this.map.addSource(sourceId, { type: 'geojson', data });
+            }
+
+            // Ensure layers exist once
+            const addOrUpdateLayers = () => {
+                if (!this.map.getLayer(layerId)) {
+                    this.map.addLayer({
+                        id: layerId,
+                        type: 'symbol',
+                        source: sourceId,
+                        layout: {
+                            'icon-image': [
+                                'case',
+                                ['==', ['get', 'stopType'], 'Pengumpan'], 'tj-stop-feeder',
+                                'tj-stop-brt'
+                            ],
+                            'icon-size': [
+                                'case',
+                                ['==', ['get', 'stopType'], 'Pengumpan'], 0.008,
+                                0.012
+                            ],
+                            'icon-rotate': [
+                                'case',
+                                ['==', ['get', 'stopType'], 'Pengumpan'], 180,
+                                0
+                            ],
+                            'icon-allow-overlap': true,
+                            'icon-ignore-placement': true
+                        }
+                    });
+                }
+                if (!this.map.getLayer(hitLayerId)) {
+                    this.map.addLayer({ id: hitLayerId, type: 'circle', source: sourceId, paint: { 'circle-radius': 12, 'circle-color': 'rgba(0,0,0,0)' } });
+                }
+                this.layers.set(layerId, { sourceId, layerId });
+                this.layers.set(hitLayerId, { sourceId, layerId: hitLayerId });
+
+                // Add/Update platform dots and hitbox layers (G*)
+                try {
+                    const platformFeatures = (stops || []).filter(s => String(s.stop_id || '').startsWith('G')).map(s => ({
+                type: 'Feature',
+                properties: {
+                            stopId: s.stop_id,
+                            stopName: s.stop_name,
+                            platformCode: String(s.platform_code || '').trim(),
+                            routeIds: stopToRoutes[s.stop_id] ? Array.from(stopToRoutes[s.stop_id]) : []
+                        },
+                        geometry: { type: 'Point', coordinates: [parseFloat(s.stop_lon), parseFloat(s.stop_lat)] }
+                    }));
+                    const pfSourceId = 'platform-source';
+                    const pfDotsId = 'platform-dots';
+                    const pfHitId = 'platform-hitbox';
+                    const pfData = { type: 'FeatureCollection', features: platformFeatures };
+                    if (this.map.getSource(pfSourceId)) {
+                        try { this.map.getSource(pfSourceId).setData(pfData); } catch (e) {}
+                    } else {
+                        this.map.addSource(pfSourceId, { type: 'geojson', data: pfData });
+                    }
+                    if (!this.map.getLayer(pfDotsId)) {
+                        this.map.addLayer({ id: pfDotsId, type: 'circle', source: pfSourceId, paint: { 'circle-radius': 2.6, 'circle-color': '#64748b', 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 0.8 } });
+                    }
+                    if (!this.map.getLayer(pfHitId)) {
+                        this.map.addLayer({ id: pfHitId, type: 'circle', source: pfSourceId, paint: { 'circle-radius': 10, 'circle-color': 'rgba(0,0,0,0)' } });
+                    }
+                    this.layers.set(pfDotsId, { sourceId: pfSourceId, layerId: pfDotsId });
+// Map Manager using MapLibre GL JS
+export class MapManager {
+    constructor() {
+        this.map = null;
+        this.markers = new Map();
+        this.layers = new Map();
+        this.isInitialized = false;
+        this._styleName = 'positron';
+        this._radiusLayerId = 'radius-stops';
+        this._radiusSourceId = 'radius-source';
+        this._currentPopup = null; // feature popup only
+        this.featurePopup = null;
+        this.userPopup = null;
+        this._activeRouteData = null; // Simpan data rute aktif
+        this._cameraLock = false; // camera follow user
+    }
+
+    init() {
+        if (this.isInitialized) return;
+        
+        try {
+            this.map = new maplibregl.Map({
+                container: 'map',
+                style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+                center: [106.8, -6.2],
+                zoom: 11,
+                attributionControl: true
+            });
+
+            this.map.addControl(new maplibregl.NavigationControl(), 'top-left');
+            this.map.addControl(new maplibregl.FullscreenControl(), 'top-left');
+
+            const geoCtrl = new maplibregl.GeolocateControl({
+                positionOptions: { enableHighAccuracy: true },
+                trackUserLocation: true,
+                showUserHeading: true
+            });
+            this.map.addControl(geoCtrl, 'top-left');
+            geoCtrl.on('geolocate', () => {
+                const app = window.transJakartaApp;
+                if (app && app.modules && app.modules.location && !app.modules.location.isActive) {
+                    app.modules.location.enableLiveLocation();
+                }
+            });
+
+            this.setupMapEvents();
+            this.featurePopup = new maplibregl.Popup({ 
+                closeButton: true, 
+                closeOnClick: false, 
+                maxWidth: '350px',
+                className: 'custom-popup-transparent'
+            });
+            this.userPopup = new maplibregl.Popup({ 
+                closeButton: false, 
+                closeOnClick: false, 
+                maxWidth: '350px',
+                className: 'custom-popup-transparent',
+                anchor: 'top',
+                offset: [0, 20]
+            });
+
+            this.isInitialized = true;
+            console.log('MapLibre map initialized successfully');
+
+        } catch (error) {
+            console.error('Failed to initialize map:', error);
+            throw error;
+        }
+    }
+
+    setupMapEvents() {
+        this.map.on('load', () => { console.log('Map loaded'); });
+        
+        // Close feature popup when clicking outside
+        this.map.on('click', (e) => {
+            if (this._currentPopup && !e.originalEvent.target.closest('.maplibregl-popup')) {
+                this._currentPopup.remove();
+                this._currentPopup = null;
+            }
+        });
+
+        this.map.on('zoomend', () => {
+            if (window.radiusHalteActive && this.map.getZoom() >= 14) {
+                const c = this.map.getCenter();
+                this.showHalteRadius(c.lng, c.lat, 300);
+            } else {
+                this.removeHalteRadiusMarkers();
+            }
+        });
+        
+        this.map.on('moveend', () => {
+            if (window.radiusHalteActive && this.map.getZoom() >= 14) {
+                const c = this.map.getCenter();
+                this.showHalteRadius(c.lng, c.lat, 300);
+            } else {
+                this.removeHalteRadiusMarkers();
+            }
+        });
+    }
+
+    setBaseStyle(name) {
+        this._styleName = name;
+        let style;
+        if (name === 'positron') style = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json';
+        else if (name === 'voyager') style = 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json';
+        else if (name === 'dark') style = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
+        else if (name === 'osm') style = 'https://demotiles.maplibre.org/style.json';
+        else if (name === 'maplibre3d') style = 'https://demotiles.maplibre.org/style.json';
+        else if (name.startsWith('openmaptiles-')) {
+            const key = localStorage.getItem('openmaptilesKey') || '';
+            const base = 'https://api.maptiler.com/maps';
+            if (name === 'openmaptiles-streets') style = `${base}/streets/style.json?key=${key}`;
+            else if (name === 'openmaptiles-bright') style = `${base}/bright/style.json?key=${key}`;
+            else if (name === 'openmaptiles-dark') style = `${base}/darkmatter/style.json?key=${key}`;
+            else if (name === 'openmaptiles-positron') style = `${base}/positron/style.json?key=${key}`;
+            else style = `${base}/streets/style.json?key=${key}`;
+        }
+        else if (name === 'satellite') style = this._buildSatelliteStyle();
+        else if (name === 'streets') style = this._buildRasterStyle(['https://services.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}'], 'Tiles © Esri');
+        else if (name === 'topo') style = this._buildRasterStyle(['https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}'], 'Tiles © Esri');
+        else if (name === 'gray') style = this._buildRasterStyle(['https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}'], 'Tiles © Esri');
+        else if (name === 'opentopo') style = this._buildRasterStyle([
+            'https://a.tile.opentopomap.org/{z}/{x}/{y}.png',
+            'https://b.tile.opentopomap.org/{z}/{x}/{y}.png',
+            'https://c.tile.opentopomap.org/{z}/{x}/{y}.png'
+        ], 'Map data: © OpenStreetMap contributors, SRTM | Style: © OpenTopoMap');
+        else style = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json';
+
+        this.map.setStyle(style);
+        
+        // Reset layer-bound handler flags so they rebind after style reload
+        this._stopsHandlersBound = false;
+        // Reset icon load promise for new style
+        this._stopIconsPromise = null;
+        
+        // Re-add layers after style change
+        const readd = () => {
+            // Re-add route polyline if exists
+            if (this._activeRouteData) {
+                this.addRoutePolyline(
+                    this._activeRouteData.routeId, 
+                    this._activeRouteData.shapes, 
+                    this._activeRouteData.color
+                );
+            }
+            
+            // Re-add stops markers if exists (snapshot stored)
+            if (this._activeRouteData && this._activeRouteData.stopsSnapshot) {
+                this.addStopsMarkers(
+                    this._activeRouteData.stopsSnapshot.stops,
+                    this._activeRouteData.stopsSnapshot.stopToRoutes,
+                    this._activeRouteData.stopsSnapshot.routes
+                );
+            }
+            // Move overlay layers above
+            this._ensureOverlaysOnTop();
+            
+            // If for some reason stops layer still missing, force re-render via RouteManager
+            try {
+                const hasStopsLayer = this.map.getLayer('stops-markers');
+                const routesMod = window.transJakartaApp?.modules?.routes;
+                const activeId = routesMod && routesMod.selectedRouteId;
+                if (!hasStopsLayer && activeId) {
+                    // Trigger a light reselect to rebuild layers
+                    routesMod.selectRoute(activeId);
+                }
+            } catch (e) {}
+            
+            // Re-add user marker if active
+            const app = window.transJakartaApp;
+            try {
+                const loc = app?.modules?.location;
+                if (loc && loc.isActive && loc.lastUserPos) {
+                    const p = loc.lastUserPos;
+                    this.addUserMarker(p.lat, p.lon);
+                }
+            } catch (e) {}
+            
+            // Re-add radius markers if active
+            try {
+            if (window.radiusHalteActive && this.map.getZoom() >= 14) {
+                const center = this.map.getCenter();
+                this.showHalteRadius(center.lng, center.lat, 300);
+            }
+            } catch (e) {}
+            
             this.map.off('idle', readd);
         };
         this.map.on('idle', readd);
@@ -374,13 +870,13 @@ export class MapManager {
             if (this.map.getLayer(layerId)) this.map.removeLayer(layerId);
             this.map.addLayer({ id: layerId, type: 'line', source: sourceId, layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': color, 'line-width': 4, 'line-opacity': 0.8 } });
             this.layers.set(layerId, { sourceId, layerId });
-
+            
             // Simpan data rute aktif untuk re-add setelah ganti style
             this._activeRouteData = { routeId, shapes, color, ...(this._activeRouteData || {}) };
-
+            
             // Ensure overlays appear above the new polyline
             this._ensureOverlaysOnTop();
-
+            
             this.fitBoundsToRoute(shapes);
         });
     }
@@ -524,26 +1020,6 @@ export class MapManager {
                                     <div style=\"display:flex;flex-wrap:nowrap;gap:4px;overflow-x:auto;-webkit-overflow-scrolling:touch;\">${badges}</div>
                                 </div>`;
                             this.showHtmlPopupAt(e.lngLat.lng, e.lngLat.lat, html);
-                            // Bind badge clicks to select route only (no live) for normal platform popup
-                            setTimeout(() => {
-                                try {
-                                    const el = this._currentPopup && this._currentPopup.getElement && this._currentPopup.getElement();
-                                    if (!el) return;
-                                    el.querySelectorAll('.badge-koridor-interaktif').forEach(badge => {
-                                        const handler = (ev) => {
-                                            try { ev.preventDefault(); ev.stopPropagation(); } catch (_){ }
-                                            const rid = badge.getAttribute('data-routeid');
-                                            if (rid) {
-                                                try { window.transJakartaApp.modules.routes.selectRoute(rid); } catch (_){ }
-                                                this._resumeAfterIdle();
-                                            }
-                                            if (this._currentPopup) { this._currentPopup.remove(); this._currentPopup = null; }
-                                        };
-                                        badge.addEventListener('click', handler);
-                                        badge.addEventListener('touchstart', handler, { passive: false });
-                                    });
-                                } catch (_){ }
-                            }, 50);
                         };
                         this.map.on('click', pfHitId, this._onPlatformClick);
                         this.map.on('mouseenter', pfHitId, () => { this.map.getCanvas().style.cursor = 'pointer'; });
@@ -554,7 +1030,7 @@ export class MapManager {
 
                 // Bind handlers once
                 if (!this._stopsHandlersBound) {
-            this._onStopsClick = (e) => { const f = e.features && e.features[0]; if (f) { this._popupContext = null; this.showStopPopup(f, e.lngLat); } };
+            this._onStopsClick = (e) => { const f = e.features && e.features[0]; if (f) this.showStopPopup(f, e.lngLat); };
             this._onStopsEnter = () => { this.map.getCanvas().style.cursor = 'pointer'; };
             this._onStopsLeave = () => { this.map.getCanvas().style.cursor = ''; };
             this.map.on('click', hitLayerId, this._onStopsClick);
@@ -601,6 +1077,7 @@ export class MapManager {
     }
 
     showStopPopup(stop, lngLat) {
+        console.debug('[Popup] showStopPopup called for stop:', stop.properties.stopId, stop.properties.stopName);
         const routes = window.transJakartaApp.modules.gtfs.getRoutes();
         const currentRouteId = window.transJakartaApp.modules.routes.selectedRouteId;
 
@@ -618,6 +1095,7 @@ export class MapManager {
         };
         const stopId = String(stop.properties.stopId || '');
         const thisStop = byId.get(stopId);
+        console.debug('[Popup] thisStop found:', thisStop?.stop_id, 'type:', thisStop?.stop_id?.charAt(0));
         let unionRouteIds = [];
         let platformCodes = [];
         let platformMap = [];
@@ -651,6 +1129,7 @@ export class MapManager {
                 unionRouteIds = Array.from(routeSet);
                 platformCodes = Array.from(codeSet).sort();
                 platformMap = Array.from(codeToSet.entries()).map(([code, set]) => ({ code, routeIds: Array.from(set) })).sort((a,b)=>a.code.localeCompare(b.code));
+                console.debug('[Popup] cluster results - unionRouteIds:', unionRouteIds, 'platformCodes:', platformCodes);
                 // Derive headsign per platform code using stop_times/trips
                 try {
                     const trips = gtfs.getTrips();
@@ -762,6 +1241,7 @@ export class MapManager {
         if (!unionRouteIds.length) unionRouteIds = Array.isArray(stop.properties.routeIds) ? stop.properties.routeIds : [];
         if (!platformCodes.length) platformCodes = Array.isArray(stop.properties.platformCodes) ? stop.properties.platformCodes : [];
         if (!platformMap.length) platformMap = Array.isArray(stop.properties.platformMap) ? stop.properties.platformMap : [];
+        console.debug('[Popup] after fallback - unionRouteIds:', unionRouteIds, 'platformCodes:', platformCodes, 'platformMap length:', platformMap.length);
         // Intersect with feature-specific routeIds when present to avoid showing routes not at this exact stop
         try {
             let given = [];
@@ -771,10 +1251,20 @@ export class MapManager {
                 given = JSON.parse(stop.properties.routeIds);
                 given = Array.isArray(given) ? given.map(x => String(x)) : [];
             }
-            if (given && given.length) {
+            console.debug('[Popup] feature routeIds:', given, 'unionRouteIds before filter:', unionRouteIds);
+            // Only apply intersection for feeder stops or if feature has meaningful route data
+            const isFeederStop = thisStop && String(thisStop.stop_id || '').startsWith('B');
+            if (given && given.length && isFeederStop) {
+                console.debug('[Popup] Applying intersection for feeder stop');
                 unionRouteIds = unionRouteIds.filter(r => given.includes(String(r)));
+            } else if (given && given.length && unionRouteIds.length === 0) {
+                console.debug('[Popup] No union routes found, using feature routes as fallback');
+                unionRouteIds = given;
             }
-        } catch (e) {}
+            console.debug('[Popup] final unionRouteIds:', unionRouteIds);
+        } catch (e) {
+            console.debug('[Popup] intersection error:', e);
+        }
 
         const wheelchair = stop.properties.wheelchairBoarding === '1';
         const isFeeder = stop.properties.stopType === 'Pengumpan' || (thisStop && String(thisStop.stop_id || '').startsWith('B'));
@@ -786,6 +1276,7 @@ export class MapManager {
         } else if (platformCodes.length) {
             jenisHtml = `<div style=\"font-size: 12px; color: #64748b; margin-bottom: 6px;\">Platform: ${platformCodes.join('-')}</div>`;
         }
+        console.debug('[Popup] jenisHtml generated:', jenisHtml);
 
         // Semua layanan di halte
         const semuaBadges = unionRouteIds
@@ -796,6 +1287,7 @@ export class MapManager {
                 const color = r.route_color ? `#${r.route_color}` : '#6c757d';
             return `<span class=\"badge badge-koridor-interaktif\" style=\"background:${color};color:#fff;cursor:pointer;font-weight:600;font-size:0.74em;padding:3px 7px;margin-right:6px;margin-bottom:6px;border-radius:9999px;\" data-routeid=\"${r.route_id}\">${r.route_short_name}</span>`;
             }).join('');
+        console.debug('[Popup] semuaBadges count:', unionRouteIds.length, 'HTML length:', semuaBadges.length);
 
         // Active route prefix before stop name as a badge
         const activePrefix = (() => {
@@ -817,6 +1309,7 @@ export class MapManager {
         // Layanan per platform (jika ada detail kode platform)
         let platformDetailHtml = '';
         if (!isFeeder && platformMap.length) {
+            console.debug('[Popup] Generating platform detail for', platformMap.length, 'platforms');
 			const pfId = 'pf-' + Date.now();
 			const rows = platformMap.map((p, idx) => {
 				const perRoute = (p.nextByRoute || []).map(({ rid, nextName }) => {
@@ -827,8 +1320,13 @@ export class MapManager {
 					return `<div class=\"pf-next-item\" data-routeid=\"${r.route_id}\" style=\"display:flex;align-items:center;gap:8px;margin:2px 0;cursor:pointer;\"><span class=\"badge\" data-routeid=\"${r.route_id}\" style=\"background:${color};color:#fff;font-weight:700;font-size:0.72em;padding:3px 7px;border-radius:9999px;\">${shortName}</span><span class=\"next-name\" style=\"color:#111827;\">${nextName || '-'}</span></div>`;
 				}).join('');
 				return `
-				<div class=\"pf-block\" data-pf=\"${idx}\" data-code=\"${p.code}\" data-lat=\"${p.lat}\" data-lng=\"${p.lng}\" style=\"margin:8px 0;\">\n\t\t\t\t\t\t<div class=\"pf-row\" style=\"font-weight:600;color:#475569;\">Platform ${p.code}<\/div>\n\t\t\t\t\t\t<div class=\"pf-next\">${perRoute}<\/div>\n\t\t\t\t\t\t<div class=\"pf-actions\" style=\"margin-top:6px;\"><button class=\"pf-open btn btn-sm btn-outline-secondary\" data-code=\"${p.code}\" data-lat=\"${p.lat}\" data-lng=\"${p.lng}\" data-rids=\"${encodeURIComponent(JSON.stringify(p.routeIds||[]))}\" style=\"padding:3px 8px;font-size:11px;\">Lihat<\/button><\/div>\n\t\t\t\t\t<\/div>`;
+				<div class=\"pf-block\" data-pf=\"${idx}\" data-code=\"${p.code}\" data-lat=\"${p.lat}\" data-lng=\"${p.lng}\" style=\"margin:8px 0;\">
+					<div class=\"pf-row\" style=\"font-weight:600;color:#475569;\">Platform ${p.code}</div>
+					<div class=\"pf-next\">${perRoute}</div>
+					<div class=\"pf-actions\" style=\"margin-top:6px;\"><button class=\"pf-open btn btn-sm btn-outline-secondary\" data-code=\"${p.code}\" data-lat=\"${p.lat}\" data-lng=\"${p.lng}\" data-rids=\"${encodeURIComponent(JSON.stringify(p.routeIds||[]))}\" style=\"padding:3px 8px;font-size:11px;\">Lihat</button></div>
+				</div>`;
 			}).join('');
+			console.debug('[Popup] Platform rows generated:', rows.length > 0 ? 'yes' : 'no');
 			// Collapse logic: show first 2 rows, toggle to show all
 			const total = platformMap.length;
 			const visible = Math.min(2, total);
@@ -933,7 +1431,7 @@ export class MapManager {
 			}, 60);
 		}
 
-        const wheelchairIconHtml = wheelchair ? `<iconify-icon icon=\"fontisto:paralysis-disability\" inline></iconify-icon>` : '';
+        const wheelchairIcon = wheelchair ? `<iconify-icon icon=\"mdi:wheelchair-accessibility\" inline></iconify-icon>` : '';
 
         const popupContent = `
             <div class=\"stop-popup plus-jakarta-sans\" style=\"min-width: 220px; max-width: 330px; padding: 10px 12px;\">
@@ -942,7 +1440,7 @@ export class MapManager {
                         ${(() => { try { const rm = window.transJakartaApp.modules.routes; const stopObj = window.transJakartaApp.modules.gtfs.getStops().find(s => String(s.stop_id) === String(stop.properties.stopId)); if (!rm || !stopObj) return ''; const html = rm.buildIntermodalIconsForStop ? rm.buildIntermodalIconsForStop(stopObj) : ''; return html || ''; } catch(e){ return ''; } })()}
                         ${(() => { try { const rm = window.transJakartaApp.modules.routes; const stopObj = window.transJakartaApp.modules.gtfs.getStops().find(s => String(s.stop_id) === String(stop.properties.stopId)); if (!rm || !stopObj) return ''; if (rm.shouldShowJaklingkoBadge && rm.shouldShowJaklingkoBadge(stopObj)) { return '<img class="jaklingko-badge" src="https://transportforjakarta.or.id/wp-content/uploads/2024/10/jaklingko-w-AR0bObLen0c7yK8n-768x768.png" alt="JakLingko" title="Terintegrasi JakLingko" />'; } return ''; } catch(e){ return ''; } })()}
                     </div>
-                    ${wheelchairIconHtml}
+                    ${wheelchairIcon}
                 </div>
                 <div class=\"popup-scroll\" style=\"max-height:56vh;overflow:auto;\">
                 ${jenisHtml}
@@ -1129,7 +1627,7 @@ export class MapManager {
                 try { rids = Array.isArray(props.routeIds) ? props.routeIds : (typeof props.routeIds === 'string' ? JSON.parse(props.routeIds) : []); } catch (err) { rids = []; }
                 const lng = f.geometry && f.geometry.coordinates ? f.geometry.coordinates[0] : e.lngLat.lng;
                 const lat = f.geometry && f.geometry.coordinates ? f.geometry.coordinates[1] : e.lngLat.lat;
-                this.navigateToPlatformAndShow(code, lat, lng, rids, true);
+                this.navigateToPlatformAndShow(code, lat, lng, rids);
             };
             this.map.on('click', pfLyId, this._onRadiusPlatformClick);
             this.map.on('mouseenter', pfLyId, () => { this.map.getCanvas().style.cursor = 'pointer'; });
@@ -1137,8 +1635,8 @@ export class MapManager {
 
             // Bind click once
             if (this._onRadiusClick) { try { this.map.off('click', this._radiusLayerId, this._onRadiusClick); } catch (e) {} }
-            this._onRadiusClick = (e) => {
-                const f = e.features && e.features[0];
+            this._onRadiusClick = (e) => { 
+                const f = e.features && e.features[0]; 
                 if (!f) return;
                 const routeIdsAtStop = Array.isArray(f.properties.routeIds) ? f.properties.routeIds : [];
                 const app = window.transJakartaApp;
@@ -1256,15 +1754,114 @@ export class MapManager {
             this.layers.set(layerId, { sourceId, layerId });
             this.layers.set(hitLayerId, { sourceId, layerId: hitLayerId });
 
-            // Click handler: open popup with badges
+            // Click handler: open popup with badges that enable Live tracking
             this.map.on('click', hitLayerId, (e) => {
                 const p = e.lngLat;
                 const s = stop; // closure
-                const pseudoFeature = { properties: { stopId: s.stop_id, stopName: s.stop_name, wheelchairBoarding: (s.wheelchair_boarding || '0') } };
-                this.showStopPopup(pseudoFeature, p);
+                console.debug('[Nearest Manual] marker clicked:', s.stop_id);
+                
+                // Build popup like in showMultipleNearestStops with Live-enabled badges
+                const stopToRoutes = window.transJakartaApp.modules.gtfs.getStopToRoutes();
+                const routes = window.transJakartaApp.modules.gtfs.getRoutes();
+                const routeIds = stopToRoutes[s.stop_id] ? Array.from(stopToRoutes[s.stop_id]) : [];
+                const badges = routeIds.map(rid => {
+                    const r = routes.find(rt => String(rt.route_id) === String(rid));
+                    if (!r) return '';
+                    const color = r.route_color ? ('#' + r.route_color) : '#6c757d';
+                    return `<span class="badge badge-koridor-interaktif manual-nearest-badge rounded-pill me-1 mb-1" style="background:${color};color:#fff;cursor:pointer;font-weight:bold;font-size:0.8em;padding:4px 8px;" data-routeid="${r.route_id}">${r.route_short_name}</span>`;
+                }).join('');
+                
+                const distText = typeof distance === 'number' ? (distance < 1000 ? Math.round(distance) + ' m' : (distance/1000).toFixed(2) + ' km') : '';
+                const html = `
+                    <div class='stop-popup plus-jakarta-sans' style='min-width: 220px; max-width: 280px; padding: 10px 12px;'>
+                        <div style='color:#333;padding:6px 0;border-bottom:1px solid #eee;margin-bottom:6px;'>
+                            <div style='font-size:14px;font-weight:600;'>${s.stop_name}</div>
+                        </div>
+                        <div style='font-size:11px;color:#666;margin-bottom:6px;'>Jarak: ${distText}</div>
+                        ${badges ? `<div><div style='font-size:11px;color:#666;margin-bottom:6px;'>Layanan:</div><div class='nearest-services' style='display:flex;flex-wrap:wrap;gap:4px;'>${badges}</div></div>` : ''}
+                    </div>`;
+                
+                const popup = this.showHtmlPopupAt(lng, lat, html);
+                
+                // Bind Live tracking to manual nearest badges
+                setTimeout(() => {
+                    const el = popup && popup.getElement && popup.getElement();
+                    if (!el) return;
+                    el.querySelectorAll('.manual-nearest-badge').forEach(badge => {
+                        const handler = (e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            const rid = badge.getAttribute('data-routeid');
+                            console.debug('[Nearest Manual] badge clicked:', rid, 'at stop', s.stop_id);
+                            // Select route first
+                            try { window.transJakartaApp.modules.routes.selectRoute(rid); } catch (err) {}
+                            setTimeout(() => {
+                                try {
+                                    console.debug('[Nearest Manual] Starting Live tracking');
+                                    const loc = window.transJakartaApp.modules.location;
+                                    // Force enable Live Location 
+                                    if (!loc.isActive) {
+                                        console.debug('[Nearest Manual] Enabling Live Location');
+                                        loc.enableLiveLocation();
+                                    }
+                                    // Activate live service from this stop and route
+                                    loc.activateLiveServiceFromStop(s, rid);
+                                    // Force show lock button
+                                    const lockBtn = document.getElementById('cameraLockBtn');
+                                    if (lockBtn) {
+                                        lockBtn.style.display = '';
+                                        console.debug('[Nearest Manual] Lock button shown');
+                                    }
+                                    // Get position and show Live UI
+                                    const tryImmediateLive = () => {
+                                        if (loc.lastUserPos && loc.userMarker) {
+                                            console.debug('[Nearest Manual] Showing Live UI immediately');
+                                            loc.showUserRouteInfo(loc.lastUserPos.lat, loc.lastUserPos.lon, s, rid);
+                                            return true;
+                                        }
+                                        return false;
+                                    };
+                                    if (!tryImmediateLive()) {
+                                        console.debug('[Nearest Manual] Getting position for Live UI');
+                                        try {
+                                            navigator.geolocation.getCurrentPosition(
+                                                (pos) => {
+                                                    try {
+                                                        const lat = pos.coords.latitude;
+                                                        const lon = pos.coords.longitude;
+                                                        console.debug('[Nearest Manual] Got position, showing Live UI');
+                                                        loc.lastUserPos = { lat, lon };
+                                                        loc.lastUserPosSmoothed = { lat, lon };
+                                                        loc.updateUserMarker(lat, lon);
+                                                        loc.showUserRouteInfo(lat, lon, s, rid);
+                                                    } catch (_) {
+                                                        console.debug('[Nearest Manual] Error in position callback');
+                                                        loc.scheduleLiveUIUpdate();
+                                                    }
+                                                },
+                                                (err) => { 
+                                                    console.debug('[Nearest Manual] Geolocation error:', err);
+                                                    loc.scheduleLiveUIUpdate(); 
+                                                },
+                                                { enableHighAccuracy: true, maximumAge: 3000, timeout: 5000 }
+                                            );
+                                        } catch (_) {
+                                            console.debug('[Nearest Manual] Geolocation API error');
+                                            loc.scheduleLiveUIUpdate();
+                                        }
+                                    }
+                                } catch (err) {
+                                    console.debug('[Nearest Manual] Error in badge handler:', err);
+                                }
+                            }, 160);
+                            // Close popup
+                            try { this.closePopup(); } catch(_){}
+                        };
+                        badge.addEventListener('click', handler);
+                        badge.addEventListener('touchstart', handler, { passive: false });
+                    });
+                }, 50);
             });
-            this.map.on('mouseenter', hitLayerId, () => { this.map.getCanvas().style.cursor = 'pointer'; });
-            this.map.on('mouseleave', hitLayerId, () => { this.map.getCanvas().style.cursor = ''; });
         });
         return id;
     }
@@ -1272,23 +1869,8 @@ export class MapManager {
     removeMarker(id) {
         const entry = this.layers.get(id);
         if (!entry) return;
-        const sourceId = entry.sourceId;
-        const layerId = entry.layerId;
-        // Remove the target layer first
-        try { if (layerId && this.map.getLayer(layerId)) this.map.removeLayer(layerId); } catch (e) {}
-        // Only remove the source if no other registered layers still reference it
-        if (sourceId) {
-            const stillUsing = Array.from(this.layers.entries()).some(([key, e]) => {
-                if (!e || key === id) return false;
-                const same = e.sourceId === sourceId;
-                if (!same) return false;
-                try { return !!(e.layerId && this.map.getLayer(e.layerId)); } catch (_) { return false; }
-            });
-            if (!stillUsing) {
-                try { if (this.map.getSource(sourceId)) this.map.removeSource(sourceId); } catch (e) {}
-            }
-        }
-        // Cleanup registry
+        if (this.map.getLayer(entry.layerId)) this.map.removeLayer(entry.layerId);
+        if (this.map.getSource(entry.sourceId)) this.map.removeSource(entry.sourceId);
         this.layers.delete(id);
     }
 
@@ -1333,10 +1915,10 @@ export class MapManager {
         });
         this.layers.clear();
         this.removeHalteRadiusMarkers();
-
+        
         // Clear active route data
         this._activeRouteData = null;
-
+        
         // Close any open feature popup
         if (this._currentPopup) {
             this._currentPopup.remove();
@@ -1378,7 +1960,7 @@ export class MapManager {
         this._currentPopup = this.featurePopup.setLngLat([lng, lat]).setHTML(html).addTo(this.map);
         return this._currentPopup;
     }
-
+    
     // Render/update label text untuk halte berikutnya di peta
     updateNextStopLabel(nextStop) {
         this._ensureStyleReady(() => {
@@ -1421,7 +2003,7 @@ export class MapManager {
             }
         });
     }
-
+    
     clearNextStopLabel() { this.updateNextStopLabel(null); }
 
     setCameraLock(enabled) {
@@ -1470,7 +2052,7 @@ export class MapManager {
         this.map.on('idle', resume);
     }
 
-    navigateToPlatformAndShow(code, lat, lng, routeIds, startLive = false) {
+    navigateToPlatformAndShow(code, lat, lng, routeIds) {
         const routes = window.transJakartaApp.modules.gtfs.getRoutes();
         // Focus map to platform location
         try { this.setView(lat, lng, Math.max(this.map.getZoom() || 16, 18)); } catch (e) {}
@@ -1483,7 +2065,13 @@ export class MapManager {
         }).join('');
         const title = code ? `Platform ${code}` : 'Platform';
         const html = `
-            <div class=\"stop-popup plus-jakarta-sans\" style=\"min-width:220px;max-width:300px;padding:10px 12px;\">\n\t\t\t\t\t<div style=\"color:#333;padding:6px 0;border-bottom:1px solid #eee;margin-bottom:6px;display:flex;align-items:center;gap:6px;\">\n\t\t\t\t\t\t<div style=\"font-size:13px;font-weight:700;\">${title}</div>\n\t\t\t\t\t</div>\n\t\t\t\t\t<div style=\"font-size:11px;color:#666;margin-bottom:6px;\">Layanan pada platform ini</div>\n\t\t\t\t\t<div style=\"display:flex;flex-wrap:wrap;gap:4px;\">${badges}</div>\n\t\t\t\t</div>`;
+            <div class=\"stop-popup plus-jakarta-sans\" style=\"min-width:220px;max-width:300px;padding:10px 12px;\">
+                <div style=\"color:#333;padding:6px 0;border-bottom:1px solid #eee;margin-bottom:6px;display:flex;align-items:center;gap:6px;\">
+                    <div style=\"font-size:13px;font-weight:700;\">${title}</div>
+                </div>
+                <div style=\"font-size:11px;color:#666;margin-bottom:6px;\">Layanan pada platform ini</div>
+                <div style=\"display:flex;flex-wrap:wrap;gap:4px;\">${badges}</div>
+            </div>`;
         this.showHtmlPopupAt(lng, lat, html);
         // Bind route badge clicks
         setTimeout(() => {
@@ -1494,62 +2082,14 @@ export class MapManager {
                     e.stopPropagation(); e.preventDefault();
                     const routeId = badge.getAttribute('data-routeid');
                     try { window.transJakartaApp.modules.location.suspendUpdates(true); } catch (e) {}
-                    if (!startLive) {
-                        // Non-nearest: select route only
-                        try { window.transJakartaApp.modules.routes.selectRoute(routeId); } catch (e) {}
-                        this._resumeAfterIdle();
-                        if (this._currentPopup) { this._currentPopup.remove(); this._currentPopup = null; }
-                        return;
-                    }
-                    // Nearest flow: start live from this platform
-                    try { window.transJakartaApp.modules.routes.selectRoute(routeId); } catch (e) {}
-                    setTimeout(() => {
-                        try {
-                            const loc = window.transJakartaApp.modules.location;
-                            if (loc) {
-                                // Mark origin for lock button policy
-                                try { loc._liveOrigin = 'nearest'; } catch(_) {}
-                                if (!loc.isActive && loc.canAutoStartLive && loc.canAutoStartLive()) loc.enableLiveLocation();
-                                const gtStop = this._findPlatformStopBy(code, lat, lng);
-                                if (gtStop) {
-                                    loc.activateLiveServiceFromStop(gtStop, routeId);
-                                    const tryImmediate = () => {
-                                        if (loc.lastUserPos && loc.userMarker) {
-                                            loc.showUserRouteInfo(loc.lastUserPos.lat, loc.lastUserPos.lon, gtStop, routeId);
-                                            return true;
-                                        }
-                                        return false;
-                                    };
-                                    if (!tryImmediate()) {
-                                        try {
-                                            navigator.geolocation.getCurrentPosition(
-                                                (pos) => {
-                                                    try {
-                                                        const plat = pos.coords.latitude, plon = pos.coords.longitude;
-                                                        loc.lastUserPos = { lat: plat, lon: plon };
-                                                        loc.lastUserPosSmoothed = { lat: plat, lon: plon };
-                                                        loc.updateUserMarker(plat, plon);
-                                                        loc.showUserRouteInfo(plat, plon, gtStop, routeId);
-                                                    } catch(_) { loc.scheduleLiveUIUpdate(); }
-                                                },
-                                                () => { try { loc.scheduleLiveUIUpdate(); } catch(_){} },
-                                                { enableHighAccuracy: true, maximumAge: 3000, timeout: 5000 }
-                                            );
-                                        } catch(_) { try { loc.scheduleLiveUIUpdate(); } catch(_){} }
-                                    }
-                                }
-                            }
-
-                            } catch (e) {}
-                            this._resumeAfterIdle();
-                        }, 160);
-                        if (this._currentPopup) { this._currentPopup.remove(); this._currentPopup = null; }
-                    };
-                    badge.addEventListener('click', handler);
-                    badge.addEventListener('touchstart', handler, { passive: false });
-                });
-            }, 50);
-
+                    window.transJakartaApp.modules.routes.selectRoute(routeId);
+                    this._resumeAfterIdle();
+                    if (this._currentPopup) { this._currentPopup.remove(); this._currentPopup = null; }
+                };
+                badge.addEventListener('click', handler);
+                badge.addEventListener('touchstart', handler, { passive: false });
+            });
+        }, 50);
     }
 
     // Control user marker visibility (avoid duplicate visuals during live popup)
@@ -1577,8 +2117,69 @@ export class MapManager {
         } catch (e) { return null; }
     }
 
-    addLiveTrackingLayer(routeId, color) {
-        // Implement live tracking layer addition logic
-        console.log(`Adding live tracking layer for route: ${routeId} with color: ${color}`);
+    navigateToPlatformAndShow(code, lat, lng, routeIds) {
+        const routes = window.transJakartaApp.modules.gtfs.getRoutes();
+        // Focus map to platform location
+        try { this.setView(lat, lng, Math.max(this.map.getZoom() || 16, 18)); } catch (e) {}
+        // Build badges
+        const badges = (routeIds || []).map(rid => {
+            const r = routes.find(rt => String(rt.route_id) === String(rid));
+            if (!r) return '';
+            const color = r.route_color ? `#${r.route_color}` : '#6c757d';
+            return `<span class="badge badge-koridor-interaktif" style="background:${color};color:#fff;font-weight:600;font-size:0.72em;padding:3px 7px;margin-right:6px;margin-bottom:6px;" data-routeid="${r.route_id}">${r.route_short_name}</span>`;
+        }).join('');
+        const title = code ? `Platform ${code}` : 'Platform';
+        const html = `
+            <div class="stop-popup plus-jakarta-sans" style="min-width:220px;max-width:300px;padding:10px 12px;">
+                <div style="color:#333;padding:6px 0;border-bottom:1px solid #eee;margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+                    <div style="font-size:13px;font-weight:700;">${title}</div>
+                </div>
+                <div style="font-size:11px;color:#666;margin-bottom:6px;">Layanan pada platform ini</div>
+                <div style="display:flex;flex-wrap:wrap;gap:4px;">${badges}</div>
+            </div>`;
+        this.showHtmlPopupAt(lng, lat, html);
+        // Bind route badge clicks to start live tracking from this platform
+        setTimeout(() => {
+            const el = this._currentPopup && this._currentPopup.getElement();
+            if (!el) return;
+            el.querySelectorAll('.badge-koridor-interaktif').forEach(badge => {
+                const handler = (e) => {
+                    e.stopPropagation(); e.preventDefault();
+                    const routeId = badge.getAttribute('data-routeid');
+                    // Select route first
+                    try { window.transJakartaApp.modules.routes.selectRoute(routeId); } catch (e) {}
+                    setTimeout(() => {
+                        try {
+                            const loc = window.transJakartaApp.modules.location;
+                            if (loc && !loc.isActive && loc.canAutoStartLive && loc.canAutoStartLive()) loc.enableLiveLocation();
+                            const gtStop = this._findPlatformStopBy(code, lat, lng);
+                            if (gtStop) {
+                                loc.activateLiveServiceFromStop(gtStop, routeId);
+                                if (loc.lastUserPos && loc.userMarker) {
+                                    loc.showUserRouteInfo(loc.lastUserPos.lat, loc.lastUserPos.lon, gtStop, routeId);
+                                } else {
+                                    try {
+                                        navigator.geolocation.getCurrentPosition((pos)=>{
+                                            try {
+                                                const plat = pos.coords.latitude, plon = pos.coords.longitude;
+                                                loc.lastUserPos = { lat: plat, lon: plon };
+                                                loc.lastUserPosSmoothed = { lat: plat, lon: plon };
+                                                loc.updateUserMarker(plat, plon);
+                                                loc.showUserRouteInfo(plat, plon, gtStop, routeId);
+                                            } catch(_) { loc.scheduleLiveUIUpdate(); }
+                                        }, ()=>{ try { loc.scheduleLiveUIUpdate(); } catch(_){} }, { enableHighAccuracy: true, maximumAge: 3000, timeout: 5000 });
+                                    } catch(_) { try { loc.scheduleLiveUIUpdate(); } catch(_){} }
+                                }
+                            }
+                        } catch (e) {}
+                        this._resumeAfterIdle();
+                    }, 160);
+                    if (this._currentPopup) { this._currentPopup.remove(); this._currentPopup = null; }
+                };
+                badge.addEventListener('click', handler);
+                badge.addEventListener('touchstart', handler, { passive: false });
+            });
+        }, 50);
     }
-}
+} 
+ 
