@@ -13,11 +13,16 @@ export class MapManager {
         this.userPopup = null;
         this._activeRouteData = null; // Simpan data rute aktif
         this._cameraLock = false; // camera follow user
+        // Memoization caches
+        this._clusterCache = new Map(); // key => { features, ts }
+        this._platformMapCache = new Map(); // key => { platformMap, ts }
+        this._stickyPopup = false; // when true, do not auto-close on map click
+        this._journeyBtn = null; // store ref to planner button for state styling
     }
 
     init() {
         if (this.isInitialized) return;
-
+        
         try {
             this.map = new maplibregl.Map({
                 container: 'map',
@@ -38,21 +43,53 @@ export class MapManager {
             this.map.addControl(geoCtrl, 'top-left');
             geoCtrl.on('geolocate', () => {
                 const app = window.transJakartaApp;
-                if (app && app.modules && app.modules.location && !app.modules.location.isActive) {
-                    app.modules.location.enableLiveLocation();
+                const loc = app && app.modules && app.modules.location;
+                if (loc && !loc.isActive && loc.canAutoStartLive && loc.canAutoStartLive()) {
+                    loc.enableLiveLocation();
                 }
             });
 
+            // Journey Planner toggle control (BETA)
+            try {
+                const ctrl = document.createElement('div');
+                ctrl.className = 'maplibregl-ctrl maplibregl-ctrl-group';
+                ctrl.style.margin = '8px';
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.title = 'Rencana (BETA)';
+                btn.setAttribute('aria-label', 'Rencana (BETA)');
+                btn.style.width = '34px';
+                btn.style.height = '34px';
+                btn.style.padding = '0';
+                btn.style.display = 'inline-flex';
+                btn.style.alignItems = 'center';
+                btn.style.justifyContent = 'center';
+                btn.style.lineHeight = '1';
+                btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#264697" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20c2-3 6-3 8-1s4 2 8-1"/><circle cx="6" cy="6" r="2"/><circle cx="18" cy="10" r="2"/></svg>';
+                btn.addEventListener('click', () => {
+                    try {
+                        const jp = window.transJakartaApp.modules.journey;
+                        if (!jp.enabled) { jp.enable(); btn.classList.add('active'); this._styleJourneyBtn(true, btn); }
+                        else { jp.disable(); btn.classList.remove('active'); this._styleJourneyBtn(false, btn); }
+                    } catch (e) {}
+                });
+                ctrl.appendChild(btn);
+                class SimpleCtrl { onAdd(map) { this._map = map; return ctrl; } onRemove() { ctrl.remove(); this._map = undefined; } }
+                this.map.addControl(new SimpleCtrl(), 'bottom-right');
+                this._journeyBtn = btn;
+                this._styleJourneyBtn(false, btn);
+            } catch (e) {}
+
             this.setupMapEvents();
-            this.featurePopup = new maplibregl.Popup({
-                closeButton: true,
-                closeOnClick: false,
+            this.featurePopup = new maplibregl.Popup({ 
+                closeButton: true, 
+                closeOnClick: false, 
                 maxWidth: '350px',
                 className: 'custom-popup-transparent'
             });
-            this.userPopup = new maplibregl.Popup({
-                closeButton: false,
-                closeOnClick: false,
+            this.userPopup = new maplibregl.Popup({ 
+                closeButton: false, 
+                closeOnClick: false, 
                 maxWidth: '350px',
                 className: 'custom-popup-transparent',
                 anchor: 'top',
@@ -70,10 +107,10 @@ export class MapManager {
 
     setupMapEvents() {
         this.map.on('load', () => { console.log('Map loaded'); });
-
+        
         // Close feature popup when clicking outside
         this.map.on('click', (e) => {
-            if (this._currentPopup && !e.originalEvent.target.closest('.maplibregl-popup')) {
+            if (this._currentPopup && !this._stickyPopup && !e.originalEvent.target.closest('.maplibregl-popup')) {
                 this._currentPopup.remove();
                 this._currentPopup = null;
             }
@@ -87,7 +124,7 @@ export class MapManager {
                 this.removeHalteRadiusMarkers();
             }
         });
-
+        
         this.map.on('moveend', () => {
             if (window.radiusHalteActive && this.map.getZoom() >= 14) {
                 const c = this.map.getCenter();
@@ -127,23 +164,23 @@ export class MapManager {
         else style = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json';
 
         this.map.setStyle(style);
-
+        
         // Reset layer-bound handler flags so they rebind after style reload
         this._stopsHandlersBound = false;
         // Reset icon load promise for new style
         this._stopIconsPromise = null;
-
+        
         // Re-add layers after style change
         const readd = () => {
             // Re-add route polyline if exists
             if (this._activeRouteData) {
                 this.addRoutePolyline(
-                    this._activeRouteData.routeId,
-                    this._activeRouteData.shapes,
+                    this._activeRouteData.routeId, 
+                    this._activeRouteData.shapes, 
                     this._activeRouteData.color
                 );
             }
-
+            
             // Re-add stops markers if exists (snapshot stored)
             if (this._activeRouteData && this._activeRouteData.stopsSnapshot) {
                 this.addStopsMarkers(
@@ -154,7 +191,7 @@ export class MapManager {
             }
             // Move overlay layers above
             this._ensureOverlaysOnTop();
-
+            
             // If for some reason stops layer still missing, force re-render via RouteManager
             try {
                 const hasStopsLayer = this.map.getLayer('stops-markers');
@@ -165,7 +202,7 @@ export class MapManager {
                     routesMod.selectRoute(activeId);
                 }
             } catch (e) {}
-
+            
             // Re-add user marker if active
             const app = window.transJakartaApp;
             try {
@@ -175,7 +212,7 @@ export class MapManager {
                     this.addUserMarker(p.lat, p.lon);
                 }
             } catch (e) {}
-
+            
             // Re-add radius markers if active
             try {
             if (window.radiusHalteActive && this.map.getZoom() >= 14) {
@@ -183,7 +220,9 @@ export class MapManager {
                 this.showHalteRadius(center.lng, center.lat, 300);
             }
             } catch (e) {}
-
+            // Rebuild journey overlays if planner is active
+            try { const jp = window.transJakartaApp?.modules?.journey; if (jp && jp.enabled) jp.rebuildOverlaysAfterStyleChange(); } catch (e) {}
+            
             this.map.off('idle', readd);
         };
         this.map.on('idle', readd);
@@ -250,6 +289,120 @@ export class MapManager {
     // - Union routeIds and collect platform codes for popup
     _buildGroupedStopFeatures(stops, stopToRoutes) {
 		const normalizeName = (n) => String(n || '').trim().replace(/\s+/g, ' ');
+        // Cache key by stop ids snapshot
+        try {
+            const key = (stops || []).map(s => s && s.stop_id ? String(s.stop_id) : '').join(',');
+            const hit = this._clusterCache.get(key);
+            if (hit && hit.features) return hit.features;
+            const built = (() => {
+                // Load all GTFS stops for full clustering
+                let allStops = [];
+                try { allStops = window.transJakartaApp.modules.gtfs.getStops() || []; } catch (e) {}
+                const idToStop = new Map(allStops.map(s => [String(s.stop_id || ''), s]));
+                // Build parent-based clusters from all stops
+                const parentToChildren = new Map();
+                for (const s of allStops) {
+                    if (!s) continue;
+                    const sid = String(s.stop_id || '');
+                    if (sid.startsWith('E')) continue; // exclude access from cluster children
+                    let key = '';
+                    if (s.parent_station) {
+                        key = String(s.parent_station);
+                    } else if (sid.startsWith('H')) {
+                        key = sid; // parent itself
+                    } else {
+                        // fallback by normalized name (for feeder/non-parented)
+                        key = `NAME:${normalizeName(s.stop_name)}`;
+                    }
+                    if (!parentToChildren.has(key)) parentToChildren.set(key, []);
+                    parentToChildren.get(key).push(s);
+                }
+                // Build features for clusters referenced by provided subset
+                const seenKeys = new Set();
+                const features = [];
+                for (const s of stops) {
+                    if (!s) continue;
+                    const sid = String(s.stop_id || '');
+                    let key = '';
+                    if (s.parent_station) key = String(s.parent_station);
+                    else if (sid.startsWith('H')) key = sid;
+                    else key = `NAME:${normalizeName(s.stop_name)}`;
+                    if (seenKeys.has(key)) continue;
+                    seenKeys.add(key);
+                    const cluster = parentToChildren.get(key) || [];
+                    if (cluster.length === 0) continue;
+                    const ids = [];
+                    const nonAccess = [];
+                    let parentStop = null;
+                    for (const cs of cluster) {
+                        const cid = String(cs.stop_id || '');
+                        if (cid.startsWith('E')) continue;
+                        ids.push(cid);
+                        if (cid.startsWith('H')) parentStop = cs;
+                        if (cs.stop_lat && cs.stop_lon) nonAccess.push(cs);
+                    }
+                    if (ids.length === 0) continue;
+                    // Geometry: prefer parent H position; else average
+                    let lat = 0, lon = 0;
+                    if (parentStop && parentStop.stop_lat && parentStop.stop_lon) {
+                        lat = parseFloat(parentStop.stop_lat); lon = parseFloat(parentStop.stop_lon);
+                    } else if (nonAccess.length) {
+                        const lats = nonAccess.map(x => parseFloat(x.stop_lat));
+                        const lons = nonAccess.map(x => parseFloat(x.stop_lon));
+                        lat = lats.reduce((a,b)=>a+b,0) / lats.length;
+                        lon = lons.reduce((a,b)=>a+b,0) / lons.length;
+                    }
+                    // Aggregate routes and platform mapping
+                    const routeIdSet = new Set();
+                    const platformCodes = new Set();
+                    const platformCodeToRouteIds = new Map();
+                    let anyWheelchair = false;
+                    let hasFeeder = false;
+                    let hasNonFeeder = false;
+                    let firstCode = '';
+                    let firstDesc = '';
+                    for (const cs of cluster) {
+                        const cid = String(cs.stop_id || '');
+                        if (cid.startsWith('E')) continue;
+                        const rids = stopToRoutes[cid] ? Array.from(stopToRoutes[cid]) : [];
+                        rids.forEach(r => routeIdSet.add(String(r)));
+                        if (!firstCode && cs.stop_code) firstCode = String(cs.stop_code);
+                        if (!firstDesc && cs.stop_desc) firstDesc = String(cs.stop_desc);
+                        if (String(cs.wheelchair_boarding || '0') === '1') anyWheelchair = true;
+                        if (cid.startsWith('B')) hasFeeder = true; else hasNonFeeder = true;
+                        if (cid.startsWith('G')) {
+                            const code = String(cs.platform_code || '').trim();
+                            if (code) {
+                                platformCodes.add(code);
+                                let set = platformCodeToRouteIds.get(code);
+                                if (!set) { set = new Set(); platformCodeToRouteIds.set(code, set); }
+                                rids.forEach(r => set.add(String(r)));
+                            }
+                        }
+                    }
+                    const platformMap = Array.from(platformCodeToRouteIds.entries()).map(([code, set]) => ({ code, routeIds: Array.from(set) })).sort((a,b)=>a.code.localeCompare(b.code));
+                    features.push({
+                        type: 'Feature',
+                        properties: {
+                            stopId: ids[0],
+                            stopName: normalizeName(s.stop_name || (parentStop && parentStop.stop_name)),
+                            stopType: (hasFeeder && !hasNonFeeder) ? 'Pengumpan' : 'Koridor',
+                            routeIds: Array.from(routeIdSet),
+                            platformCodes: Array.from(platformCodes).sort(),
+                            platformMap,
+                            wheelchairBoarding: anyWheelchair ? '1' : '0',
+                            stopCode: firstCode,
+                            stopDesc: firstDesc
+                        },
+                        geometry: { type: 'Point', coordinates: [lon, lat] }
+                    });
+                }
+                return features;
+            })();
+            this._clusterCache.set(key, { features: built, ts: Date.now() });
+            return built;
+        } catch(_){}
+        // Fallback to original implementation if cache errored
 		// Load all GTFS stops for full clustering
 		let allStops = [];
 		try { allStops = window.transJakartaApp.modules.gtfs.getStops() || []; } catch (e) {}
@@ -374,13 +527,13 @@ export class MapManager {
             if (this.map.getLayer(layerId)) this.map.removeLayer(layerId);
             this.map.addLayer({ id: layerId, type: 'line', source: sourceId, layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': color, 'line-width': 4, 'line-opacity': 0.8 } });
             this.layers.set(layerId, { sourceId, layerId });
-
+            
             // Simpan data rute aktif untuk re-add setelah ganti style
             this._activeRouteData = { routeId, shapes, color, ...(this._activeRouteData || {}) };
-
+            
             // Ensure overlays appear above the new polyline
             this._ensureOverlaysOnTop();
-
+            
             this.fitBoundsToRoute(shapes);
         });
     }
@@ -524,26 +677,6 @@ export class MapManager {
                                     <div style=\"display:flex;flex-wrap:nowrap;gap:4px;overflow-x:auto;-webkit-overflow-scrolling:touch;\">${badges}</div>
                                 </div>`;
                             this.showHtmlPopupAt(e.lngLat.lng, e.lngLat.lat, html);
-                            // Bind badge clicks to select route only (no live) for normal platform popup
-                            setTimeout(() => {
-                                try {
-                                    const el = this._currentPopup && this._currentPopup.getElement && this._currentPopup.getElement();
-                                    if (!el) return;
-                                    el.querySelectorAll('.badge-koridor-interaktif').forEach(badge => {
-                                        const handler = (ev) => {
-                                            try { ev.preventDefault(); ev.stopPropagation(); } catch (_){ }
-                                            const rid = badge.getAttribute('data-routeid');
-                                            if (rid) {
-                                                try { window.transJakartaApp.modules.routes.selectRoute(rid); } catch (_){ }
-                                                this._resumeAfterIdle();
-                                            }
-                                            if (this._currentPopup) { this._currentPopup.remove(); this._currentPopup = null; }
-                                        };
-                                        badge.addEventListener('click', handler);
-                                        badge.addEventListener('touchstart', handler, { passive: false });
-                                    });
-                                } catch (_){ }
-                            }, 50);
                         };
                         this.map.on('click', pfHitId, this._onPlatformClick);
                         this.map.on('mouseenter', pfHitId, () => { this.map.getCanvas().style.cursor = 'pointer'; });
@@ -554,7 +687,7 @@ export class MapManager {
 
                 // Bind handlers once
                 if (!this._stopsHandlersBound) {
-            this._onStopsClick = (e) => { const f = e.features && e.features[0]; if (f) { this._popupContext = null; this.showStopPopup(f, e.lngLat); } };
+            this._onStopsClick = (e) => { const f = e.features && e.features[0]; if (f) this.showStopPopup(f, e.lngLat); };
             this._onStopsEnter = () => { this.map.getCanvas().style.cursor = 'pointer'; };
             this._onStopsLeave = () => { this.map.getCanvas().style.cursor = ''; };
             this.map.on('click', hitLayerId, this._onStopsClick);
@@ -600,9 +733,10 @@ export class MapManager {
         tempEntries.forEach(({ key }) => this.layers.delete(key));
     }
 
-    showStopPopup(stop, lngLat) {
+    showStopPopup(stop, lngLat, options = {}) {
         const routes = window.transJakartaApp.modules.gtfs.getRoutes();
         const currentRouteId = window.transJakartaApp.modules.routes.selectedRouteId;
+        const allowAutoLive = options && options.origin === 'nearest';
 
         // Recompute union of route IDs and platform mapping from GTFS to be robust
         const gtfs = window.transJakartaApp.modules.gtfs;
@@ -824,10 +958,10 @@ export class MapManager {
 					if (!r) return '';
 					const color = r.route_color ? `#${r.route_color}` : '#6c757d';
 					const shortName = r.route_short_name || rid;
-					return `<div class=\"pf-next-item\" data-routeid=\"${r.route_id}\" style=\"display:flex;align-items:center;gap:8px;margin:2px 0;cursor:pointer;\"><span class=\"badge\" data-routeid=\"${r.route_id}\" style=\"background:${color};color:#fff;font-weight:700;font-size:0.72em;padding:3px 7px;border-radius:9999px;\">${shortName}</span><span class=\"next-name\" style=\"color:#111827;\">${nextName || '-'}</span></div>`;
+					return `<div class=\"pf-next-item\" data-routeid=\"${r.route_id}\" style=\"display:flex;align-items:center;gap:8px;margin:2px 0;cursor:pointer;\"><span class=\"badge\" data-routeid=\"${r.route_id}\" style=\"background:${color};color:#fff;font-weight:700;font-size:0.72em;padding:3px 7px;border-radius:9999px;\">${shortName}</span><span class=\"next-name\" style=\"color:#111827;\">${nextName || '-'}<\/span><\/div>`;
 				}).join('');
 				return `
-				<div class=\"pf-block\" data-pf=\"${idx}\" data-code=\"${p.code}\" data-lat=\"${p.lat}\" data-lng=\"${p.lng}\" style=\"margin:8px 0;\">\n\t\t\t\t\t\t<div class=\"pf-row\" style=\"font-weight:600;color:#475569;\">Platform ${p.code}<\/div>\n\t\t\t\t\t\t<div class=\"pf-next\">${perRoute}<\/div>\n\t\t\t\t\t\t<div class=\"pf-actions\" style=\"margin-top:6px;\"><button class=\"pf-open btn btn-sm btn-outline-secondary\" data-code=\"${p.code}\" data-lat=\"${p.lat}\" data-lng=\"${p.lng}\" data-rids=\"${encodeURIComponent(JSON.stringify(p.routeIds||[]))}\" style=\"padding:3px 8px;font-size:11px;\">Lihat<\/button><\/div>\n\t\t\t\t\t<\/div>`;
+				<div class=\"pf-block\" data-pf=\"${idx}\" data-code=\"${p.code}\" data-lat=\"${p.lat}\" data-lng=\"${p.lng}\" style=\"margin:8px 0;\">\n\t\t\t\t\t<div class=\"pf-row\" style=\"font-weight:600;color:#475569;\">Platform ${p.code}<\/div>\n\t\t\t\t\t<div class=\"pf-next\">${perRoute}<\/div>\n\t\t\t\t\t<div class=\"pf-actions\" style=\"margin-top:6px;\"><button class=\"pf-open btn btn-sm btn-outline-secondary\" data-code=\"${p.code}\" data-lat=\"${p.lat}\" data-lng=\"${p.lng}\" data-rids=\"${encodeURIComponent(JSON.stringify(p.routeIds||[]))}\" style=\"padding:3px 8px;font-size:11px;\">Lihat<\/button><\/div>\n\t\t\t\t<\/div>`;
 			}).join('');
 			// Collapse logic: show first 2 rows, toggle to show all
 			const total = platformMap.length;
@@ -837,7 +971,7 @@ export class MapManager {
 			`;
 			const toggleBtn = total > visible ? `<button id=\"${pfId}-toggle\" class=\"btn btn-sm btn-link p-0\" type=\"button\">Tampilkan semua (${total})</button>` : '';
 			platformDetailHtml = `
-				<div style=\"margin-top:8px;\">\n\t\t\t\t\t\t<div style=\"font-size:11px;color:#666;margin-bottom:4px;\">Per Platform</div>\n\t\t\t\t\t\t<div id=\"${pfId}\">${htmlRows}${toggleBtn}</div>\n\t\t\t\t\t</div>`;
+				<div style=\"margin-top:8px;\">\n\t\t\t\t\t<div style=\"font-size:11px;color:#666;margin-bottom:4px;\">Per Platform</div>\n\t\t\t\t\t<div id=\"${pfId}\">${htmlRows}${toggleBtn}</div>\n\t\t\t\t</div>`;
 			// After popup render we will collapse extra rows and bind toggle
 			setTimeout(() => {
 				try {
@@ -858,7 +992,7 @@ export class MapManager {
 							btn.textContent = expanded ? 'Sembunyikan' : `Tampilkan semua (${blocks.length})`;
 						});
 					}
-					// Bind per-route click to select route and start Live from this platform
+					// Bind per-route click to select route and (conditionally) start Live from this platform
 					const onRouteClick = (ev) => {
 						try { ev.preventDefault(); ev.stopPropagation(); } catch (e) {}
 						const target = ev.currentTarget;
@@ -870,6 +1004,7 @@ export class MapManager {
 						const code = host ? host.getAttribute('data-code') : '';
 						const platLat = host ? parseFloat(host.getAttribute('data-lat')) : NaN;
 						const platLng = host ? parseFloat(host.getAttribute('data-lng')) : NaN;
+						if (allowAutoLive) {
 						try { window.transJakartaApp.modules.location.suspendUpdates(true); } catch (e) {}
 						// Select route first
 						try { window.transJakartaApp.modules.routes.selectRoute(rid); } catch (e) {}
@@ -910,6 +1045,12 @@ export class MapManager {
 							this._resumeAfterIdle();
 						}, 160);
 						if (this._currentPopup) { this._currentPopup.remove(); this._currentPopup = null; }
+						} else {
+							// Generic context: only select route, do NOT auto-start live
+							try { window.transJakartaApp.modules.routes.selectRoute(rid); } catch (e) {}
+							this._resumeAfterIdle();
+							if (this._currentPopup) { this._currentPopup.remove(); this._currentPopup = null; }
+						}
 					};
 					container.querySelectorAll('.pf-next-item').forEach(el => {
 						el.addEventListener('click', onRouteClick);
@@ -936,27 +1077,7 @@ export class MapManager {
         const wheelchairIconHtml = wheelchair ? `<iconify-icon icon=\"fontisto:paralysis-disability\" inline></iconify-icon>` : '';
 
         const popupContent = `
-            <div class=\"stop-popup plus-jakarta-sans\" style=\"min-width: 220px; max-width: 330px; padding: 10px 12px;\">
-                <div style=\"color: #333; padding: 6px 0; border-bottom: 1px solid #eee; margin-bottom: 6px; display:flex; align-items:center; gap:6px;\">
-                    <div style=\"display:flex;align-items:center;gap:6px;\">${activePrefix}<span style=\"font-size: 14px; font-weight: 600;\">${stop.properties.stopName}</span>
-                        ${(() => { try { const rm = window.transJakartaApp.modules.routes; const stopObj = window.transJakartaApp.modules.gtfs.getStops().find(s => String(s.stop_id) === String(stop.properties.stopId)); if (!rm || !stopObj) return ''; const html = rm.buildIntermodalIconsForStop ? rm.buildIntermodalIconsForStop(stopObj) : ''; return html || ''; } catch(e){ return ''; } })()}
-                        ${(() => { try { const rm = window.transJakartaApp.modules.routes; const stopObj = window.transJakartaApp.modules.gtfs.getStops().find(s => String(s.stop_id) === String(stop.properties.stopId)); if (!rm || !stopObj) return ''; if (rm.shouldShowJaklingkoBadge && rm.shouldShowJaklingkoBadge(stopObj)) { return '<img class="jaklingko-badge" src="https://transportforjakarta.or.id/wp-content/uploads/2024/10/jaklingko-w-AR0bObLen0c7yK8n-768x768.png" alt="JakLingko" title="Terintegrasi JakLingko" />'; } return ''; } catch(e){ return ''; } })()}
-                    </div>
-                    ${wheelchairIconHtml}
-                </div>
-                <div class=\"popup-scroll\" style=\"max-height:56vh;overflow:auto;\">
-                ${jenisHtml}
-                    ${semuaBadges ? `
-                <div>
-                        <div style=\"font-size: 11px; color: #666; margin-bottom: 6px;\">Layanan</div>
-                        <div style=\"display:flex;flex-wrap:wrap;gap:4px;\">
-                            ${semuaBadges}
-                    </div>
-                </div>` : ''}
-                    ${platformDetailHtml}
-                </div>
-            </div>
-        `;
+            <div class=\"stop-popup plus-jakarta-sans\" style=\"min-width: 220px; max-width: 330px; padding: 10px 12px;\">\n                <div style=\"color: #333; padding: 6px 0; border-bottom: 1px solid #eee; margin-bottom: 6px; display:flex; align-items:center; gap:6px;\">\n                    <div style=\"display:flex;align-items:center;gap:6px;\">${activePrefix}<span style=\"font-size: 14px; font-weight: 600;\">${stop.properties.stopName}</span>\n                        ${(() => { try { const rm = window.transJakartaApp.modules.routes; const stopObj = window.transJakartaApp.modules.gtfs.getStops().find(s => String(s.stop_id) === String(stop.properties.stopId)); if (!rm || !stopObj) return ''; const html = rm.buildIntermodalIconsForStop ? rm.buildIntermodalIconsForStop(stopObj) : ''; return html || ''; } catch(e){ return ''; } })()}\n                        ${(() => { try { const rm = window.transJakartaApp.modules.routes; const stopObj = window.transJakartaApp.modules.gtfs.getStops().find(s => String(s.stop_id) === String(stop.properties.stopId)); if (!rm || !stopObj) return ''; if (rm.shouldShowJaklingkoBadge && rm.shouldShowJaklingkoBadge(stopObj)) { return '<img class="jaklingko-badge" src="https://transportforjakarta.or.id/wp-content/uploads/2024/10/jaklingko-w-AR0bObLen0c7yK8n-768x768.png" alt="JakLingko" title="Terintegrasi JakLingko" />'; } return ''; } catch(e){ return ''; } })()}\n                    </div>\n                    ${wheelchairIconHtml}\n                </div>\n                <div class=\"popup-scroll\" style=\"max-height:56vh;overflow:auto;\">\n                ${jenisHtml}\n                    ${semuaBadges ? `\n                <div>\n                        <div style=\"font-size: 11px; color: #666; margin-bottom: 6px;\">Layanan</div>\n                        <div style=\"display:flex;flex-wrap:wrap;gap:4px;\">\n                            ${semuaBadges}\n                    </div>\n                </div>` : ''}\n                    ${platformDetailHtml}\n                </div>\n            </div>\n        `;
 
         if (this._currentPopup) this._currentPopup.remove();
         this._currentPopup = this.featurePopup.setLngLat(lngLat).setHTML(popupContent).addTo(this.map);
@@ -969,10 +1090,60 @@ export class MapManager {
                     e.stopPropagation();
                     e.preventDefault();
                     const routeId = badge.getAttribute('data-routeid');
-                    // Select route only from union services
+                    if (allowAutoLive) {
+                        // Auto start live only for Nearest origin
+                        try { window.transJakartaApp.modules.location.suspendUpdates(true); } catch (e) {}
                     try { window.transJakartaApp.modules.routes.selectRoute(routeId); } catch (e) {}
+                        setTimeout(() => {
+                            try {
+                                const loc = window.transJakartaApp.modules.location;
+                                if (loc && !loc.isActive && loc.canAutoStartLive && loc.canAutoStartLive()) loc.enableLiveLocation();
+                                // Prefer platform G when available from computed platformMap, else use thisStop (feeder/non-platform)
+                                let gtStop = null;
+                                try {
+                                    if (Array.isArray(platformMap) && platformMap.length) {
+                                        const pm = platformMap[0];
+                                        gtStop = this._findPlatformStopBy(pm.code, pm.lat, pm.lng);
+                                    }
+                                } catch (_) {}
+                                if (!gtStop) gtStop = thisStop || null;
+                                if (loc && gtStop) {
+                                    loc.activateLiveServiceFromStop(gtStop, routeId);
+                                    const tryImmediate = () => {
+                                        if (loc.lastUserPos && loc.userMarker) {
+                                            loc.showUserRouteInfo(loc.lastUserPos.lat, loc.lastUserPos.lon, gtStop, routeId);
+                                            return true;
+                                        }
+                                        return false;
+                                    };
+                                    if (!tryImmediate()) {
+                                        try {
+                                            navigator.geolocation.getCurrentPosition(
+                                                (pos) => {
+                                                    try {
+                                                        const lat = pos.coords.latitude, lon = pos.coords.longitude;
+                                                        loc.lastUserPos = { lat, lon };
+                                                        loc.lastUserPosSmoothed = { lat, lon };
+                                                        loc.updateUserMarker(lat, lon);
+                                                        loc.showUserRouteInfo(lat, lon, gtStop, routeId);
+                                                    } catch (_) { loc.scheduleLiveUIUpdate(); }
+                                                },
+                                                () => { try { loc.scheduleLiveUIUpdate(); } catch(_){} },
+                                                { enableHighAccuracy: true, maximumAge: 3000, timeout: 5000 }
+                                            );
+                                        } catch (_) { try { loc.scheduleLiveUIUpdate(); } catch(_){} }
+                                    }
+                                }
+                            } catch (e) {}
                     this._resumeAfterIdle();
+                        }, 160);
                     if (this._currentPopup) { this._currentPopup.remove(); this._currentPopup = null; }
+                    } else {
+                        // Generic: select route only
+                        try { window.transJakartaApp.modules.routes.selectRoute(routeId); } catch (e) {}
+                        this._resumeAfterIdle();
+                        if (this._currentPopup) { this._currentPopup.remove(); this._currentPopup = null; }
+                    }
                 };
                 badge.addEventListener('click', handler);
                 badge.addEventListener('touchstart', handler, { passive: false });
@@ -1129,7 +1300,7 @@ export class MapManager {
                 try { rids = Array.isArray(props.routeIds) ? props.routeIds : (typeof props.routeIds === 'string' ? JSON.parse(props.routeIds) : []); } catch (err) { rids = []; }
                 const lng = f.geometry && f.geometry.coordinates ? f.geometry.coordinates[0] : e.lngLat.lng;
                 const lat = f.geometry && f.geometry.coordinates ? f.geometry.coordinates[1] : e.lngLat.lat;
-                this.navigateToPlatformAndShow(code, lat, lng, rids, true);
+                this.navigateToPlatformAndShow(code, lat, lng, rids);
             };
             this.map.on('click', pfLyId, this._onRadiusPlatformClick);
             this.map.on('mouseenter', pfLyId, () => { this.map.getCanvas().style.cursor = 'pointer'; });
@@ -1137,8 +1308,8 @@ export class MapManager {
 
             // Bind click once
             if (this._onRadiusClick) { try { this.map.off('click', this._radiusLayerId, this._onRadiusClick); } catch (e) {} }
-            this._onRadiusClick = (e) => {
-                const f = e.features && e.features[0];
+            this._onRadiusClick = (e) => { 
+                const f = e.features && e.features[0]; 
                 if (!f) return;
                 const routeIdsAtStop = Array.isArray(f.properties.routeIds) ? f.properties.routeIds : [];
                 const app = window.transJakartaApp;
@@ -1261,7 +1432,7 @@ export class MapManager {
                 const p = e.lngLat;
                 const s = stop; // closure
                 const pseudoFeature = { properties: { stopId: s.stop_id, stopName: s.stop_name, wheelchairBoarding: (s.wheelchair_boarding || '0') } };
-                this.showStopPopup(pseudoFeature, p);
+                this.showStopPopup(pseudoFeature, p, { origin: 'nearest' });
             });
             this.map.on('mouseenter', hitLayerId, () => { this.map.getCanvas().style.cursor = 'pointer'; });
             this.map.on('mouseleave', hitLayerId, () => { this.map.getCanvas().style.cursor = ''; });
@@ -1333,10 +1504,10 @@ export class MapManager {
         });
         this.layers.clear();
         this.removeHalteRadiusMarkers();
-
+        
         // Clear active route data
         this._activeRouteData = null;
-
+        
         // Close any open feature popup
         if (this._currentPopup) {
             this._currentPopup.remove();
@@ -1378,7 +1549,7 @@ export class MapManager {
         this._currentPopup = this.featurePopup.setLngLat([lng, lat]).setHTML(html).addTo(this.map);
         return this._currentPopup;
     }
-
+    
     // Render/update label text untuk halte berikutnya di peta
     updateNextStopLabel(nextStop) {
         this._ensureStyleReady(() => {
@@ -1421,7 +1592,7 @@ export class MapManager {
             }
         });
     }
-
+    
     clearNextStopLabel() { this.updateNextStopLabel(null); }
 
     setCameraLock(enabled) {
@@ -1470,7 +1641,7 @@ export class MapManager {
         this.map.on('idle', resume);
     }
 
-    navigateToPlatformAndShow(code, lat, lng, routeIds, startLive = false) {
+    navigateToPlatformAndShow(code, lat, lng, routeIds) {
         const routes = window.transJakartaApp.modules.gtfs.getRoutes();
         // Focus map to platform location
         try { this.setView(lat, lng, Math.max(this.map.getZoom() || 16, 18)); } catch (e) {}
@@ -1479,13 +1650,19 @@ export class MapManager {
             const r = routes.find(rt => String(rt.route_id) === String(rid));
             if (!r) return '';
             const color = r.route_color ? `#${r.route_color}` : '#6c757d';
-            return `<span class=\"badge badge-koridor-interaktif\" style=\"background:${color};color:#fff;font-weight:600;font-size:0.72em;padding:3px 7px;margin-right:6px;margin-bottom:6px;\" data-routeid=\"${r.route_id}\">${r.route_short_name}</span>`;
+            return `<span class="badge badge-koridor-interaktif" style="background:${color};color:#fff;font-weight:600;font-size:0.72em;padding:3px 7px;margin-right:6px;margin-bottom:6px;" data-routeid="${r.route_id}">${r.route_short_name}</span>`;
         }).join('');
         const title = code ? `Platform ${code}` : 'Platform';
         const html = `
-            <div class=\"stop-popup plus-jakarta-sans\" style=\"min-width:220px;max-width:300px;padding:10px 12px;\">\n\t\t\t\t\t<div style=\"color:#333;padding:6px 0;border-bottom:1px solid #eee;margin-bottom:6px;display:flex;align-items:center;gap:6px;\">\n\t\t\t\t\t\t<div style=\"font-size:13px;font-weight:700;\">${title}</div>\n\t\t\t\t\t</div>\n\t\t\t\t\t<div style=\"font-size:11px;color:#666;margin-bottom:6px;\">Layanan pada platform ini</div>\n\t\t\t\t\t<div style=\"display:flex;flex-wrap:wrap;gap:4px;\">${badges}</div>\n\t\t\t\t</div>`;
+            <div class="stop-popup plus-jakarta-sans" style="min-width:220px;max-width:300px;padding:10px 12px;">
+                <div style="color:#333;padding:6px 0;border-bottom:1px solid #eee;margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+                    <div style="font-size:13px;font-weight:700;">${title}</div>
+                </div>
+                <div style="font-size:11px;color:#666;margin-bottom:6px;">Layanan pada platform ini</div>
+                <div style="display:flex;flex-wrap:wrap;gap:4px;">${badges}</div>
+            </div>`;
         this.showHtmlPopupAt(lng, lat, html);
-        // Bind route badge clicks
+        // Bind route badge clicks (no auto-live here)
         setTimeout(() => {
             const el = this._currentPopup && this._currentPopup.getElement();
             if (!el) return;
@@ -1494,62 +1671,14 @@ export class MapManager {
                     e.stopPropagation(); e.preventDefault();
                     const routeId = badge.getAttribute('data-routeid');
                     try { window.transJakartaApp.modules.location.suspendUpdates(true); } catch (e) {}
-                    if (!startLive) {
-                        // Non-nearest: select route only
-                        try { window.transJakartaApp.modules.routes.selectRoute(routeId); } catch (e) {}
-                        this._resumeAfterIdle();
-                        if (this._currentPopup) { this._currentPopup.remove(); this._currentPopup = null; }
-                        return;
-                    }
-                    // Nearest flow: start live from this platform
-                    try { window.transJakartaApp.modules.routes.selectRoute(routeId); } catch (e) {}
-                    setTimeout(() => {
-                        try {
-                            const loc = window.transJakartaApp.modules.location;
-                            if (loc) {
-                                // Mark origin for lock button policy
-                                try { loc._liveOrigin = 'nearest'; } catch(_) {}
-                                if (!loc.isActive && loc.canAutoStartLive && loc.canAutoStartLive()) loc.enableLiveLocation();
-                                const gtStop = this._findPlatformStopBy(code, lat, lng);
-                                if (gtStop) {
-                                    loc.activateLiveServiceFromStop(gtStop, routeId);
-                                    const tryImmediate = () => {
-                                        if (loc.lastUserPos && loc.userMarker) {
-                                            loc.showUserRouteInfo(loc.lastUserPos.lat, loc.lastUserPos.lon, gtStop, routeId);
-                                            return true;
-                                        }
-                                        return false;
-                                    };
-                                    if (!tryImmediate()) {
-                                        try {
-                                            navigator.geolocation.getCurrentPosition(
-                                                (pos) => {
-                                                    try {
-                                                        const plat = pos.coords.latitude, plon = pos.coords.longitude;
-                                                        loc.lastUserPos = { lat: plat, lon: plon };
-                                                        loc.lastUserPosSmoothed = { lat: plat, lon: plon };
-                                                        loc.updateUserMarker(plat, plon);
-                                                        loc.showUserRouteInfo(plat, plon, gtStop, routeId);
-                                                    } catch(_) { loc.scheduleLiveUIUpdate(); }
-                                                },
-                                                () => { try { loc.scheduleLiveUIUpdate(); } catch(_){} },
-                                                { enableHighAccuracy: true, maximumAge: 3000, timeout: 5000 }
-                                            );
-                                        } catch(_) { try { loc.scheduleLiveUIUpdate(); } catch(_){} }
-                                    }
-                                }
-                            }
-
-                            } catch (e) {}
-                            this._resumeAfterIdle();
-                        }, 160);
-                        if (this._currentPopup) { this._currentPopup.remove(); this._currentPopup = null; }
-                    };
-                    badge.addEventListener('click', handler);
-                    badge.addEventListener('touchstart', handler, { passive: false });
-                });
-            }, 50);
-
+                    window.transJakartaApp.modules.routes.selectRoute(routeId);
+                    this._resumeAfterIdle();
+                    if (this._currentPopup) { this._currentPopup.remove(); this._currentPopup = null; }
+                };
+                badge.addEventListener('click', handler);
+                badge.addEventListener('touchstart', handler, { passive: false });
+            });
+        }, 50);
     }
 
     // Control user marker visibility (avoid duplicate visuals during live popup)
@@ -1577,8 +1706,59 @@ export class MapManager {
         } catch (e) { return null; }
     }
 
-    addLiveTrackingLayer(routeId, color) {
-        // Implement live tracking layer addition logic
-        console.log(`Adding live tracking layer for route: ${routeId} with color: ${color}`);
+    navigateToPlatformAndShow(code, lat, lng, routeIds) {
+        const routes = window.transJakartaApp.modules.gtfs.getRoutes();
+        // Focus map to platform location
+        try { this.setView(lat, lng, Math.max(this.map.getZoom() || 16, 18)); } catch (e) {}
+        // Build badges
+        const badges = (routeIds || []).map(rid => {
+            const r = routes.find(rt => String(rt.route_id) === String(rid));
+            if (!r) return '';
+            const color = r.route_color ? `#${r.route_color}` : '#6c757d';
+            return `<span class="badge badge-koridor-interaktif" style="background:${color};color:#fff;font-weight:600;font-size:0.72em;padding:3px 7px;margin-right:6px;margin-bottom:6px;" data-routeid="${r.route_id}">${r.route_short_name}</span>`;
+        }).join('');
+        const title = code ? `Platform ${code}` : 'Platform';
+        const html = `
+            <div class="stop-popup plus-jakarta-sans" style="min-width:220px;max-width:300px;padding:10px 12px;">
+                <div style="color:#333;padding:6px 0;border-bottom:1px solid #eee;margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+                    <div style="font-size:13px;font-weight:700;">${title}</div>
+                </div>
+                <div style="font-size:11px;color:#666;margin-bottom:6px;">Layanan pada platform ini</div>
+                <div style="display:flex;flex-wrap:wrap;gap:4px;">${badges}</div>
+            </div>`;
+        this.showHtmlPopupAt(lng, lat, html);
+        // Bind route badge clicks to select route only (no auto-start live here)
+        setTimeout(() => {
+            const el = this._currentPopup && this._currentPopup.getElement();
+            if (!el) return;
+            el.querySelectorAll('.badge-koridor-interaktif').forEach(badge => {
+                const handler = (e) => {
+                    e.stopPropagation(); e.preventDefault();
+                    const routeId = badge.getAttribute('data-routeid');
+                    // Select route only
+                    try { window.transJakartaApp.modules.routes.selectRoute(routeId); } catch (e) {}
+                        this._resumeAfterIdle();
+                    if (this._currentPopup) { this._currentPopup.remove(); this._currentPopup = null; }
+                };
+                badge.addEventListener('click', handler);
+                badge.addEventListener('touchstart', handler, { passive: false });
+            });
+        }, 50);
     }
-}
+
+    setStickyPopup(sticky) { this._stickyPopup = !!sticky; }
+    setJourneyActive(active) {
+        try {
+            if (this._journeyBtn) {
+                if (active) this._journeyBtn.classList.add('active'); else this._journeyBtn.classList.remove('active');
+                this._styleJourneyBtn(!!active, this._journeyBtn);
+            }
+        } catch (e) {}
+    }
+    _styleJourneyBtn(active, btn) {
+        try {
+            btn.style.background = active ? '#e6f0ff' : '';
+            btn.style.borderColor = active ? '#264697' : '';
+        } catch (e) {}
+    }
+} 

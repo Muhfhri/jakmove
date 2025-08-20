@@ -37,7 +37,6 @@ export class LocationManager {
         this._userAnimStart = 0;
         this._userAnimDurationMs = 450;
         this._lastLiveStopForPopup = null;
-        this._liveOrigin = null; // 'nearest' when live started from nearest flow
     }
 
     // Toggle live location
@@ -77,7 +76,7 @@ export class LocationManager {
         this.updateLockButtonVisibility();
         const mapEl = document.getElementById('map');
         if (mapEl) mapEl.classList.add('live-has-custom-marker');
-        // Seed marker immediately if possible
+        // Seed marker immediately jika bisa (perpanjang timeout agar tidak cepat expired)
         try {
             navigator.geolocation.getCurrentPosition((pos)=>{
                 try {
@@ -87,7 +86,7 @@ export class LocationManager {
                     this.updateUserMarker(lat, lon);
                     this._renderedUserPos = { lat, lon };
                 } catch(_){}
-            }, ()=>{}, { enableHighAccuracy: true, maximumAge: 3000, timeout: 5000 });
+            }, ()=>{}, { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 });
         } catch(_){}
     }
 
@@ -124,10 +123,16 @@ export class LocationManager {
         this.userCentered = false;
         this.isActive = false;
         this._allowAutoStart = false;
+        // Clear user position state to avoid stale behavior after OFF
+        this.lastUserPos = null;
+        this.lastUserPosSmoothed = null;
+        this._prevUserPos = null;
+        this._prevUserPosSmoothed = null;
+        this.lastUserTime = null;
+        this.lastUserSpeed = null;
         this.updateLiveLocationButton(false);
         this.hideNearestStopsButton();
         this.updateLockButtonVisibility();
-        this._liveOrigin = null;
 
         // Remove nearest stops markers
         this.clearNearestStopsMarkers();
@@ -752,18 +757,38 @@ export class LocationManager {
             this.showMultipleNearestStops(this.lastUserPos.lat, this.lastUserPos.lon, maxStops);
             return;
         }
-        // If not active, enable and mark pending
-        if (!this.isActive) {
-            console.debug('[Nearest] location inactive, enabling and marking pending');
+        // If live active but no position yet; mark pending
+        if (this.isActive) {
+            console.debug('[Nearest] active but no lastUserPos yet, pending');
+            this._pendingNearest = true;
+            this._pendingNearestMax = maxStops;
+            return;
+        }
+        // Live OFF: respect manual OFF; avoid auto-start unless allowed
+        if (this.canAutoStartLive && this.canAutoStartLive()) {
+            console.debug('[Nearest] location inactive, auto-start allowed; enabling and marking pending');
             this._pendingNearest = true;
             this._pendingNearestMax = maxStops;
             this.enableLiveLocation();
             return;
         }
-        // Active but no position yet; mark pending
-        console.debug('[Nearest] active but no lastUserPos yet, pending');
-        this._pendingNearest = true;
-        this._pendingNearestMax = maxStops;
+        // Live OFF and auto-start not allowed: use one-shot geolocation without enabling watch
+        console.debug('[Nearest] live OFF and auto-start not allowed; using one-shot geolocation');
+        try {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    try {
+                        const lat = pos.coords.latitude;
+                        const lon = pos.coords.longitude;
+                        this.showMultipleNearestStops(lat, lon, maxStops);
+                    } catch (e) { console.debug('[Nearest] one-shot success but handler failed:', e); }
+                },
+                (err) => { console.debug('[Nearest] one-shot geolocation failed:', err); },
+                { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
+            );
+        } catch (e) {
+            console.debug('[Nearest] one-shot geolocation error:', e);
+        }
     }
 
     // Show multiple nearest stops
@@ -841,7 +866,6 @@ export class LocationManager {
                                     this.enableLiveLocation();
                                 }
                                 // Activate live service from this stop and route
-                                this._liveOrigin = 'nearest';
                                 this.activateLiveServiceFromStop(stop, rid);
                                 // Visibility is handled centrally
                                 this.updateLockButtonVisibility();
@@ -1143,7 +1167,7 @@ export class LocationManager {
         try {
             const btn = document.getElementById('cameraLockBtn');
             if (!btn) return;
-            const shouldShow = !!(this.isActive && this.selectedRouteIdForUser && this.selectedCurrentStopForUser && this._liveOrigin === 'nearest');
+            const shouldShow = !!(this.isActive && this.selectedRouteIdForUser && this.selectedCurrentStopForUser);
             btn.style.display = shouldShow ? '' : 'none';
             if (!shouldShow) {
                 const mapManager = window.transJakartaApp.modules.map;

@@ -8,6 +8,18 @@
     <meta name="keywords" content="TransJakarta, peta interaktif, halte, koridor, BRT, Jakarta, transportasi umum">
     <meta name="author" content="TransJakarta Interactive Map">
     
+    <!-- Resource Hints -->
+    <link rel="preconnect" href="https://basemaps.cartocdn.com" crossorigin>
+    <link rel="dns-prefetch" href="//basemaps.cartocdn.com">
+    <link rel="preconnect" href="https://services.arcgisonline.com" crossorigin>
+    <link rel="dns-prefetch" href="//services.arcgisonline.com">
+    <link rel="preconnect" href="https://api.maptiler.com" crossorigin>
+    <link rel="dns-prefetch" href="//api.maptiler.com">
+    <link rel="preconnect" href="https://unpkg.com" crossorigin>
+    <link rel="dns-prefetch" href="//unpkg.com">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="dns-prefetch" href="//cdn.jsdelivr.net">
+    
     <!-- Open Graph Meta Tags -->
     <meta property="og:title" content="JakMove">
     <meta property="og:description" content="Peta interaktif koridor TransJakarta dengan informasi halte, rute, dan fitur live location">
@@ -173,8 +185,8 @@
     <!-- Progress Bar untuk Initial Loading -->
     <div id="loadingProgress" class="loading-modal" style="display: none;">
         <div class="loading-content modern">
-            <div class="loading-brand text-center mb-3">
-                <img id="light" class="progress-logo" alt="JakMove" />
+            <div class="loading-spinner">
+                <div class="spinner"></div>
             </div>
             <div class="loading-header text-center">
                 <h4 class="mb-1">Memuat JakMove</h4>
@@ -185,7 +197,7 @@
                     <div id="progressBar" class="progress-bar" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
                 </div>
                 <div class="progress-info d-flex align-items-center justify-content-between mt-2">
-                    <span id="progressStatus" class="small text-muted">Menyiapkan aplikasi...</span>
+                    <span id="progressStatus" class="small text-muted" aria-live="polite">Menyiapkan aplikasi...</span>
                     <span id="progressPercent" class="fw-bold">0%</span>
                 </div>
             </div>
@@ -455,17 +467,26 @@
     </div>
     
     <!-- MapLibre GL JS -->
-    <script src='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js'></script>
+    <script src='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js' defer></script>
     
     <!-- Main Application Script -->
-    <script type="module" src="main.js"></script>
+    <script defer type="module" src="main.js"></script>
+    
+    <script>
+    // Register Service Worker for caching tiles/assets
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('sw.js').catch(()=>{});
+        });
+    }
+    </script>
     
     <!-- Additional Scripts -->
-    <script src="js/weather.js"></script>
-    <script src="https://code.iconify.design/iconify-icon/1.0.2/iconify-icon.min.js"></script>
-    <script src="js/dark-mode-switch.js"></script>
-    <script src="js/navbar.js"></script>
-    <script src="js/intermodal.js"></script>
+    <script src="js/weather.js" defer></script>
+    <script src="https://code.iconify.design/iconify-icon/1.0.2/iconify-icon.min.js" defer></script>
+    <script src="js/dark-mode-switch.js" defer></script>
+    <script src="js/navbar.js" defer></script>
+    <script src="js/intermodal.js" defer></script>
 
     <script>
     // Modal Izin Lokasi dengan persistensi pilihan

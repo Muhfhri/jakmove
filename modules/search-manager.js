@@ -137,25 +137,35 @@ export class SearchManager {
     // Get unique stops
     getUniqueStops(stops, stopToRoutes) {
         const stopMap = new Map();
-        
+        const normalizeName = (n) => String(n || '').trim().toLowerCase().replace(/\s+/g, ' ');
+        const buildKey = (s) => {
+            const sid = String(s.stop_id || '');
+            if (s.parent_station) return `PARENT:${String(s.parent_station)}`;
+            if (sid.startsWith('H')) return `H:${sid}`;
+            return `NAME:${normalizeName(s.stop_name)}`;
+        };
         stops.forEach(stop => {
-            const normName = stop.stop_name.trim().toLowerCase();
-            const lat = parseFloat(stop.stop_lat).toFixed(5);
-            const lon = parseFloat(stop.stop_lon).toFixed(5);
-            const key = `${normName}|${lat}|${lon}`;
-            
+            const key = buildKey(stop);
             if (!stopMap.has(key)) {
-                stopMap.set(key, { ...stop, koridors: new Set() });
+                stopMap.set(key, { ...stop, koridors: new Set(), _cluster: [stop] });
+            } else {
+                stopMap.get(key)._cluster.push(stop);
             }
-            
             if (stopToRoutes[stop.stop_id]) {
                 Array.from(stopToRoutes[stop.stop_id]).forEach(rid => 
                     stopMap.get(key).koridors.add(rid)
                 );
             }
         });
-
-        return Array.from(stopMap.values());
+        return Array.from(stopMap.values()).map(v => {
+            // compute representative lat/lon as average of cluster
+            try {
+                const lat = (v._cluster.map(s => parseFloat(s.stop_lat)).filter(n=>!isNaN(n)).reduce((a,b)=>a+b,0) / v._cluster.length) || parseFloat(v.stop_lat);
+                const lon = (v._cluster.map(s => parseFloat(s.stop_lon)).filter(n=>!isNaN(n)).reduce((a,b)=>a+b,0) / v._cluster.length) || parseFloat(v.stop_lon);
+                v.stop_lat = lat; v.stop_lon = lon;
+            } catch(_){}
+            return v;
+        });
     }
 
     // Create route result item
@@ -214,7 +224,6 @@ export class SearchManager {
                 const iconsSpan = document.createElement('span');
                 iconsSpan.className = 'intermodal-icons';
                 iconsSpan.innerHTML = interHtml;
-                // Ensure icons are properly sized even outside .stop-header context
                 iconsSpan.querySelectorAll('img').forEach(img => {
                     img.style.width = '16px';
                     img.style.height = '16px';
@@ -239,12 +248,12 @@ export class SearchManager {
         header.appendChild(right);
         li.appendChild(header);
 
-        // Route badges: clickable to switch route
-        if (stopToRoutes[stop.stop_id]) {
+        // Route badges: clickable to switch route (use union set from getUniqueStops)
+        if (stop.koridors && stop.koridors.size > 0) {
             const badgesWrap = document.createElement('div');
             badgesWrap.className = 'mt-1';
-            Array.from(stopToRoutes[stop.stop_id]).forEach(rid => {
-                const route = routes.find(r => r.route_id === rid);
+            Array.from(stop.koridors).forEach(rid => {
+                const route = routes.find(r => String(r.route_id) === String(rid));
                 if (!route) return;
                 const badge = document.createElement('span');
                 const color = route.route_color ? ('#' + route.route_color) : '#6c757d';
@@ -284,22 +293,20 @@ export class SearchManager {
         // Set map view to stop location
         mapManager.setView(parseFloat(stop.stop_lat), parseFloat(stop.stop_lon), 17);
 
-        // Show stop popup directly
+        // Show stop popup with union (use pseudo feature; map popup re-unions too)
         try {
             const f = {
                 properties: {
                     stopId: stop.stop_id,
                     stopName: stop.stop_name,
                     stopType: mapManager.getStopType ? mapManager.getStopType(String(stop.stop_id)) : '',
-                    routeIds: (window.transJakartaApp.modules.gtfs.getStopToRoutes()[stop.stop_id] ? Array.from(window.transJakartaApp.modules.gtfs.getStopToRoutes()[stop.stop_id]) : [])
+                    routeIds: (stop.koridors ? Array.from(stop.koridors) : (window.transJakartaApp.modules.gtfs.getStopToRoutes()[stop.stop_id] ? Array.from(window.transJakartaApp.modules.gtfs.getStopToRoutes()[stop.stop_id]) : []))
                 }
             };
             mapManager.showStopPopup(f, { lng: parseFloat(stop.stop_lon), lat: parseFloat(stop.stop_lat) });
         } catch (e) {
             // Fallback to marker if popup fails
-            if (window.searchResultMarker) {
-                mapManager.removeSearchResultMarker();
-            }
+            try { if (window.searchResultMarker) { mapManager.removeSearchResultMarker(); } } catch(_){ }
             window.searchResultMarker = mapManager.addSearchResultMarker(
                 parseFloat(stop.stop_lat), 
                 parseFloat(stop.stop_lon), 

@@ -7,6 +7,7 @@ import { SearchManager } from './modules/search-manager.js';
 import { LocationManager } from './modules/location-manager.js';
 import { UIManager } from './modules/ui-manager.js';
 import { SettingsManager } from './modules/settings-manager.js';
+import { JourneyPlanner } from './modules/journey-planner.js';
 
 class TransJakartaApp {
     constructor() {
@@ -26,6 +27,7 @@ class TransJakartaApp {
             this.modules.settings = new SettingsManager();
             this.modules.location = new LocationManager();
             this.modules.ui = new UIManager();
+            this.modules.journey = new JourneyPlanner(this);
 
             // Load GTFS data
             await this.modules.gtfs.loadData();
@@ -36,6 +38,7 @@ class TransJakartaApp {
             
             // Setup UI (dropdowns, buttons)
             this.modules.ui.init();
+            this.modules.journey.init();
 
             // Setup event listeners
             this.setupEventListeners();
@@ -45,6 +48,15 @@ class TransJakartaApp {
             
             // Load saved state
             this.loadSavedState();
+
+            // Handle URL parameter for direct route selection (e.g., index.html?route_id=3F)
+            try {
+                const url = new URL(window.location.href);
+                const routeParam = url.searchParams.get('route_id');
+                if (routeParam) {
+                    this.modules.routes.selectRoute(routeParam);
+                }
+            } catch (e) {}
             
             console.log('TransJakarta App initialized successfully');
         } catch (error) {
@@ -75,6 +87,7 @@ class TransJakartaApp {
         if (resetBtn) {
             resetBtn.addEventListener('click', () => {
                 this.resetApp();
+                try { this.modules.journey.reset(); } catch(e) {}
             });
         }
 
@@ -85,6 +98,13 @@ class TransJakartaApp {
                 this.modules.search.handleSearch(e.target.value);
             });
         }
+        // Temporary: press J to toggle Journey Planner
+        document.addEventListener('keydown', (ev) => {
+            if ((ev.key === 'j' || ev.key === 'J') && !ev.repeat) {
+                const jp = this.modules.journey;
+                if (!jp.enabled) jp.enable(); else jp.disable();
+            }
+        });
     }
 
     initLiveClock() {

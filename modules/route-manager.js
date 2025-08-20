@@ -795,26 +795,55 @@ export class RouteManager {
 
     // Create other routes badges
     createOtherRoutesBadges(stop) {
-        const stopToRoutes = window.transJakartaApp.modules.gtfs.getStopToRoutes();
-        if (!stopToRoutes[stop.stop_id]) return '';
-
-        const otherRoutes = Array.from(stopToRoutes[stop.stop_id])
-            .filter(rid => rid !== this.selectedRouteId);
-        
-        if (otherRoutes.length === 0) return '';
-
+        const gtfs = window.transJakartaApp.modules.gtfs;
+        const stopToRoutes = gtfs.getStopToRoutes();
+        const allStops = gtfs.getStops() || [];
+        const routesAll = gtfs.getRoutes() || [];
+        if (!stop) return '';
+        // Build cluster key similar to popup logic
+        const normalizeName = (n) => String(n || '').trim().replace(/\s+/g, ' ');
+        const buildKey = (s) => {
+            const sid = String(s.stop_id || '');
+            if (s.parent_station) return String(s.parent_station);
+            if (sid.startsWith('H')) return sid;
+            return `NAME:${normalizeName(s.stop_name)}`;
+        };
+        const sid = String(stop.stop_id || '');
+        let unionRouteIds = [];
+        if (sid.startsWith('B')) {
+            // Feeder: keep this stop's services only
+            unionRouteIds = stopToRoutes[sid] ? Array.from(stopToRoutes[sid]) : [];
+        } else {
+            // BRT/others: union services across cluster (merge platforms)
+            try {
+                const key = buildKey(stop);
+                const cluster = allStops.filter(s => buildKey(s) === key);
+                const set = new Set();
+                cluster.forEach(cs => {
+                    const cid = String(cs.stop_id || '');
+                    // skip access E*
+                    if (cid.startsWith('E')) return;
+                    const rids = stopToRoutes[cid] ? Array.from(stopToRoutes[cid]) : [];
+                    rids.forEach(r => set.add(String(r)));
+                });
+                unionRouteIds = Array.from(set);
+            } catch (e) {
+                unionRouteIds = stopToRoutes[sid] ? Array.from(stopToRoutes[sid]) : [];
+            }
+        }
+        // Filter out currently selected route
+        const others = unionRouteIds.filter(rid => String(rid) !== String(this.selectedRouteId));
+        if (others.length === 0) return '';
         let otherRoutesBadges = `<div class='other-routes'>
             <div class='other-routes-label'>Layanan lain:</div>
             <div class='other-routes-badges'>`;
-        
-        otherRoutes.forEach(rid => {
-            const route = window.transJakartaApp.modules.gtfs.getRoutes().find(r => r.route_id === rid);
+        others.forEach(rid => {
+            const route = routesAll.find(r => String(r.route_id) === String(rid));
             if (route) {
-                let badgeColor = (route.route_color) ? ('#' + route.route_color) : '#6c757d';
-                otherRoutesBadges += `<span class='badge badge-koridor-interaktif rounded-pill me-1 mb-1 other-route-badge' data-routeid='${route.route_id}' style='background:${badgeColor};color:#fff;font-weight:bold;font-size:0.8em;padding:4px 8px;' title='${route.route_long_name}'>${route.route_short_name}</span>`;
+                const badgeColor = route.route_color ? ('#' + route.route_color) : '#6c757d';
+                otherRoutesBadges += `<span class='badge badge-koridor-interaktif rounded-pill me-1 mb-1 other-route-badge' data-routeid='${route.route_id}' style='background:${badgeColor};color:#fff;font-weight:bold;font-size:0.8em;padding:4px 8px;' title='${route.route_long_name || ''}'>${route.route_short_name || route.route_id}</span>`;
             }
         });
-        
         otherRoutesBadges += `</div></div>`;
         return otherRoutesBadges;
     }

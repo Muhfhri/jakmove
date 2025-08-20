@@ -69,64 +69,8 @@ export class UIManager {
             mapDiv.appendChild(container);
         }
 
-        // Create basemap selector (lebih pendek)
-        if (!document.getElementById('basemapSelector')) {
-            const bm = document.createElement('select');
-            bm.id = 'basemapSelector';
-            bm.className = 'form-select form-select-sm plus-jakarta-sans';
-            bm.style.minWidth = '140px';
-            bm.style.maxWidth = '200px';
-            bm.innerHTML = `
-                <option value="positron">Positron</option>
-                <option value="voyager">Voyager</option>
-                <option value="dark">Dark Matter</option>
-                <option value="streets">Streets</option>
-                <option value="topo">Topo</option>
-                <option value="gray">Gray</option>
-                <option value="opentopo">OpenTopo</option>
-                <option value="satellite">Satelit</option>
-                <option value="openmaptiles-streets">OpenMapTiles Streets</option>
-                <option value="openmaptiles-bright">OpenMapTiles Bright</option>
-                <option value="openmaptiles-dark">OpenMapTiles Dark</option>
-                <option value="openmaptiles-positron">OpenMapTiles Positron</option>
-            `;
-            // Simpan default OpenMapTiles key jika ada dari konfigurasi
-            try {
-                const defaultOmtKey = 'RVJ0OE10B7aw0wl2Tdyl';
-                if (defaultOmtKey && !localStorage.getItem('openmaptilesKey')) {
-                    localStorage.setItem('openmaptilesKey', defaultOmtKey);
-                }
-            } catch (e) {}
-            // Restore saved base style
-            const savedStyle = localStorage.getItem('baseMapStyle') || 'positron';
-            // Fallback jika tersimpan OSM atau MapLibre3D
-            if (savedStyle === 'osm' || savedStyle === 'maplibre3d') {
-                localStorage.setItem('baseMapStyle', 'positron');
-            }
-            bm.value = localStorage.getItem('baseMapStyle') || 'positron';
-            window.transJakartaApp.modules.map.setBaseStyle(bm.value);
-            bm.onchange = () => {
-                const val = bm.value;
-                if (val && val.startsWith('openmaptiles-')) {
-                    try {
-                        const suppliedKey = 'RVJ0OE10B7aw0wl2Tdyl';
-                        const stored = localStorage.getItem('openmaptilesKey');
-                        if (stored !== suppliedKey) localStorage.setItem('openmaptilesKey', suppliedKey);
-                    } catch (e) {}
-                }
-                localStorage.setItem('baseMapStyle', val);
-                window.transJakartaApp.modules.map.setBaseStyle(val);
-            };
-            container.appendChild(bm);
-        } else {
-            // Ensure existing reflects saved value
-            const bm = document.getElementById('basemapSelector');
-            const savedStyle = localStorage.getItem('baseMapStyle');
-            if (savedStyle === 'osm' || savedStyle === 'maplibre3d') {
-                localStorage.setItem('baseMapStyle', 'positron');
-            }
-            if (bm && savedStyle && bm.value !== savedStyle) bm.value = savedStyle;
-        }
+		// Cleanup any previous basemap gallery in old position
+		try { const old = document.getElementById('basemapGallery'); if (old) old.remove(); } catch(e){}
 
         // Create route dropdown (lebih pendek)
         let routeDropdown = document.getElementById('mapRouteDropdown');
@@ -272,6 +216,285 @@ export class UIManager {
     setupMapControls() {
         const mapDiv = document.getElementById('map');
         if (!mapDiv) return;
+
+		// Geocoding Search (center top, above route dropdown)
+		(() => {
+			const container = document.getElementById('mapDropdownContainer');
+			if (!container) return;
+			if (document.getElementById('geoSearchWrap')) return;
+
+			const wrap = document.createElement('div');
+			wrap.id = 'geoSearchWrap';
+			wrap.style.position = 'relative';
+			wrap.style.zIndex = 1000;
+			wrap.style.display = 'flex';
+			wrap.style.flexDirection = 'column';
+			wrap.style.gap = '6px';
+			// Insert as first child (above route dropdown)
+			container.insertBefore(wrap, container.firstChild);
+
+			const box = document.createElement('div');
+			box.style.display = 'flex';
+			box.style.alignItems = 'center';
+			box.style.gap = '6px';
+			box.style.background = 'rgba(255,255,255,0.95)';
+			box.style.borderRadius = '999px';
+			box.style.padding = '6px 10px';
+			box.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)';
+			box.style.minWidth = '240px';
+			box.style.maxWidth = '56vw';
+			box.style.width = '100%';
+			wrap.appendChild(box);
+
+			const icon = document.createElement('span');
+			icon.innerHTML = '<iconify-icon icon="mdi:magnify" inline></iconify-icon>';
+			icon.style.color = '#64748b';
+			box.appendChild(icon);
+
+			const input = document.createElement('input');
+			input.type = 'search';
+			input.id = 'geoSearchInput';
+			input.placeholder = 'Cari tempat (mis. GBK, Monas)';
+			input.className = 'plus-jakarta-sans';
+			input.style.border = 'none';
+			input.style.outline = 'none';
+			input.style.background = 'transparent';
+			input.style.flex = '1';
+			input.style.minWidth = '120px';
+			box.appendChild(input);
+
+			const clearBtn = document.createElement('button');
+			clearBtn.type = 'button';
+			clearBtn.id = 'geoSearchClear';
+			clearBtn.className = 'btn btn-sm btn-light';
+			clearBtn.innerHTML = '<iconify-icon icon="mdi:close" inline></iconify-icon>';
+			clearBtn.style.borderRadius = '999px';
+			clearBtn.style.padding = '4px 6px';
+			clearBtn.title = 'Bersihkan';
+			box.appendChild(clearBtn);
+
+			const list = document.createElement('div');
+			list.id = 'geoSearchResults';
+			list.style.position = 'absolute';
+			list.style.left = '0';
+			list.style.top = '48px';
+			list.style.background = 'rgba(255,255,255,0.98)';
+			list.style.borderRadius = '10px';
+			list.style.boxShadow = '0 8px 20px rgba(0,0,0,0.12)';
+			list.style.padding = '6px';
+			list.style.minWidth = '260px';
+			list.style.maxWidth = '56vw';
+			list.style.maxHeight = '50vh';
+			list.style.overflow = 'auto';
+			list.style.display = 'none';
+			wrap.appendChild(list);
+
+			let debounceTimer = null;
+			const renderResults = (results) => {
+				list.innerHTML = '';
+				if (!results || results.length === 0) {
+					list.style.display = 'none';
+					return;
+				}
+				results.forEach((r) => {
+					const item = document.createElement('button');
+					item.type = 'button';
+					item.className = 'btn btn-light btn-sm w-100 text-start';
+					item.style.whiteSpace = 'nowrap';
+					item.style.overflow = 'hidden';
+					item.style.textOverflow = 'ellipsis';
+					const title = r.display_name || r.name || r.address?.city || 'Hasil';
+					item.textContent = title;
+					item.addEventListener('click', () => {
+						try {
+							const lat = parseFloat(r.lat);
+							const lon = parseFloat(r.lon);
+							const mm = window.transJakartaApp.modules.map;
+							if (mm) {
+								try { mm.removeSearchResultMarker(); } catch(_){}
+								mm.setView(lat, lon, 17);
+								const label = title.length > 60 ? title.slice(0, 60) + '…' : title;
+								mm.addSearchResultMarker(lat, lon, label);
+							}
+						} catch(_){ }
+						list.style.display = 'none';
+					});
+					list.appendChild(item);
+				});
+				list.style.display = 'block';
+			};
+
+			const fetchGeocode = async (q) => {
+				if (!q || q.trim().length < 2) { renderResults([]); return; }
+				const query = encodeURIComponent(q.trim());
+				const url = `https://nominatim.openstreetmap.org/search?format=json&limit=8&addressdetails=1&countrycodes=id&q=${query}`;
+				try {
+					const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+					const data = await res.json();
+					renderResults(Array.isArray(data) ? data : []);
+				} catch (_) {
+					renderResults([]);
+				}
+			};
+
+			input.addEventListener('input', () => {
+				const val = input.value || '';
+				if (debounceTimer) clearTimeout(debounceTimer);
+				debounceTimer = setTimeout(() => fetchGeocode(val), 250);
+			});
+			input.addEventListener('keydown', (e) => {
+				if (e.key === 'Enter') {
+					e.preventDefault();
+					const val = input.value || '';
+					fetchGeocode(val);
+				} else if (e.key === 'Escape') {
+					list.style.display = 'none';
+				}
+			});
+			clearBtn.addEventListener('click', () => {
+				input.value = '';
+				list.style.display = 'none';
+				try { const mm = window.transJakartaApp.modules.map; if (mm) mm.removeSearchResultMarker(); } catch(_){ }
+			});
+			document.addEventListener('click', (e) => {
+				const within = wrap.contains(e.target);
+				if (!within) list.style.display = 'none';
+			});
+		})();
+
+		// Basemap toggle and panel (bottom-left)
+		if (!document.getElementById('basemapToggleBtn')) {
+			const wrap = document.createElement('div');
+			wrap.id = 'basemapControlWrap';
+			wrap.style.position = 'absolute';
+			wrap.style.left = '12px';
+			wrap.style.bottom = '12px';
+			wrap.style.zIndex = 1000;
+			mapDiv.appendChild(wrap);
+
+			const btn = document.createElement('button');
+			btn.id = 'basemapToggleBtn';
+			btn.type = 'button';
+			btn.className = 'btn btn-primary rounded-5 btn-sm';
+			btn.style.display = 'inline-flex';
+			btn.style.alignItems = 'center';
+			btn.style.gap = '6px';
+			btn.innerHTML = '<iconify-icon icon="mdi:layers" inline></iconify-icon> <span class="d-none d-md-inline">Basemap</span>';
+			wrap.appendChild(btn);
+
+			const panel = document.createElement('div');
+			panel.id = 'basemapPanel';
+			panel.style.position = 'absolute';
+			panel.style.left = '0';
+			panel.style.bottom = '48px';
+			panel.style.background = 'rgba(255,255,255,0.95)';
+			panel.style.backdropFilter = 'blur(2px)';
+			panel.style.borderRadius = '12px';
+			panel.style.boxShadow = '0 8px 20px rgba(0,0,0,0.12)';
+			panel.style.padding = '10px';
+			panel.style.maxWidth = '70vw';
+			panel.style.maxHeight = '46vh';
+			panel.style.overflow = 'auto';
+			panel.style.display = 'none';
+			wrap.appendChild(panel);
+
+			const grid = document.createElement('div');
+			grid.id = 'basemapGrid';
+			grid.style.display = 'grid';
+			grid.style.gridTemplateColumns = 'repeat( auto-fill, minmax(64px, 1fr) )';
+			grid.style.gap = '10px';
+			panel.appendChild(grid);
+
+			// thumbnails
+			const lonLatToTile = (lon, lat, z) => {
+				const latRad = lat * Math.PI / 180;
+				const n = Math.pow(2, z);
+				const x = Math.floor((lon + 180) / 360 * n);
+				const y = Math.floor((1 - Math.log(Math.tan(latRad) + 1/Math.cos(latRad)) / Math.PI) / 2 * n);
+				return { x, y };
+			};
+			const center = { lon: 106.8, lat: -6.2 };
+			const z = 11;
+			const { x, y } = lonLatToTile(center.lon, center.lat, z);
+			const omtKey = (()=>{ try { return localStorage.getItem('openmaptilesKey') || 'RVJ0OE10B7aw0wl2Tdyl'; } catch(e){ return 'RVJ0OE10B7aw0wl2Tdyl'; } })();
+			const thumbs = [
+				{ id: 'positron', title: 'Positron', url: `https://basemaps.cartocdn.com/rastertiles/light_all/${z}/${x}/${y}.png` },
+				{ id: 'voyager', title: 'Voyager', url: `https://basemaps.cartocdn.com/rastertiles/voyager/${z}/${x}/${y}.png` },
+				{ id: 'dark', title: 'Dark', url: `https://basemaps.cartocdn.com/rastertiles/dark_all/${z}/${x}/${y}.png` },
+				{ id: 'streets', title: 'Esri Streets', url: `https://services.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/${z}/${y}/${x}` },
+				{ id: 'topo', title: 'Esri Topo', url: `https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/${z}/${y}/${x}` },
+				{ id: 'gray', title: 'Esri Gray', url: `https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/${z}/${y}/${x}` },
+				{ id: 'opentopo', title: 'OpenTopo', url: `https://a.tile.opentopomap.org/${z}/${x}/${y}.png` },
+				{ id: 'satellite', title: 'Satellite', url: `https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}` },
+				{ id: 'openmaptiles-streets', title: 'OMT Streets', url: `https://api.maptiler.com/maps/streets/256/${z}/${x}/${y}.png?key=${omtKey}` },
+				{ id: 'openmaptiles-bright', title: 'OMT Bright', url: `https://api.maptiler.com/maps/bright/256/${z}/${x}/${y}.png?key=${omtKey}` },
+				{ id: 'openmaptiles-dark', title: 'OMT Dark', url: `https://api.maptiler.com/maps/darkmatter/256/${z}/${x}/${y}.png?key=${omtKey}` },
+				{ id: 'openmaptiles-positron', title: 'OMT Positron', url: `https://api.maptiler.com/maps/positron/256/${z}/${x}/${y}.png?key=${omtKey}` }
+			];
+
+			const saved = (localStorage.getItem('baseMapStyle') || 'positron');
+			const selectStyle = (id) => {
+				try {
+					if (id && id.startsWith('openmaptiles-')) {
+						const suppliedKey = 'RVJ0OE10B7aw0wl2Tdyl';
+						const stored = localStorage.getItem('openmaptilesKey');
+						if (stored !== suppliedKey) localStorage.setItem('openmaptilesKey', suppliedKey);
+					}
+					localStorage.setItem('baseMapStyle', id);
+					window.transJakartaApp.modules.map.setBaseStyle(id);
+					// highlight
+					grid.querySelectorAll('.bm-thumb').forEach(el => el.classList.remove('active'));
+					const el = grid.querySelector(`.bm-thumb[data-style="${CSS.escape(id)}"]`);
+					if (el) el.classList.add('active');
+					// close after select
+					panel.style.display = 'none';
+				} catch (e) {}
+			};
+
+			thumbs.forEach(({ id, title, url }) => {
+				const item = document.createElement('button');
+				item.type = 'button';
+				item.className = 'bm-thumb';
+				item.setAttribute('data-style', id);
+				item.title = title;
+				item.style.border = '2px solid rgba(0,0,0,0.08)';
+				item.style.borderRadius = '10px';
+				item.style.padding = '0';
+				item.style.overflow = 'hidden';
+				item.style.width = '64px';
+				item.style.height = '64px';
+				item.style.cursor = 'pointer';
+				item.style.background = '#fff';
+				item.style.boxShadow = 'inset 0 0 0 1px rgba(255,255,255,0.4)';
+				item.onclick = () => selectStyle(id);
+				const img = document.createElement('img');
+				img.src = url;
+				img.alt = title;
+				img.style.width = '100%';
+				img.style.height = '100%';
+				img.style.objectFit = 'cover';
+				item.appendChild(img);
+				grid.appendChild(item);
+			});
+
+			// Active highlight style
+			const styleEl = document.createElement('style');
+			styleEl.textContent = `#basemapPanel .bm-thumb.active{border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,0.2) inset}`;
+			document.head.appendChild(styleEl);
+			// Initialize selection
+			setTimeout(() => selectStyle(saved), 0);
+
+			// Toggle behavior
+			btn.addEventListener('click', (e) => {
+				try { e.preventDefault(); e.stopPropagation(); } catch(_){ }
+				panel.style.display = (panel.style.display === 'none' || panel.style.display === '') ? 'block' : 'none';
+			});
+			// Close on outside click
+			document.addEventListener('click', (e) => {
+				const within = wrap.contains(e.target);
+				if (!within) panel.style.display = 'none';
+			});
+		}
 
         // Reset Button (kanan)
         if (!document.getElementById('resetMapBtn')) {

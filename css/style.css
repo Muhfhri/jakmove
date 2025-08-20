@@ -5462,3 +5462,83 @@ body {
 	text-shadow: 0 1px 2px rgba(0,0,0,0.45);
 }
 
+body.no-scroll { overflow: hidden; height: 100vh; }
+
+/* Prevent long route labels like JAK.100 from overflowing */
+.badge-koridor-interaktif {
+    display: inline-block;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
+}
+
+/* Category route list styling */
+.category-routes .list-group {
+    border-radius: 0.5rem;
+    overflow: hidden;
+}
+
+.category-routes .list-group-item {
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* Compact badge inside category route list, prevent overflow */
+.category-routes .list-group-item .badge {
+    display: inline-block;
+    max-width: 72px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1;
+    padding: 4px 8px;
+    border-radius: 10px;
+}
+
+/* Dark mode for category route list */
+[data-theme="dark"] .category-routes .list-group-item {
+    background: rgba(40, 49, 65, 0.85);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: #e9ecef;
+}
+
+[data-theme="dark"] .category-routes .list-group-item .badge {
+    box-shadow: none;
+}
+
+/* Vertical centering fix for badges in stops list on mobile */
+@media (max-width: 768px) {
+	.stops-list .badge-koridor-interaktif {
+		display: inline-flex;
+		align-items: center;
+		line-height: 1;
+		vertical-align: middle;
+		padding-top: 0.35em;
+		padding-bottom: 0.35em;
+	}
+}
+
+/* Global baseline/centering fix for badges in popups and route badges */
+.stop-popup .badge,
+.leaflet-popup-content .badge,
+.maplibregl-popup-content .badge,
+.badge-koridor-interaktif {
+	display: inline-flex;
+	align-items: center;
+	vertical-align: middle;
+	line-height: 1;
+}
+
+/* Reasonable default height for compact badges; keep responsive */
+.badge-koridor-interaktif {
+	min-height: 1.6em;
+}
+
+@media (max-width: 480px) {
+	.badge-koridor-interaktif {
+		min-height: 1.5em;
+	}
+}
+
