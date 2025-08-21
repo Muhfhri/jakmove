@@ -32,6 +32,13 @@ export class MapManager {
                 attributionControl: true
             });
 
+            // Lock map to Jabodetabek (approximate bounds) to avoid panning too far
+            try {
+                const bounds = new maplibregl.LngLatBounds([106.25, -6.95], [107.35, -5.8]);
+                this.map.setMaxBounds(bounds);
+                this.map.setMinZoom(9.5);
+            } catch (e) {}
+
             this.map.addControl(new maplibregl.NavigationControl(), 'top-left');
             this.map.addControl(new maplibregl.FullscreenControl(), 'top-left');
 
@@ -66,6 +73,7 @@ export class MapManager {
                 btn.style.justifyContent = 'center';
                 btn.style.lineHeight = '1';
                 btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#264697" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20c2-3 6-3 8-1s4 2 8-1"/><circle cx="6" cy="6" r="2"/><circle cx="18" cy="10" r="2"/></svg>';
+
                 btn.addEventListener('click', () => {
                     try {
                         const jp = window.transJakartaApp.modules.journey;
@@ -74,6 +82,7 @@ export class MapManager {
                     } catch (e) {}
                 });
                 ctrl.appendChild(btn);
+
                 class SimpleCtrl { onAdd(map) { this._map = map; return ctrl; } onRemove() { ctrl.remove(); this._map = undefined; } }
                 this.map.addControl(new SimpleCtrl(), 'bottom-right');
                 this._journeyBtn = btn;
@@ -1547,6 +1556,13 @@ export class MapManager {
         if (!this.featurePopup) return;
         if (this._currentPopup) this._currentPopup.remove();
         this._currentPopup = this.featurePopup.setLngLat([lng, lat]).setHTML(html).addTo(this.map);
+        // Ensure iconify icons render reliably
+        try {
+            const el = this._currentPopup && this._currentPopup.getElement && this._currentPopup.getElement();
+            if (el && window.Iconify && typeof window.Iconify.scan === 'function') {
+                window.Iconify.scan(el);
+            }
+        } catch (e) {}
         return this._currentPopup;
     }
     
@@ -1601,9 +1617,31 @@ export class MapManager {
         if (this._cameraLock) {
             // Set initial 3D pitch for better perspective
             this.map.setPitch(60);
+            try {
+                const ctr = document.getElementById('mapDropdownContainer');
+                if (ctr) {
+                    ctr.style.visibility = 'hidden';
+                    ctr.style.opacity = '0';
+                    ctr.style.pointerEvents = 'none';
+                }
+            } catch (e) {}
         } else {
             // Optionally relax pitch when unlocked
             this.map.setPitch(0);
+            try {
+                const ctr = document.getElementById('mapDropdownContainer');
+                if (ctr) {
+                    // Restore visibility without breaking layout
+                    ctr.style.visibility = '';
+                    ctr.style.opacity = '';
+                    ctr.style.pointerEvents = '';
+                    // Ensure expected flex layout is retained
+                    ctr.style.display = 'flex';
+                    ctr.style.flexDirection = 'column';
+                    ctr.style.alignItems = 'center';
+                    ctr.style.gap = '8px';
+                }
+            } catch (e) {}
         }
     }
 
@@ -1757,8 +1795,27 @@ export class MapManager {
     }
     _styleJourneyBtn(active, btn) {
         try {
-            btn.style.background = active ? '#e6f0ff' : '';
-            btn.style.borderColor = active ? '#264697' : '';
+            if (active) {
+                btn.style.background = '#2563eb';
+                btn.style.borderColor = '#1d4ed8';
+                btn.style.boxShadow = '0 0 0 2px rgba(37,99,235,0.25), 0 2px 8px rgba(37,99,235,0.35)';
+                btn.style.transform = 'scale(1.05)';
+                btn.style.color = '#ffffff';
+                const svg = btn.querySelector('svg');
+                if (svg) svg.setAttribute('stroke', '#ffffff');
+                btn.setAttribute('aria-pressed', 'true');
+                btn.title = 'Rencana (AKTIF)';
+            } else {
+                btn.style.background = '';
+                btn.style.borderColor = '';
+                btn.style.boxShadow = '';
+                btn.style.transform = '';
+                btn.style.color = '';
+                const svg = btn.querySelector('svg');
+                if (svg) svg.setAttribute('stroke', '#264697');
+                btn.setAttribute('aria-pressed', 'false');
+                btn.title = 'Rencana (BETA)';
+            }
         } catch (e) {}
     }
 } 

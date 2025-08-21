@@ -767,8 +767,8 @@ export class LocationManager {
         // Live OFF: respect manual OFF; avoid auto-start unless allowed
         if (this.canAutoStartLive && this.canAutoStartLive()) {
             console.debug('[Nearest] location inactive, auto-start allowed; enabling and marking pending');
-            this._pendingNearest = true;
-            this._pendingNearestMax = maxStops;
+        this._pendingNearest = true;
+        this._pendingNearestMax = maxStops;
             this.enableLiveLocation();
             return;
         }

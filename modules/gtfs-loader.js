@@ -23,18 +23,72 @@ export class GTFSLoader {
             this.showLoadingProgress();
             this.updateLoadingProgress(2, 'Menyiapkan aplikasi...');
 
-            const files = [
-                { url: 'gtfs/stops.txt', key: 'stopsTxt', label: 'Mengunduh stops.txt', range: [2, 10] },
-                { url: 'gtfs/routes.txt', key: 'routesTxt', label: 'Mengunduh routes.txt', range: [10, 16] },
-                { url: 'gtfs/trips.txt', key: 'tripsTxt', label: 'Mengunduh trips.txt', range: [16, 28] },
-                { url: 'gtfs/stop_times.txt', key: 'stopTimesTxt', label: 'Mengunduh stop_times.txt', range: [28, 50] },
-                { url: 'gtfs/shapes.txt', key: 'shapesTxt', label: 'Mengunduh shapes.txt', range: [50, 62] },
-                { url: 'gtfs/frequencies.txt', key: 'frequenciesTxt', label: 'Mengunduh frequencies.txt', range: [62, 66] },
-                { url: 'gtfs/fare_rules.txt', key: 'fareRulesTxt', label: 'Mengunduh fare_rules.txt', range: [66, 70] },
-                { url: 'gtfs/fare_attributes.txt', key: 'fareAttributesTxt', label: 'Mengunduh fare_attributes.txt', range: [70, 74] },
-                { url: 'gtfs/transfers.txt', key: 'transfersTxt', label: 'Mengunduh transfers.txt', range: [74, 78] },
-                { url: 'gtfs/calendar.txt', key: 'calendarTxt', label: 'Mengunduh calendar.txt', range: [78, 82] },
-                { url: 'gtfs/agency.txt', key: 'agencyTxt', label: 'Mengunduh agency.txt', range: [82, 86] }
+            const files = [{
+                    url: 'gtfs/stops.txt',
+                    key: 'stopsTxt',
+                    label: 'Mengunduh stops.txt',
+                    range: [2, 10]
+                },
+                {
+                    url: 'gtfs/routes.txt',
+                    key: 'routesTxt',
+                    label: 'Mengunduh routes.txt',
+                    range: [10, 16]
+                },
+                {
+                    url: 'gtfs/trips.txt',
+                    key: 'tripsTxt',
+                    label: 'Mengunduh trips.txt',
+                    range: [16, 28]
+                },
+                {
+                    url: 'gtfs/stop_times.txt',
+                    key: 'stopTimesTxt',
+                    label: 'Mengunduh stop_times.txt',
+                    range: [28, 50]
+                },
+                {
+                    url: 'gtfs/shapes.txt',
+                    key: 'shapesTxt',
+                    label: 'Mengunduh shapes.txt',
+                    range: [50, 62]
+                },
+                {
+                    url: 'gtfs/frequencies.txt',
+                    key: 'frequenciesTxt',
+                    label: 'Mengunduh frequencies.txt',
+                    range: [62, 66]
+                },
+                {
+                    url: 'gtfs/fare_rules.txt',
+                    key: 'fareRulesTxt',
+                    label: 'Mengunduh fare_rules.txt',
+                    range: [66, 70]
+                },
+                {
+                    url: 'gtfs/fare_attributes.txt',
+                    key: 'fareAttributesTxt',
+                    label: 'Mengunduh fare_attributes.txt',
+                    range: [70, 74]
+                },
+                {
+                    url: 'gtfs/transfers.txt',
+                    key: 'transfersTxt',
+                    label: 'Mengunduh transfers.txt',
+                    range: [74, 78]
+                },
+                {
+                    url: 'gtfs/calendar.txt',
+                    key: 'calendarTxt',
+                    label: 'Mengunduh calendar.txt',
+                    range: [78, 82]
+                },
+                {
+                    url: 'gtfs/agency.txt',
+                    key: 'agencyTxt',
+                    label: 'Mengunduh agency.txt',
+                    range: [82, 86]
+                }
             ];
 
             // Sequential streaming fetch with per-file progress
@@ -90,10 +144,15 @@ export class GTFSLoader {
             let received = 0;
             let chunks = '';
             while (true) {
-                const { done, value } = await reader.read();
+                const {
+                    done,
+                    value
+                } = await reader.read();
                 if (done) break;
                 received += value.byteLength;
-                chunks += decoder.decode(value, { stream: true });
+                chunks += decoder.decode(value, {
+                    stream: true
+                });
                 const frac = contentLength > 0 ? (received / contentLength) : 0.5; // fallback
                 const pct = Math.min(endPercent, startPercent + Math.floor((endPercent - startPercent) * frac));
                 this.updateLoadingProgress(pct, `${label} (${contentLength ? Math.min(100, Math.floor(frac * 100)) : '...'}%)`);
@@ -152,7 +211,9 @@ export class GTFSLoader {
                     result.stopToRoutes = stopToRoutes;
                     onProgress && onProgress(96, 'Finalisasi data...');
                     resolve(result);
-                } catch (e) { reject(e); }
+                } catch (e) {
+                    reject(e);
+                }
                 return;
             }
             const onMsg = (ev) => {
@@ -169,7 +230,10 @@ export class GTFSLoader {
             };
             w.addEventListener('message', onMsg);
             try {
-                w.postMessage({ cmd: 'parseAll', payload: texts });
+                w.postMessage({
+                    cmd: 'parseAll',
+                    payload: texts
+                });
             } catch (e) {
                 w.removeEventListener('message', onMsg);
                 reject(e);
@@ -178,15 +242,39 @@ export class GTFSLoader {
     }
 
     // Utility functions
-    getStops() { return this.data.stops; }
-    getRoutes() { return this.data.routes; }
-    getTrips() { return this.data.trips; }
-    getStopTimes() { return this.data.stop_times; }
-    getShapes() { return this.data.shapes; }
-    getFrequencies() { return this.data.frequencies; }
-    getFareRules() { return this.data.fare_rules; }
-    getFareAttributes() { return this.data.fare_attributes; }
-    getStopToRoutes() { return this.stopToRoutes; }
+    getStops() {
+        return this.data.stops;
+    }
+    getRoutes() {
+        return this.data.routes;
+    }
+    getTrips() {
+        return this.data.trips;
+    }
+    getStopTimes() {
+        return this.data.stop_times;
+    }
+    getShapes() {
+        return this.data.shapes;
+    }
+    getFrequencies() {
+        return this.data.frequencies;
+    }
+    getFareRules() {
+        return this.data.fare_rules;
+    }
+    getFareAttributes() {
+        return this.data.fare_attributes;
+    }
+    getStopToRoutes() {
+        return this.stopToRoutes;
+    }
+    getCalendar() {
+        return this.data.calendar;
+    }
+    getAgency() {
+        return this.data.agency;
+    }
 
     // Natural sort function for human-friendly sorting of route names
     naturalSort(a, b) {
@@ -196,7 +284,10 @@ export class GTFSLoader {
         if (!ax && typeof a === 'object') ax = a.route_id;
         if (!bx && typeof b === 'object') bx = b.route_id;
         
-        return ax.localeCompare(bx, undefined, { numeric: true, sensitivity: 'base' });
+        return ax.localeCompare(bx, undefined, {
+            numeric: true,
+            sensitivity: 'base'
+        });
     }
 
     // Loading progress functions
@@ -206,7 +297,9 @@ export class GTFSLoader {
             loadingModal.style.display = 'flex';
             setTimeout(() => loadingModal.classList.add('show'), 10);
         }
-        try { document.body.classList.add('no-scroll'); } catch(_) {}
+        try {
+            document.body.classList.add('no-scroll');
+        } catch (_) {}
     }
 
     hideLoadingProgress() {
@@ -215,7 +308,9 @@ export class GTFSLoader {
             loadingModal.classList.remove('show');
             setTimeout(() => loadingModal.style.display = 'none', 300);
         }
-        try { document.body.classList.remove('no-scroll'); } catch(_) {}
+        try {
+            document.body.classList.remove('no-scroll');
+        } catch (_) {}
     }
 
     updateLoadingProgress(percent, status) {
@@ -248,5 +343,4 @@ export class GTFSLoader {
             return obj;
         });
     }
-} 
- 
+}

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,10 +8,12 @@
     <meta name="description" content="Peta interaktif koridor TransJakarta dengan informasi halte, rute, dan fitur live location. Temukan halte terdekat dan rute optimal untuk perjalanan Anda.">
     <meta name="keywords" content="TransJakarta, peta interaktif, halte, koridor, BRT, Jakarta, transportasi umum">
     <meta name="author" content="TransJakarta Interactive Map">
-    
+
     <!-- Resource Hints -->
     <link rel="preconnect" href="https://basemaps.cartocdn.com" crossorigin>
     <link rel="dns-prefetch" href="//basemaps.cartocdn.com">
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+    <link rel="dns-prefetch" href="//cdnjs.cloudflare.com">
     <link rel="preconnect" href="https://services.arcgisonline.com" crossorigin>
     <link rel="dns-prefetch" href="//services.arcgisonline.com">
     <link rel="preconnect" href="https://api.maptiler.com" crossorigin>
@@ -19,36 +22,39 @@
     <link rel="dns-prefetch" href="//unpkg.com">
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="dns-prefetch" href="//cdn.jsdelivr.net">
-    
+
     <!-- Open Graph Meta Tags -->
     <meta property="og:title" content="JakMove">
     <meta property="og:description" content="Peta interaktif koridor TransJakarta dengan informasi halte, rute, dan fitur live location">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://transjakarta-interactive-map.vercel.app/">
     <meta property="og:image" content="https://transjakarta-interactive-map.vercel.app/og-image.jpg">
-    
+
     <!-- Twitter Card Meta Tags -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="JakMove">
     <meta name="twitter:description" content="Peta interaktif koridor TransJakarta dengan informasi halte, rute, dan fitur live location">
     <meta name="twitter:image" content="https://transjakarta-interactive-map.vercel.app/og-image.jpg">
-    
+
     <!-- Favicon -->
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
     <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
-    
+
     <!-- Bootstrap CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <link rel="stylesheet" href="css/dark-mode.css">
-    
+
     <!-- MapLibre GL JS CSS -->
     <link href='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css' rel='stylesheet' />
-    
+
     <link rel="stylesheet" href="css/style.css">
+    <!-- Fallback FA stylesheet -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/css/all.min.css">
 </head>
+
 <body>
     <!-- Sticky Navigation Bar -->
     <nav class="navbar navbar-expand-lg sticky-top bg-white shadow-sm border-bottom" style="top: 0; z-index: 1030;">
@@ -56,7 +62,7 @@
             <span class="navbar-brand plus-jakarta-sans fw-bold text-primary">
                 <img class="brand-title" alt="JakMove">
             </span>
-            
+
             <!-- Desktop Navigation -->
             <div class="navbar-nav me-auto d-none d-lg-flex">
                 <a class="nav-link d-flex align-items-center gap-2" href="index.html">
@@ -72,7 +78,7 @@
                     <span>Tentang Pembuat</span>
                 </a>
             </div>
-            
+
             <!-- Mobile Toggle Button -->
             <button class="navbar-toggler custom-toggler d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#navbarOffcanvas" aria-controls="navbarOffcanvas" aria-expanded="false" aria-label="Toggle navigation">
                 <div class="hamburger-line"></div>
@@ -130,15 +136,14 @@
                 <div class="col-12 col-lg-6 mb-3 mb-lg-0">
                     <div class="logo-section d-flex align-items-center gap-3">
                         <img src="image/tije.png" width="180" alt="Logo Transjakarta & JakLingko" class="logo-img">
-                        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/%2BJakarta_Logo_%28Indonesian_Language%29.svg/330px-%2BJakarta_Logo_%28Indonesian_Language%29.svg.png" 
-                             width="120" alt="Logo Jakarta Kota Kolaborasi" class="jakarta-logo">
+                        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/%2BJakarta_Logo_%28Indonesian_Language%29.svg/330px-%2BJakarta_Logo_%28Indonesian_Language%29.svg.png" width="120" alt="Logo Jakarta Kota Kolaborasi" class="jakarta-logo">
                         <div class="brand-text">
                             <img class="brand-title plus-jakarta-sans fw-bold mb-1">
                             <p class="brand-subtitle plus-jakarta-sans mb-0">Smart Transit Experience</p>
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- Header Info Section -->
                 <div class="col-12 col-lg-6">
                     <div class="header-info d-flex flex-wrap justify-content-center justify-content-lg-end gap-2">
@@ -165,7 +170,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <!-- Announcement Bar -->
             <div class="row mt-3">
                 <div class="col-12">
@@ -179,9 +184,9 @@
             </div>
         </div>
     </div>
-    
-    
-    
+
+
+
     <!-- Progress Bar untuk Initial Loading -->
     <div id="loadingProgress" class="loading-modal" style="display: none;">
         <div class="loading-content modern">
@@ -228,7 +233,7 @@
                 <div id="map" class="interactive-map"></div>
             </div>
         </div>
-        
+
         <!-- Search & Selection Section -->
         <div class="search-section mb-4">
             <div class="search-container">
@@ -277,7 +282,7 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- Stops Section -->
         <div class="stops-section mb-4">
             <div class="section-header">
@@ -303,7 +308,7 @@
                         <div class="footer-brand">
                             <div class="footer-brand-text">
                                 <h4 class="footer-title">
-                                    
+
                                     <img class="brand-title" alt="JakMove">
                                 </h4>
                                 <p class="footer-subtitle">Smart Transit Experience</p>
@@ -313,7 +318,7 @@
                             </p>
                         </div>
                     </div>
-                    
+
                     <!-- Quick Links -->
                     <div class="col-lg-2 col-md-6 mb-4 mb-lg-0">
                         <h5 class="footer-heading">
@@ -322,24 +327,24 @@
                         </h5>
                         <ul class="footer-links">
                             <li><a href="index.html">
-                                <iconify-icon icon="mdi:map-marker-multiple" inline></iconify-icon>
-                                Peta Interaktif
-                            </a></li>
+                                    <iconify-icon icon="mdi:map-marker-multiple" inline></iconify-icon>
+                                    Peta Interaktif
+                                </a></li>
                             <li><a href="transportasi-jakarta.html">
-                                <iconify-icon icon="mdi:bus" inline></iconify-icon>
-                                Transportasi Jakarta
-                            </a></li>
+                                    <iconify-icon icon="mdi:bus" inline></iconify-icon>
+                                    Transportasi Jakarta
+                                </a></li>
                             <li><a href="tentang-pembuat.html">
-                                <iconify-icon icon="mdi:account" inline></iconify-icon>
-                                Tentang Pembuat
-                            </a></li>
+                                    <iconify-icon icon="mdi:account" inline></iconify-icon>
+                                    Tentang Pembuat
+                                </a></li>
                             <li><a href="#">
-                                <iconify-icon icon="mdi:help-circle" inline></iconify-icon>
-                                Bantuan
-                            </a></li>
+                                    <iconify-icon icon="mdi:help-circle" inline></iconify-icon>
+                                    Bantuan
+                                </a></li>
                         </ul>
                     </div>
-                    
+
                     <!-- Features -->
                     <div class="col-lg-2 col-md-6 mb-4 mb-lg-0">
                         <h5 class="footer-heading">
@@ -348,20 +353,20 @@
                         </h5>
                         <ul class="footer-links">
                             <li><a href="#">
-                                <iconify-icon icon="mdi:map-search" inline></iconify-icon>
-                                Pencarian Halte
-                            </a></li>
+                                    <iconify-icon icon="mdi:map-search" inline></iconify-icon>
+                                    Pencarian Halte
+                                </a></li>
                             <li><a href="#">
-                                <iconify-icon icon="mdi:clock-outline" inline></iconify-icon>
-                                Rute Optimal
-                            </a></li>
+                                    <iconify-icon icon="mdi:clock-outline" inline></iconify-icon>
+                                    Rute Optimal
+                                </a></li>
                             <li><a href="#">
-                                <iconify-icon icon="mdi:crosshairs-gps" inline></iconify-icon>
-                                Live Location
-                            </a></li>
+                                    <iconify-icon icon="mdi:crosshairs-gps" inline></iconify-icon>
+                                    Live Location
+                                </a></li>
                         </ul>
                     </div>
-                    
+
                     <!-- Contact -->
                     <div class="col-lg-2 col-md-6 mb-4 mb-lg-0">
                         <h5 class="footer-heading">
@@ -375,7 +380,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <!-- Social -->
                     <div class="col-lg-2 col-md-6">
                         <h5 class="footer-heading">
@@ -396,7 +401,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <!-- Footer Bottom -->
             <div class="footer-bottom py-3">
                 <div class="row align-items-center">
@@ -407,8 +412,8 @@
                                 2025 <img class="brand-title" alt="JakMove">
                             </div>
                             <div class="copyright-line">
-                                Dibuat dengan 
-                                <iconify-icon icon="mdi:heart" style="color: #e74c3c;" inline></iconify-icon> 
+                                Dibuat dengan
+                                <iconify-icon icon="mdi:heart" style="color: #e74c3c;" inline></iconify-icon>
                                 oleh Muhammad Fachri
                             </div>
                         </div>
@@ -430,7 +435,7 @@
             </div>
         </div>
     </footer>
-    
+
     <!-- Modal Izin Lokasi -->
     <div class="modal fade" id="locationPermissionModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="locationPermissionModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
@@ -465,22 +470,22 @@
             </div>
         </div>
     </div>
-    
+
     <!-- MapLibre GL JS -->
     <script src='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js' defer></script>
-    
+
     <!-- Main Application Script -->
     <script defer type="module" src="main.js"></script>
-    
+
     <script>
-    // Register Service Worker for caching tiles/assets
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('sw.js').catch(()=>{});
-        });
-    }
+        // Register Service Worker for caching tiles/assets
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').catch(() => {});
+            });
+        }
     </script>
-    
+
     <!-- Additional Scripts -->
     <script src="js/weather.js" defer></script>
     <script src="https://code.iconify.design/iconify-icon/1.0.2/iconify-icon.min.js" defer></script>
@@ -489,197 +494,214 @@
     <script src="js/intermodal.js" defer></script>
 
     <script>
-    // Modal Izin Lokasi dengan persistensi pilihan
-    document.addEventListener('DOMContentLoaded', function() {
-        const locationModalEl = document.getElementById('locationPermissionModal');
-        const locationModal = new bootstrap.Modal(locationModalEl);
-        const allowBtn = document.getElementById('allowLocationBtn');
-        const denyBtn = document.getElementById('denyLocationBtn');
+        // Modal Izin Lokasi dengan persistensi pilihan
+        document.addEventListener('DOMContentLoaded', function() {
+            const locationModalEl = document.getElementById('locationPermissionModal');
+            const locationModal = new bootstrap.Modal(locationModalEl);
+            const allowBtn = document.getElementById('allowLocationBtn');
+            const denyBtn = document.getElementById('denyLocationBtn');
 
-        const key = 'locationPermission';
-        const saved = localStorage.getItem(key);
+            const key = 'locationPermission';
+            const saved = localStorage.getItem(key);
 
-        // Tampilkan modal hanya jika belum pernah memilih
-        if (!saved) {
-            setTimeout(() => { locationModal.show(); }, 1200);
-        }
+            // Tampilkan modal hanya jika belum pernah memilih
+            if (!saved) {
+                setTimeout(() => {
+                    locationModal.show();
+                }, 1200);
+            }
 
-        allowBtn.addEventListener('click', function() {
-            localStorage.setItem(key, 'granted');
-            locationModal.hide();
-            // Opsional: otomatis aktifkan live location
-            const liveLocationBtn = document.getElementById('liveLocationBtn');
-            if (liveLocationBtn) liveLocationBtn.click();
+            allowBtn.addEventListener('click', function() {
+                localStorage.setItem(key, 'granted');
+                locationModal.hide();
+                // Opsional: otomatis aktifkan live location
+                const liveLocationBtn = document.getElementById('liveLocationBtn');
+                if (liveLocationBtn) liveLocationBtn.click();
+            });
+
+            denyBtn.addEventListener('click', function() {
+                localStorage.setItem(key, 'denied');
+                locationModal.hide();
+            });
         });
 
-        denyBtn.addEventListener('click', function() {
-            localStorage.setItem(key, 'denied');
-            locationModal.hide();
-        });
-    });
+        // Settings UI wiring
+        document.addEventListener('DOMContentLoaded', function() {
+            const elShowIntermodal = document.getElementById('settingShowIntermodal');
+            const elShowJaklingko = document.getElementById('settingShowJaklingko');
+            const elShowAccessibility = document.getElementById('settingShowAccessibility');
+            const elFilterAccess = document.getElementById('settingFilterAccess');
+            const elBatterySaver = document.getElementById('settingBatterySaver');
+            const toggleBtn = document.getElementById('toggleSettingsBtn');
+            const body = document.getElementById('settingsBody');
+            const panel = document.getElementById('settingsPanel');
+            const darkSwitch = document.getElementById('darkSwitch');
 
-    // Settings UI wiring
-    document.addEventListener('DOMContentLoaded', function() {
-        const elShowIntermodal = document.getElementById('settingShowIntermodal');
-        const elShowJaklingko = document.getElementById('settingShowJaklingko');
-        const elShowAccessibility = document.getElementById('settingShowAccessibility');
-        const elFilterAccess = document.getElementById('settingFilterAccess');
-        const elBatterySaver = document.getElementById('settingBatterySaver');
-        const toggleBtn = document.getElementById('toggleSettingsBtn');
-        const body = document.getElementById('settingsBody');
-        const panel = document.getElementById('settingsPanel');
-        const darkSwitch = document.getElementById('darkSwitch');
+            if (toggleBtn && body) {
+                toggleBtn.addEventListener('click', () => {
+                    body.style.display = (body.style.display === 'none') ? 'block' : 'none';
+                });
+            }
+            if (panel) {
+                panel.style.position = 'relative';
+                panel.style.zIndex = 2;
+            }
 
-        if (toggleBtn && body) {
-            toggleBtn.addEventListener('click', () => {
-                body.style.display = (body.style.display === 'none') ? 'block' : 'none';
-            });
-        }
-        if (panel) { panel.style.position = 'relative'; panel.style.zIndex = 2; }
+            function refreshUI(app) {
+                // Re-render current route list to apply settings
+                try {
+                    const routes = app.modules.routes;
+                    const id = routes && routes.selectedRouteId;
+                    if (id) {
+                        routes.renderRouteInfo();
+                        routes.showStopsByRoute(id);
+                    }
+                } catch (e) {}
+                // Refresh search results based on current query
+                try {
+                    const searchInput = document.getElementById('searchStop');
+                    if (searchInput && searchInput.value) {
+                        app.modules.search.handleSearch(searchInput.value);
+                    }
+                } catch (e) {}
+            }
 
-        function refreshUI(app) {
-            // Re-render current route list to apply settings
-            try {
-                const routes = app.modules.routes;
-                const id = routes && routes.selectedRouteId;
-                if (id) {
-                    routes.renderRouteInfo();
-                    routes.showStopsByRoute(id);
+            function bindToggle(app, el, key) {
+                if (!el) return;
+                el.checked = !!app.modules.settings.get(key);
+                el.addEventListener('change', () => {
+                    app.modules.settings.set(key, el.checked);
+                    refreshUI(app);
+                });
+            }
+
+            // Wait for app + settings to be ready, then bind toggles
+            (function waitForSettings() {
+                const app = window.transJakartaApp;
+                if (!app || !app.modules || !app.modules.settings) {
+                    setTimeout(waitForSettings, 200);
+                    return;
                 }
-            } catch (e) {}
-            // Refresh search results based on current query
-            try {
-                const searchInput = document.getElementById('searchStop');
-                if (searchInput && searchInput.value) {
-                    app.modules.search.handleSearch(searchInput.value);
-                }
-            } catch (e) {}
-        }
-
-        function bindToggle(app, el, key) {
-            if (!el) return;
-            el.checked = !!app.modules.settings.get(key);
-            el.addEventListener('change', () => {
-                app.modules.settings.set(key, el.checked);
-                refreshUI(app);
-            });
-        }
-
-        // Wait for app + settings to be ready, then bind toggles
-        (function waitForSettings(){
-            const app = window.transJakartaApp;
-            if (!app || !app.modules || !app.modules.settings) { setTimeout(waitForSettings, 200); return; }
-            try {
-                bindToggle(app, elShowIntermodal, 'showIntermodalIcons');
-                bindToggle(app, elShowJaklingko, 'showJaklingkoBadge');
-                bindToggle(app, elShowAccessibility, 'showAccessibilityIcon');
-                bindToggle(app, elFilterAccess, 'filterAccessStops');
-                // Battery Saver binding with side-effects
-                if (elBatterySaver) {
-                    elBatterySaver.checked = !!app.modules.settings.get('batterySaver');
-                    // Apply initial state
-                    document.body.classList.toggle('battery-saver', elBatterySaver.checked);
-                    document.body.classList.toggle('force-amoled', elBatterySaver.checked);
-                    // Force dark theme if available
-                    try { if (elBatterySaver.checked) { document.documentElement.setAttribute('data-theme','dark'); } } catch (e) {}
-                    try {
-                        const mapMgr = app.modules.map;
-                        if (mapMgr && mapMgr.setBaseStyle) {
-                            if (elBatterySaver.checked) {
-                                mapMgr.setBaseStyle('dark');
-                            }
-                        }
-                    } catch (e) {}
-                    // Disable dark/light switch while battery saver ON
-                    try {
-                        if (darkSwitch) {
-                            darkSwitch.disabled = elBatterySaver.checked;
-                            if (elBatterySaver.checked) darkSwitch.checked = true;
-                        }
-                    } catch (e) {}
-                    // Show info card
-                    try {
-                        if (elBatterySaver.checked) {
-                            const container = document.getElementById('searchResults') || document.querySelector('.search-section');
-                            if (container && !document.getElementById('batterySaverInfo')) {
-                                const info = document.createElement('div');
-                                info.id = 'batterySaverInfo';
-                                info.className = 'alert alert-info mt-2';
-                                info.innerHTML = `<div class='d-flex align-items-center justify-content-between'>
-                                    <div><strong>Hemat Baterai aktif.</strong> Animasi dan efek visual dinonaktifkan, peta disederhanakan agar performa meningkat.</div>
-                                    <button type='button' class='btn-close' aria-label='Close'></button>
-                                </div>`;
-                                container.parentNode.insertBefore(info, container.nextSibling);
-                                const btn = info.querySelector('.btn-close');
-                                if (btn) btn.addEventListener('click', ()=> info.remove());
-                            }
-                        } else {
-                            const info = document.getElementById('batterySaverInfo');
-                            if (info) info.remove();
-                        }
-                    } catch (e) {}
-                    elBatterySaver.addEventListener('change', () => {
-                        app.modules.settings.set('batterySaver', elBatterySaver.checked);
-                        // Apply body class for CSS overrides
+                try {
+                    bindToggle(app, elShowIntermodal, 'showIntermodalIcons');
+                    bindToggle(app, elShowJaklingko, 'showJaklingkoBadge');
+                    bindToggle(app, elShowAccessibility, 'showAccessibilityIcon');
+                    bindToggle(app, elFilterAccess, 'filterAccessStops');
+                    // Battery Saver binding with side-effects
+                    if (elBatterySaver) {
+                        elBatterySaver.checked = !!app.modules.settings.get('batterySaver');
+                        // Apply initial state
                         document.body.classList.toggle('battery-saver', elBatterySaver.checked);
                         document.body.classList.toggle('force-amoled', elBatterySaver.checked);
+                        // Force dark theme if available
                         try {
-                            if (elBatterySaver.checked) { document.documentElement.setAttribute('data-theme','dark'); }
+                            if (elBatterySaver.checked) {
+                                document.documentElement.setAttribute('data-theme', 'dark');
+                            }
                         } catch (e) {}
-                        // Switch to the lightest basemap
                         try {
                             const mapMgr = app.modules.map;
                             if (mapMgr && mapMgr.setBaseStyle) {
                                 if (elBatterySaver.checked) {
                                     mapMgr.setBaseStyle('dark');
-                                } else {
-                                    const saved = localStorage.getItem('baseMapStyle') || 'positron';
-                                    mapMgr.setBaseStyle(saved);
                                 }
                             }
                         } catch (e) {}
-                        // Disable basemap selector when battery saver on
-                        try {
-                            const basemapSelect = document.getElementById('basemapSelector');
-                            if (basemapSelect) basemapSelect.disabled = elBatterySaver.checked;
-                        } catch (e) {}
-                        // Disable/enable dark switch accordingly
+                        // Disable dark/light switch while battery saver ON
                         try {
                             if (darkSwitch) {
                                 darkSwitch.disabled = elBatterySaver.checked;
                                 if (elBatterySaver.checked) darkSwitch.checked = true;
                             }
                         } catch (e) {}
-                        // Info card
+                        // Show info card
                         try {
-                            const container = document.getElementById('searchResults') || document.querySelector('.search-section');
-                            const existing = document.getElementById('batterySaverInfo');
                             if (elBatterySaver.checked) {
-                                if (container && !existing) {
+                                const container = document.getElementById('searchResults') || document.querySelector('.search-section');
+                                if (container && !document.getElementById('batterySaverInfo')) {
                                     const info = document.createElement('div');
                                     info.id = 'batterySaverInfo';
                                     info.className = 'alert alert-info mt-2';
                                     info.innerHTML = `<div class='d-flex align-items-center justify-content-between'>
+                                    <div><strong>Hemat Baterai aktif.</strong> Animasi dan efek visual dinonaktifkan, peta disederhanakan agar performa meningkat.</div>
+                                    <button type='button' class='btn-close' aria-label='Close'></button>
+                                </div>`;
+                                    container.parentNode.insertBefore(info, container.nextSibling);
+                                    const btn = info.querySelector('.btn-close');
+                                    if (btn) btn.addEventListener('click', () => info.remove());
+                                }
+                            } else {
+                                const info = document.getElementById('batterySaverInfo');
+                                if (info) info.remove();
+                            }
+                        } catch (e) {}
+                        elBatterySaver.addEventListener('change', () => {
+                            app.modules.settings.set('batterySaver', elBatterySaver.checked);
+                            // Apply body class for CSS overrides
+                            document.body.classList.toggle('battery-saver', elBatterySaver.checked);
+                            document.body.classList.toggle('force-amoled', elBatterySaver.checked);
+                            try {
+                                if (elBatterySaver.checked) {
+                                    document.documentElement.setAttribute('data-theme', 'dark');
+                                }
+                            } catch (e) {}
+                            // Switch to the lightest basemap
+                            try {
+                                const mapMgr = app.modules.map;
+                                if (mapMgr && mapMgr.setBaseStyle) {
+                                    if (elBatterySaver.checked) {
+                                        mapMgr.setBaseStyle('dark');
+                                    } else {
+                                        const saved = localStorage.getItem('baseMapStyle') || 'positron';
+                                        mapMgr.setBaseStyle(saved);
+                                    }
+                                }
+                            } catch (e) {}
+                            // Disable basemap selector when battery saver on
+                            try {
+                                const basemapSelect = document.getElementById('basemapSelector');
+                                if (basemapSelect) basemapSelect.disabled = elBatterySaver.checked;
+                            } catch (e) {}
+                            // Disable/enable dark switch accordingly
+                            try {
+                                if (darkSwitch) {
+                                    darkSwitch.disabled = elBatterySaver.checked;
+                                    if (elBatterySaver.checked) darkSwitch.checked = true;
+                                }
+                            } catch (e) {}
+                            // Info card
+                            try {
+                                const container = document.getElementById('searchResults') || document.querySelector('.search-section');
+                                const existing = document.getElementById('batterySaverInfo');
+                                if (elBatterySaver.checked) {
+                                    if (container && !existing) {
+                                        const info = document.createElement('div');
+                                        info.id = 'batterySaverInfo';
+                                        info.className = 'alert alert-info mt-2';
+                                        info.innerHTML = `<div class='d-flex align-items-center justify-content-between'>
                                         <div><strong>Hemat Baterai aktif.</strong> Animasi dan efek visual dinonaktifkan, peta disederhanakan agar performa meningkat.</div>
                                         <button type='button' class='btn-close' aria-label='Close'></button>
                                     </div>`;
-                                    container.parentNode.insertBefore(info, container.nextSibling);
-                                    const btn = info.querySelector('.btn-close');
-                                    if (btn) btn.addEventListener('click', ()=> info.remove());
+                                        container.parentNode.insertBefore(info, container.nextSibling);
+                                        const btn = info.querySelector('.btn-close');
+                                        if (btn) btn.addEventListener('click', () => info.remove());
+                                    }
+                                } else if (existing) {
+                                    existing.remove();
                                 }
-                            } else if (existing) {
-                                existing.remove();
-                            }
+                            } catch (e) {}
+                            refreshUI(app);
+                        });
+                        // Disable basemap selector initially if needed
+                        try {
+                            const basemapSelect = document.getElementById('basemapSelector');
+                            if (basemapSelect) basemapSelect.disabled = elBatterySaver.checked;
                         } catch (e) {}
-                        refreshUI(app);
-                    });
-                    // Disable basemap selector initially if needed
-                    try { const basemapSelect = document.getElementById('basemapSelector'); if (basemapSelect) basemapSelect.disabled = elBatterySaver.checked; } catch (e) {}
-                }
-            } catch (e) {}
-        })();
-    });
+                    }
+                } catch (e) {}
+            })();
+        });
     </script>
 </body>
-</html>
 
+</html>

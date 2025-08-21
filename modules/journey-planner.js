@@ -8,13 +8,31 @@ export class JourneyPlanner {
         this._graphBuilt = false;
         this._adj = new Map(); // stopId -> Array<{to, routeId}>
         this._routesAtStop = new Map(); // stopId -> Set(routeId)
-        this._validStops = new Set(); // stop_ids that appear in stop_times
+        this._validStops = new Set(); // stop_ids yang appear in stop_times
         this._parentToChildren = new Map(); // parent_station -> Array(stop)
         this._ui = null; // no longer used (replaced by popups)
         this._layers = []; // ids of lines
         this._markers = []; // ids of temp markers
         this._rawLayers = []; // {id, sourceId, onClick} custom map layers for polylines
         this._lastPlan = null; // { startStop, goalStop, legs, steps }
+        this._mode = 'balanced'; // 'fastest' | 'cheapest' | 'balanced'
+        this._replanTimer = null; // debounce timer for replan
+        this._drawSeq = 0; // token to cancel stale scheduled draws
+    }
+
+    setOptimizationMode(mode) {
+        try {
+            const allowed = new Set(['fastest', 'cheapest', 'balanced']);
+            if (!allowed.has(String(mode))) mode = 'balanced';
+            this._mode = String(mode);
+            const label = this._mode === 'fastest' ? 'Paling cepat' : (this._mode === 'cheapest' ? 'Paling hemat' : 'Seimbang');
+            this._setStatus(`Mode rute: ${label}`);
+            // Trigger immediate replan when mode changes (ensure visible update)
+            if (this.origin && this.destination) {
+                try { if (this._replanTimer) clearTimeout(this._replanTimer); } catch(_){}
+                try { this._plan(); } catch(_){}
+            }
+        } catch (e) {}
     }
 
     init() {
@@ -27,11 +45,18 @@ export class JourneyPlanner {
                 this._graphBuilding = false;
             });
         }
+        // Load saved optimization mode
+        try { const saved = localStorage.getItem('jp_mode'); if (saved) this.setOptimizationMode(saved); } catch(e) {}
     }
 
     enable() {
         if (this.enabled) return;
         this.enabled = true;
+        // Start fresh every activation
+        try { this._clearMapArtifacts(); } catch (e) {}
+        this.origin = null;
+        this.destination = null;
+        this._lastPlan = null;
         if (!this._graphBuilt) this._buildGraph();
         this._bindMapClick();
         this._setStatus('Klik peta untuk memilih titik awal');
@@ -42,6 +67,13 @@ export class JourneyPlanner {
         if (!this.enabled) return;
         this.enabled = false;
         this._unbindMapClick();
+        // Clear overlays and reset state when deactivated
+        try { this._clearMapArtifacts(); } catch (e) {}
+        try { this.app.modules.map.closePopup(); } catch (e) {}
+        this.origin = null;
+        this.destination = null;
+        this._lastPlan = null;
+        this._setSteps([]);
         this._setStatus('Nonaktif');
         try { this.app.modules.map.setJourneyActive(false); } catch (e) {}
     }
@@ -54,6 +86,14 @@ export class JourneyPlanner {
         this._setStatus('');
         this._setSteps([]);
         this._lastPlan = null;
+    }
+
+    replan() {
+        try {
+            if (!this.origin || !this.destination) return;
+            if (this._replanTimer) clearTimeout(this._replanTimer);
+            this._replanTimer = setTimeout(() => { try { this._plan(); } catch(_){} }, 80);
+        } catch(e) {}
     }
 
     _buildGraph() {
@@ -239,7 +279,28 @@ export class JourneyPlanner {
                 try {
                     const el = this.app.modules.map._currentPopup && this.app.modules.map._currentPopup.getElement && this.app.modules.map._currentPopup.getElement();
                     const btn = el && el.querySelector('#jp-reset-inline');
-                    if (btn) btn.addEventListener('click', () => this.reset());
+                    if (btn) btn.addEventListener('click', () => { try { this.reset(); } catch(_) {} try { this.app.modules.map.closePopup(); } catch(_) {} });
+                    // Bind mode buttons in full-steps popup
+                    const group = el && el.querySelector('#jp-mode-inline');
+                    if (group) {
+                        const setActive = (activeId) => {
+                            group.querySelectorAll('button[data-mode]').forEach(b => {
+                                if (b.getAttribute('data-mode') === activeId) { b.classList.remove('btn-outline-primary'); b.classList.add('btn-primary'); }
+                                else { b.classList.add('btn-outline-primary'); b.classList.remove('btn-primary'); }
+                            });
+                        };
+                        setActive(this._mode || 'balanced');
+                        group.querySelectorAll('button[data-mode]').forEach(b => {
+                            b.addEventListener('click', (ev) => {
+                                try { ev.preventDefault(); ev.stopPropagation(); } catch(_){}
+                                const m = b.getAttribute('data-mode');
+                                try { localStorage.setItem('jp_mode', m); } catch(_){ }
+                                this.setOptimizationMode(m);
+                                setActive(m);
+                                this.replan();
+                            });
+                        });
+                    }
                 } catch (e) {}
             }
         } catch (e) {}
@@ -258,40 +319,97 @@ export class JourneyPlanner {
     }
 
     _findPath(startId, goalId) {
-        // Dijkstra: minimize (transfers * BIG + distance)
-        const BIG = 100000; // beratkan transfer jauh lebih tinggi dari jarak
-        const MAX_TRANSFERS = 5; // izinkan lebih banyak transfer untuk jarak jauh
-        const key = (sid, rid) => sid + '|' + (rid || '');
+        // Dijkstra: minimize weighted distance + transfer penalties (depends on optimization mode)
+        const mode = this._mode || 'balanced';
+        const BIG = mode === 'fastest' ? 30000 : (mode === 'cheapest' ? 150000 : 100000);
+        const MAX_TRANSFERS = mode === 'cheapest' ? 3 : 5;
+        const TRANSIT_WEIGHT = mode === 'fastest' ? 0.18 : (mode === 'cheapest' ? 0.35 : 0.25);
+        const WALK_WEIGHT = mode === 'fastest' ? 1.0 : (mode === 'cheapest' ? 1.2 : 1.0);
+        const ALIGHT_WALK_PENALTY = mode === 'fastest' ? Math.round(BIG * 0.4) : BIG;
+        // Fare-aware preferences (only used in 'cheapest')
+        let priceByRoute = new Map();
+        let fareIdByRoute = new Map();
+        // Frequency-aware preferences (only used in 'fastest')
+        let headwayByRoute = new Map(); // seconds
+        if (mode === 'cheapest') {
+            try {
+                const gtfs = this.app.modules.gtfs;
+                const fareRules = gtfs.getFareRules ? (gtfs.getFareRules() || []) : [];
+                const fareAttrs = gtfs.getFareAttributes ? (gtfs.getFareAttributes() || []) : [];
+                const priceByFare = new Map(fareAttrs.map(a => [String(a.fare_id||''), parseInt(a.price||'0',10) || 0]));
+                fareIdByRoute = new Map();
+                for (const fr of fareRules) {
+                    const rid = String(fr.route_id||'');
+                    const fid = String(fr.fare_id||'');
+                    if (rid && fid && !fareIdByRoute.has(rid)) fareIdByRoute.set(rid, fid);
+                }
+                priceByRoute = new Map(Array.from(fareIdByRoute.entries()).map(([rid,fid]) => [rid, priceByFare.get(fid) || 0]));
+            } catch (e) { priceByRoute = new Map(); fareIdByRoute = new Map(); }
+        }
+        if (mode === 'fastest') {
+            try {
+                const gtfs = this.app.modules.gtfs;
+                const freqs = gtfs.getFrequencies ? (gtfs.getFrequencies() || []) : [];
+                const trips = gtfs.getTrips ? (gtfs.getTrips() || []) : [];
+                const byRoute = new Map(); // routeId -> array of trip_ids
+                for (const t of trips) {
+                    const rid = String(t.route_id || '');
+                    if (!byRoute.has(rid)) byRoute.set(rid, []);
+                    byRoute.get(rid).push(String(t.trip_id || ''));
+                }
+                // Build headway (use min headway across freqs for the route; fallback to 900s)
+                for (const [rid, trIds] of byRoute.entries()) {
+                    let best = Infinity;
+                    for (const f of freqs) {
+                        const tid = String(f.trip_id || '');
+                        if (trIds.includes(tid)) {
+                            const vals = [f.min_headway_secs, f.max_headway_secs, f.headway_secs]
+                                .map(x => (x !== undefined && x !== null) ? parseInt(x, 10) : NaN)
+                                .filter(v => isFinite(v) && v > 0);
+                            for (const v of vals) if (v < best) best = v;
+                        }
+                    }
+                    headwayByRoute.set(rid, isFinite(best) ? best : 900);
+                }
+            } catch (e) { headwayByRoute = new Map(); }
+        }
+        const FARE_WEIGHT = 10; // 1 IDR ~ 10 cost units (tuned so 3500 IDR ~ 35k)
+        const WAIT_W_MPS = 12; // convert wait seconds to distance-equivalent cost (12 m/s)
+        const key = (sid, rid, fare) => sid + '|' + (rid || '') + '|' + (fare || '');
         const stopsById = new Map((this.app.modules.gtfs.getStops() || []).map(s => [String(s.stop_id||''), s]));
 
         const bestCost = new Map(); // key -> cost
         const bestTransfers = new Map(); // key -> transfers
         const parent = new Map(); // key -> { prevKey, viaRoute, at }
 
+        // Fast min-heap priority queue to avoid O(n log n) sort per push
         const pq = [];
-        const push = (node) => { pq.push(node); pq.sort((a,b) => a.cost - b.cost); };
-        const pop = () => pq.shift();
+        const swap = (i,j)=>{ const t=pq[i]; pq[i]=pq[j]; pq[j]=t; };
+        const siftUp = (i)=>{ while(i>0){ const p=((i-1)>>1); if (pq[p].cost <= pq[i].cost) break; swap(i,p); i=p; } };
+        const siftDown = (i)=>{ const n=pq.length; while(true){ let l=i*2+1,r=l+1,m=i; if(l<n && pq[l].cost<pq[m].cost) m=l; if(r<n && pq[r].cost<pq[m].cost) m=r; if(m===i) break; swap(i,m); i=m; } };
+        const push = (node)=>{ pq.push(node); siftUp(pq.length-1); };
+        const pop = ()=>{ if(!pq.length) return undefined; const root=pq[0]; const last=pq.pop(); if(pq.length){ pq[0]=last; siftDown(0);} return root; };
 
-        const tryRelax = (sid, rid, transfers, cost, prevKey) => {
+        const tryRelax = (sid, rid, transfers, cost, prevKey, fareUsed) => {
             if (transfers > MAX_TRANSFERS) return false;
-            const k = key(sid, rid);
+            const k = key(sid, rid, fareUsed || '');
             const prev = bestCost.get(k);
             if (prev !== undefined && prev <= cost) return false;
             bestCost.set(k, cost);
             bestTransfers.set(k, transfers);
             parent.set(k, { prevKey, viaRoute: rid, at: sid });
-            push({ sid, rid, transfers, cost });
+            push({ sid, rid, transfers, cost, fareUsed: fareUsed || '' });
             return true;
         };
 
-        tryRelax(startId, '', 0, 0, null);
+        tryRelax(startId, '', 0, 0, null, '');
 
         while (pq.length) {
             const cur = pop();
             if (cur.sid === goalId) {
-                return this._reconstruct(parent, key(cur.sid, cur.rid), startId);
+                return this._reconstruct(parent, key(cur.sid, cur.rid, cur.fareUsed || ''), startId);
             }
-            const curKey = key(cur.sid, cur.rid);
+            const curKey = key(cur.sid, cur.rid, cur.fareUsed || '');
             if (bestCost.get(curKey) !== cur.cost) continue; // stale
 
             const s = stopsById.get(String(cur.sid));
@@ -310,21 +428,62 @@ export class JourneyPlanner {
                 let nextRid = cur.rid;
                 let nextTransfers = cur.transfers;
                 let edgePenalty = 0;
+                let distComponent = 0;
+                let nextFareUsed = cur.fareUsed || '';
                 if (edgeRid) {
+                    // riding transit
+                    distComponent = stepDist * TRANSIT_WEIGHT;
                     if (!cur.rid) {
                         nextRid = edgeRid; // boarding, no transfer penalty
+                        // fare-aware: pay fare only if not already on same fare product
+                        if (mode === 'cheapest') {
+                            const f = fareIdByRoute.get(edgeRid) || '';
+                            nextFareUsed = f || '';
+                            if (!cur.fareUsed || cur.fareUsed !== f) {
+                                const p = priceByRoute.get(edgeRid) || 0;
+                                edgePenalty += p * FARE_WEIGHT;
+                            }
+                        }
+                        // frequency-aware: expected wait ~ headway/2
+                        if (mode === 'fastest') {
+                            const hw = headwayByRoute.get(edgeRid) || 900;
+                            edgePenalty += (hw / 2) * WAIT_W_MPS;
+                        }
                     } else if (edgeRid !== cur.rid) {
                         nextRid = edgeRid;
                         nextTransfers = cur.transfers + 1;
-                        edgePenalty += BIG; // penalize transfer heavily
+                        edgePenalty += BIG; // transfer penalty when switching routes
+                        // fare-aware: charge only when switching to different fare product
+                        if (mode === 'cheapest') {
+                            const f = fareIdByRoute.get(edgeRid) || '';
+                            nextFareUsed = f || '';
+                            if (!cur.fareUsed || cur.fareUsed !== f) {
+                                const p = priceByRoute.get(edgeRid) || 0;
+                                edgePenalty += p * FARE_WEIGHT;
+                            }
+                        }
+                        // frequency-aware: expected wait on route change
+                        if (mode === 'fastest') {
+                            const hw = headwayByRoute.get(edgeRid) || 900;
+                            edgePenalty += (hw / 2) * WAIT_W_MPS;
+                        }
                     }
                 } else {
-                    // walking/transfer edge: small penalty to avoid berputar
-                    edgePenalty += Math.min(500, stepDist); // penalize based on distance, capped
+                    // walking/transfer edge
+                    distComponent = stepDist * WALK_WEIGHT;
+                    nextRid = '';
+                    if (cur.rid) {
+                        nextTransfers = cur.transfers + 1; // alight → walk counts as a transfer
+                        edgePenalty += ALIGHT_WALK_PENALTY;
+                    }
+                    // discourage tiny zig-zags within same stop area
+                    edgePenalty += Math.min(400, stepDist * (mode === 'cheapest' ? 1.4 : 1.0));
+                    // keep current fare product validity across walking (integration window approximation)
+                    nextFareUsed = cur.fareUsed || '';
                 }
 
-                const newCost = cur.cost + stepDist + edgePenalty;
-                tryRelax(nextSid, nextRid, nextTransfers, newCost, key(cur.sid, cur.rid));
+                const newCost = cur.cost + distComponent + edgePenalty;
+                tryRelax(nextSid, nextRid, nextTransfers, newCost, key(cur.sid, cur.rid, cur.fareUsed || ''), nextFareUsed);
             }
 
             // Transfer in-place: switch to any route at this stop (no distance, but transfer penalty)
@@ -332,11 +491,38 @@ export class JourneyPlanner {
             if (routeSet && routeSet.size) {
                 for (const r of routeSet) {
                     if (!cur.rid) {
-                        // first boarding, no penalty
-                        tryRelax(cur.sid, r, cur.transfers, cur.cost, key(cur.sid, cur.rid));
+                        // first boarding, include fare-aware penalty in 'cheapest'
+                        let cost2 = cur.cost;
+                        let nextFareUsed = cur.fareUsed || '';
+                        if (mode === 'cheapest') {
+                            const f = fareIdByRoute.get(String(r)) || '';
+                            nextFareUsed = f || '';
+                            if (!cur.fareUsed || cur.fareUsed !== f) {
+                                const p = priceByRoute.get(String(r)) || 0;
+                                cost2 += p * FARE_WEIGHT;
+                            }
+                        }
+                        if (mode === 'fastest') {
+                            const hw = headwayByRoute.get(String(r)) || 900;
+                            cost2 += (hw / 2) * WAIT_W_MPS;
+                        }
+                        tryRelax(cur.sid, r, cur.transfers, cost2, key(cur.sid, cur.rid, cur.fareUsed || ''), nextFareUsed);
                     } else if (r !== cur.rid) {
-                        const cost2 = cur.cost + BIG; // transfer penalty
-                        tryRelax(cur.sid, r, cur.transfers + 1, cost2, key(cur.sid, cur.rid));
+                        let cost2 = cur.cost + BIG; // transfer penalty per mode
+                        let nextFareUsed = cur.fareUsed || '';
+                        if (mode === 'cheapest') {
+                            const f = fareIdByRoute.get(String(r)) || '';
+                            nextFareUsed = f || '';
+                            if (!cur.fareUsed || cur.fareUsed !== f) {
+                                const p = priceByRoute.get(String(r)) || 0;
+                                cost2 += p * FARE_WEIGHT;
+                            }
+                        }
+                        if (mode === 'fastest') {
+                            const hw = headwayByRoute.get(String(r)) || 900;
+                            cost2 += (hw / 2) * WAIT_W_MPS;
+                        }
+                        tryRelax(cur.sid, r, cur.transfers + 1, cost2, key(cur.sid, cur.rid, cur.fareUsed || ''), nextFareUsed);
                     }
                 }
             }
@@ -396,11 +582,15 @@ export class JourneyPlanner {
         this._addEndpointMarker(this.destination.lat, this.destination.lon, 'end');
 
         // Draw walking: origin -> startStop
-        this._drawWalk(this.origin.lat, this.origin.lon, parseFloat(startStop.stop_lat), parseFloat(startStop.stop_lon), { type: 'walk', toStopName: startStop.stop_name });
+        const dStart = this._haversine(this.origin.lat, this.origin.lon, parseFloat(startStop.stop_lat), parseFloat(startStop.stop_lon));
+        this._drawWalk(this.origin.lat, this.origin.lon, parseFloat(startStop.stop_lat), parseFloat(startStop.stop_lon), { type: 'walk', toStopName: startStop.stop_name, preferStraight: dStart <= 120 });
         // Draw walking: goalStop -> destination
-        this._drawWalk(parseFloat(goalStop.stop_lat), parseFloat(goalStop.stop_lon), this.destination.lat, this.destination.lon, { type: 'walk', toStopName: 'Tujuan' });
-        // Draw transit legs (as direct lines between consecutive stops)
-        for (const leg of legs) {
+        const dEnd = this._haversine(parseFloat(goalStop.stop_lat), parseFloat(goalStop.stop_lon), this.destination.lat, this.destination.lon);
+        this._drawWalk(parseFloat(goalStop.stop_lat), parseFloat(goalStop.stop_lon), this.destination.lat, this.destination.lon, { type: 'walk', toStopName: 'Tujuan', preferStraight: dEnd <= 120 });
+        // Draw transit legs (chunked to avoid blocking UI)
+        const seq = ++this._drawSeq;
+        const drawOneLeg = (leg, index) => {
+            if (seq !== this._drawSeq) return; // canceled by reset
             const color = this._routeColorHex(String(leg.routeId));
             const segment = this._computeShapeSegmentForLeg(leg, stopsById);
             if (segment && segment.length >= 2) {
@@ -409,10 +599,13 @@ export class JourneyPlanner {
                 this._drawPolyline(segment, color, 4.5, 0.9, null, { type: 'transit', routeId: String(leg.routeId), fromStopName: fromStop?.stop_name, toStopName: toStop?.stop_name });
                 this._addLineLabel(segment, `Naik ${this._routeLabel(leg.routeId)}`, color);
                 // Add start/end labels for the leg
-                try { const [sLat, sLon] = segment[0]; this._addTextAt(sLat, sLon, `Naik ${this._routeLabel(leg.routeId)} di ${fromStop?.stop_name || ''}`, color); } catch(e){}
+                try {
+                    const [sLat, sLon] = segment[0];
+                    const plat = (fromStop && String(fromStop.platform_code || '').trim()) || '';
+                    this._addTextAt(sLat, sLon, `Naik ${this._routeLabel(leg.routeId)} di ${fromStop?.stop_name || ''}${plat ? ' (Platform ' + plat + ')' : ''}`, color);
+                } catch(e){}
                 try { const [eLat, eLon] = segment[segment.length - 1]; this._addTextAt(eLat, eLon, `Turun di ${toStop?.stop_name || ''}`, color); } catch(e){}
             } else {
-                // Fallback straight segments between stops
                 for (let i = 0; i < leg.stops.length - 1; i++) {
                     const a = stopsById.get(String(leg.stops[i]));
                     const b = stopsById.get(String(leg.stops[i+1]));
@@ -420,38 +613,150 @@ export class JourneyPlanner {
                     const straight = [[parseFloat(a.stop_lat), parseFloat(a.stop_lon)], [parseFloat(b.stop_lat), parseFloat(b.stop_lon)]];
                     this._drawPolyline(straight, color, 4.5, 0.9, null, { type: 'transit', routeId: String(leg.routeId), fromStopName: a?.stop_name, toStopName: b?.stop_name });
                     this._addLineLabel(straight, `Naik ${this._routeLabel(leg.routeId)}`, color);
-                    try { const [sLat, sLon] = straight[0]; this._addTextAt(sLat, sLon, `Naik ${this._routeLabel(leg.routeId)} di ${a?.stop_name || ''}`, color); } catch(e){}
+                    try {
+                        const [sLat, sLon] = straight[0];
+                        const plat = (a && String(a.platform_code || '').trim()) || '';
+                        this._addTextAt(sLat, sLon, `Naik ${this._routeLabel(leg.routeId)} di ${a?.stop_name || ''}${plat ? ' (Platform ' + plat + ')' : ''}`, color);
+                    } catch(e){}
                     try { const [eLat, eLon] = straight[straight.length - 1]; this._addTextAt(eLat, eLon, `Turun di ${b?.stop_name || ''}`, color); } catch(e){}
                 }
             }
             // Mark transfer at start of each subsequent leg
             const startStop2 = stopsById.get(String(leg.stops[0]));
-            if (startStop2) this._addTransitHereMarker(parseFloat(startStop2.stop_lat), parseFloat(startStop2.stop_lon), startStop2.stop_name || 'Transit di sini');
+            if (startStop2) {
+                const plat2 = String(startStop2.platform_code || '').trim();
+                const name2 = (startStop2.stop_name || 'Transit di sini') + (plat2 ? ` (Platform ${plat2})` : '');
+                this._addTransitHereMarker(parseFloat(startStop2.stop_lat), parseFloat(startStop2.stop_lon), name2);
+            }
+        };
+        legs.forEach((leg, idx) => { setTimeout(() => drawOneLeg(leg, idx), idx * 0); });
+
+        // Draw walking between transfer stops when legs are not contiguous at the same stop
+        for (let i = 0; i < legs.length - 1; i++) {
+            const currLastId = String(legs[i].stops[legs[i].stops.length - 1]);
+            const nextFirstId = String(legs[i+1].stops[0]);
+            if (currLastId !== nextFirstId) {
+                const a = stopsById.get(currLastId);
+                const b = stopsById.get(nextFirstId);
+                if (a && b) {
+                    const nearD = this._haversine(parseFloat(a.stop_lat), parseFloat(a.stop_lon), parseFloat(b.stop_lat), parseFloat(b.stop_lon));
+                    const sameParent = String(a.parent_station || '') && String(a.parent_station || '') === String(b.parent_station || '');
+                    this._drawWalk(
+                        parseFloat(a.stop_lat), parseFloat(a.stop_lon),
+                        parseFloat(b.stop_lat), parseFloat(b.stop_lon),
+                        { type: 'walk', toStopName: b.stop_name, preferStraight: sameParent || nearD <= 150 }
+                    );
+                }
+            }
         }
 
         // Steps UI
         const steps = [];
         const dist1 = this._haversine(this.origin.lat, this.origin.lon, parseFloat(startStop.stop_lat), parseFloat(startStop.stop_lon));
         steps.push({ type: 'walk', text: `Jalan ke ${startStop.stop_name} (${this._fmtDist(dist1)})` });
-        for (const leg of legs) {
+        for (let i = 0; i < legs.length; i++) {
+            const leg = legs[i];
             const first = stopsById.get(String(leg.stops[0]));
             const last = stopsById.get(String(leg.stops[leg.stops.length - 1]));
             const r = routeById.get(String(leg.routeId));
             const name = r ? (r.route_short_name || r.route_id) : leg.routeId;
             steps.push({ type: 'ride', text: `Naik ${name} dari ${first?.stop_name} ke ${last?.stop_name}` });
-            if (last) steps.push({ type: 'transfer', text: `Transit di ${last.stop_name}` });
+            if (i < legs.length - 1) {
+                const nextFirst = stopsById.get(String(legs[i+1].stops[0]));
+                if (last && nextFirst) {
+                    const d = this._haversine(parseFloat(last.stop_lat), parseFloat(last.stop_lon), parseFloat(nextFirst.stop_lat), parseFloat(nextFirst.stop_lon));
+                    steps.push({ type: 'transfer', text: `Transit di ${last.stop_name}` });
+                    if (d > 1) steps.push({ type: 'walk', text: `Jalan ke ${nextFirst.stop_name} (${this._fmtDist(d)})` });
+                }
+            }
         }
         const dist2 = this._haversine(parseFloat(goalStop.stop_lat), parseFloat(goalStop.stop_lon), this.destination.lat, this.destination.lon);
         steps.push({ type: 'walk', text: `Jalan ke tujuan (${this._fmtDist(dist2)})` });
-        this._lastPlan = { startStop, goalStop, legs, steps };
+        // Fare estimate
+        const fare = this._estimateFare(legs);
+        this._lastPlan = { startStop, goalStop, legs, steps, fare };
         this._setStatus('Rencana siap. Klik jalur untuk melihat langkah.');
     }
 
+    _estimateFare(legs) {
+        try {
+            const gtfs = this.app.modules.gtfs;
+            const fareRules = gtfs.getFareRules ? (gtfs.getFareRules() || []) : [];
+            const fareAttrs = gtfs.getFareAttributes ? (gtfs.getFareAttributes() || []) : [];
+            if (!fareRules.length || !fareAttrs.length || !legs || !legs.length) return null;
+            const attrsById = new Map(fareAttrs.map(a => [String(a.fare_id||''), a]));
+            // Map route_id -> first fare_id found
+            const fareIdByRoute = new Map();
+            for (const fr of fareRules) {
+                const rid = String(fr.route_id||'');
+                const fid = String(fr.fare_id||'');
+                if (rid && fid && !fareIdByRoute.has(rid)) fareIdByRoute.set(rid, fid);
+            }
+            const usedFareIds = new Set();
+            let total = 0;
+            const breakdown = [];
+            for (const leg of legs) {
+                const rid = String(leg.routeId||'');
+                const fid = fareIdByRoute.get(rid);
+                if (!fid || usedFareIds.has(fid)) continue; // de-dup same fare product (integrasi)
+                const attr = attrsById.get(fid);
+                if (!attr) continue;
+                const price = parseInt(attr.price, 10);
+                if (isFinite(price)) {
+                    total += price;
+                    usedFareIds.add(fid);
+                    breakdown.push({ fare_id: fid, price, currency: attr.currency_type || '' });
+                }
+            }
+            return { total, breakdown };
+        } catch (e) { return null; }
+    }
+
     _drawWalk(lat1, lon1, lat2, lon2, meta = {}) {
-        // custom dashed polyline for walking
-        const path = [[lat1, lon1], [lat2, lon2]];
-        this._drawPolyline(path, '#10b981', 3, 0.9, [2, 2], { type: 'walk', ...meta });
-        this._addLineLabel(path, 'Jalan kaki', '#10b981');
+        // Prefer straight within campus/terminal or very short distances
+        try {
+            const dist = this._haversine(lat1, lon1, lat2, lon2);
+            if ((meta && (meta.forceStraight || meta.preferStraight)) || dist <= 120) {
+                const path = [[lat1, lon1], [lat2, lon2]];
+                this._drawPolyline(path, '#10b981', 3, 0.9, [2, 2], { type: 'walk', ...meta });
+                this._addLineLabel(path, 'Jalan kaki', '#10b981');
+                return;
+            }
+        } catch (_) {}
+        // try to follow streets using OSRM; fallback to straight line
+        try {
+            const url = `https://router.project-osrm.org/route/v1/foot/${lon1},${lat1};${lon2},${lat2}?overview=full&geometries=geojson&radiuses=50;50`;
+            fetch(url)
+                .then(res => res.json())
+                .then(data => {
+                    let path;
+                    if (data && data.routes && data.routes[0] && data.routes[0].geometry && Array.isArray(data.routes[0].geometry.coordinates)) {
+                        const straight = this._haversine(lat1, lon1, lat2, lon2);
+                        const osrmDist = typeof data.routes[0].distance === 'number' ? data.routes[0].distance : null;
+                        // Guard against excessive detours (common inside terminals)
+                        if (osrmDist !== null && osrmDist > Math.max(300, straight * 2.2)) {
+                            path = [[lat1, lon1], [lat2, lon2]];
+                        } else {
+                            path = data.routes[0].geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+                        }
+                    } else {
+                        path = [[lat1, lon1], [lat2, lon2]];
+                    }
+                    this._drawPolyline(path, '#10b981', 3, 0.9, [2, 2], { type: 'walk', ...meta });
+                    this._addLineLabel(path, 'Jalan kaki', '#10b981');
+                })
+                .catch(() => {
+                    const path = [[lat1, lon1], [lat2, lon2]];
+                    this._drawPolyline(path, '#10b981', 3, 0.9, [2, 2], { type: 'walk', ...meta });
+                    this._addLineLabel(path, 'Jalan kaki', '#10b981');
+                });
+        } catch (e) {
+            try {
+                const path = [[lat1, lon1], [lat2, lon2]];
+                this._drawPolyline(path, '#10b981', 3, 0.9, [2, 2], { type: 'walk', ...meta });
+                this._addLineLabel(path, 'Jalan kaki', '#10b981');
+            } catch (_) {}
+        }
     }
 
     _drawPolyline(latlngs, color = '#2563eb', width = 4, opacity = 0.88, dash = null, meta = null) {
@@ -538,6 +843,14 @@ export class JourneyPlanner {
             const head = isWalk ? 'Jalan Kaki' : `Naik ${this._routeLabel(props && props.routeId)}`;
             const sub = isWalk ? (props && props.toStopName ? `Menuju ${props.toStopName}` : '') : `${props && props.fromStopName ? props.fromStopName : ''} → ${props && props.toStopName ? props.toStopName : ''}`;
             const stepsHtml = plan.steps.map(s => `<div class="small" style="margin:4px 0;">• ${s.text}</div>`).join('');
+            const mode = this._mode || 'balanced';
+            const modeLabel = (mode === 'fastest') ? 'Paling cepat' : (mode === 'cheapest' ? 'Paling hemat' : 'Seimbang');
+            const modeHtml = `
+                <div id="jp-mode-inline" class="btn-group btn-group-sm" role="group" aria-label="Mode">
+                    <button type="button" class="btn ${mode==='balanced'?'btn-primary':'btn-outline-primary'}" data-mode="balanced" title="Seimbang"><i class="fa-solid fa-scale-balanced"></i></button>
+                    <button type="button" class="btn ${mode==='fastest'?'btn-primary':'btn-outline-primary'}" data-mode="fastest" title="Paling cepat"><i class="fa-solid fa-gauge-high"></i></button>
+                    <button type="button" class="btn ${mode==='cheapest'?'btn-primary':'btn-outline-primary'}" data-mode="cheapest" title="Paling hemat"><i class="fa-solid fa-money-bill-wave"></i></button>
+                </div>`;
             const html = `
                 <div class="stop-popup plus-jakarta-sans" style="min-width: 220px; max-width: 330px; padding: 10px 12px;">
                     <div style="color:#333; padding:4px 0; border-bottom:1px solid #eee; margin-bottom:6px; display:flex; align-items:center; justify-content:space-between;">
@@ -545,6 +858,10 @@ export class JourneyPlanner {
                         <div style="font-size:10px;color:#f59e0b;font-weight:800;border:1px solid #f59e0b;border-radius:999px;padding:1px 6px;">BETA</div>
                     </div>
                     ${sub ? `<div class="small" style="color:#374151;margin-bottom:6px;">${sub}</div>` : ''}
+                    <div style="margin-bottom:8px;display:flex;flex-direction:column;gap:4px;align-items:flex-start;">
+                        <div style="display:flex;gap:6px;align-items:center;"><span class="small" style="color:#6b7280;">Mode:</span> ${modeHtml}</div>
+                        <div id="jp-mode-label" class="small" style="color:#6b7280;"><i class="fa-solid ${mode==='balanced'?'fa-scale-balanced':(mode==='fastest'?'fa-gauge-high':'fa-money-bill-wave')}"></i> ${modeLabel}</div>
+                    </div>
                     <div style="margin-top:4px;">
                         <div class="small" style="color:#6b7280;margin-bottom:4px;">Langkah lengkap:</div>
                         <div style="max-height:36vh;overflow:auto;">${stepsHtml}</div>
@@ -561,7 +878,34 @@ export class JourneyPlanner {
             try {
                 const el = this.app.modules.map._currentPopup && this.app.modules.map._currentPopup.getElement && this.app.modules.map._currentPopup.getElement();
                 const btn = el && el.querySelector('#jp-reset-inline');
-                if (btn) btn.addEventListener('click', () => this.reset());
+                if (btn) btn.addEventListener('click', () => { try { this.reset(); } catch(_) {} try { this.app.modules.map.closePopup(); } catch(_) {} });
+                // Bind mode buttons
+                const group = el && el.querySelector('#jp-mode-inline');
+                if (group) {
+                    const setActive = (activeId) => {
+                        group.querySelectorAll('button[data-mode]').forEach(bb => {
+                            if (bb.getAttribute('data-mode') === activeId) { bb.classList.remove('btn-outline-primary'); bb.classList.add('btn-primary'); }
+                            else { bb.classList.add('btn-outline-primary'); bb.classList.remove('btn-primary'); }
+                        });
+                        const lbl = el.querySelector('#jp-mode-label');
+                        if (lbl) {
+                            const text = (activeId === 'fastest') ? 'Paling cepat' : (activeId === 'cheapest' ? 'Paling hemat' : 'Seimbang');
+                            const icon = (activeId === 'fastest') ? 'fa-gauge-high' : (activeId === 'cheapest' ? 'fa-money-bill-wave' : 'fa-scale-balanced');
+                            lbl.innerHTML = `<i class="fa-solid ${icon}"></i> ${text}`;
+                        }
+                    };
+                    setActive(this._mode || 'balanced');
+                    group.querySelectorAll('button[data-mode]').forEach(b => {
+                        b.addEventListener('click', (ev) => {
+                            try { ev.preventDefault(); ev.stopPropagation(); } catch(_){}
+                            const m = b.getAttribute('data-mode');
+                            try { localStorage.setItem('jp_mode', m); } catch(_){ }
+                            this.setOptimizationMode(m);
+                            setActive(m);
+                            this.replan();
+                        });
+                    });
+                }
             } catch (e) {}
         } catch (e) {}
     }
@@ -590,7 +934,11 @@ export class JourneyPlanner {
 
             let bestSeg = null;
             let bestScore = Infinity;
+            // Limit work to avoid freezes
+            const MAX_SHAPES = 60;
+            let checked = 0;
             for (const shp of shapes) {
+                if (++checked > MAX_SHAPES) break;
                 if (!Array.isArray(shp) || shp.length < 2) continue;
                 const idxA = this._nearestIdx(shp, aLat, aLon);
                 const idxB = this._nearestIdx(shp, bLat, bLon);
@@ -606,6 +954,7 @@ export class JourneyPlanner {
                 if (score < bestScore) {
                     bestScore = score;
                     bestSeg = pts.map(p => [p.lat, p.lng]);
+                    if (bestScore < 1e-8) break; // good enough
                 }
             }
             return bestSeg;
@@ -637,6 +986,8 @@ export class JourneyPlanner {
 
     _clearMapArtifacts() {
         const mapMod = this.app.modules.map;
+        // Cancel any scheduled draws
+        this._drawSeq++;
         if (this._layers && this._layers.length) {
             for (const id of this._layers) {
                 try { mapMod.removeMarker(id); } catch(e) {}
@@ -695,12 +1046,33 @@ export class JourneyPlanner {
 
     _buildFullStepsPopupHTML(title, steps) {
         const stepsHtml = steps.map(s => `<div class="small" style="margin:4px 0;">• ${s.text}</div>`).join('');
+        let fareHtml = '';
+        try {
+            const fare = this._lastPlan && this._lastPlan.fare;
+            if (fare && isFinite(fare.total)) {
+                const rp = new Intl.NumberFormat('id-ID').format(fare.total);
+                fareHtml = `<div class="small" style="color:#111827;margin:6px 0 8px 0;"><b>Perkiraan tarif:</b> Rp${rp}</div>`;
+            }
+        } catch (_) {}
+        const mode = this._mode || 'balanced';
+        const modeLabel = (mode === 'fastest') ? 'Paling cepat' : (mode === 'cheapest' ? 'Paling hemat' : 'Seimbang');
+        const modeHtml = `
+            <div id="jp-mode-inline" class="btn-group btn-group-sm" role="group" aria-label="Mode">
+                <button type="button" class="btn ${mode==='balanced'?'btn-primary':'btn-outline-primary'}" data-mode="balanced" title="Seimbang"><i class="fa-solid fa-scale-balanced"></i></button>
+                <button type="button" class="btn ${mode==='fastest'?'btn-primary':'btn-outline-primary'}" data-mode="fastest" title="Paling cepat"><i class="fa-solid fa-gauge-high"></i></button>
+                <button type="button" class="btn ${mode==='cheapest'?'btn-primary':'btn-outline-primary'}" data-mode="cheapest" title="Paling hemat"><i class="fa-solid fa-money-bill-wave"></i></button>
+            </div>`;
         return `
             <div class="stop-popup plus-jakarta-sans" style="min-width: 220px; max-width: 330px; padding: 10px 12px;">
                 <div style="color:#333; padding:4px 0; border-bottom:1px solid #eee; margin-bottom:6px; display:flex; align-items:center; justify-content:space-between;">
                     <div style="font-weight:700;">${title}</div>
                     <div style="font-size:10px;color:#f59e0b;font-weight:800;border:1px solid #f59e0b;border-radius:999px;padding:1px 6px;">BETA</div>
                 </div>
+                <div style="margin-bottom:8px;display:flex;flex-direction:column;gap:4px;align-items:flex-start;">
+                    <div style="display:flex;gap:6px;align-items:center;"><span class="small" style="color:#6b7280;">Mode:</span> ${modeHtml}</div>
+                    <div id="jp-mode-label" class="small" style="color:#6b7280;"><i class="fa-solid ${mode==='balanced'?'fa-scale-balanced':(mode==='fastest'?'fa-gauge-high':'fa-money-bill-wave')}"></i> ${modeLabel}</div>
+                </div>
+                ${fareHtml}
                 <div style="max-height:36vh;overflow:auto;">${stepsHtml}</div>
                 <div style="margin-top:8px;display:flex;justify-content:flex-end;">
                     <button id="jp-reset-inline" class="btn btn-sm btn-outline-secondary" style="padding:3px 8px;font-size:11px;">Reset</button>
@@ -736,7 +1108,28 @@ export class JourneyPlanner {
                 try {
                     const el = this.app.modules.map._currentPopup && this.app.modules.map._currentPopup.getElement && this.app.modules.map._currentPopup.getElement();
                     const btn = el && el.querySelector('#jp-reset-inline');
-                    if (btn) btn.addEventListener('click', () => this.reset());
+                    if (btn) btn.addEventListener('click', () => { try { this.reset(); } catch(_) {} try { this.app.modules.map.closePopup(); } catch(_) {} });
+                    // Bind mode buttons in restored popup
+                    const group = el && el.querySelector('#jp-mode-inline');
+                    if (group) {
+                        const setActive = (activeId) => {
+                            group.querySelectorAll('button[data-mode]').forEach(b => {
+                                if (b.getAttribute('data-mode') === activeId) { b.classList.remove('btn-outline-primary'); b.classList.add('btn-primary'); }
+                                else { b.classList.add('btn-outline-primary'); b.classList.remove('btn-primary'); }
+                            });
+                        };
+                        setActive(this._mode || 'balanced');
+                        group.querySelectorAll('button[data-mode]').forEach(b => {
+                            b.addEventListener('click', (ev) => {
+                                try { ev.preventDefault(); ev.stopPropagation(); } catch(_){}
+                                const m = b.getAttribute('data-mode');
+                                try { localStorage.setItem('jp_mode', m); } catch(_){ }
+                                this.setOptimizationMode(m);
+                                setActive(m);
+                                this.replan();
+                            });
+                        });
+                    }
                 } catch (e) {}
             }
         } catch (e) {}
