@@ -636,62 +636,81 @@ export class RouteManager {
 
     // Download route image
     downloadRouteImage(routeId, buttonElement) {
-        if (!buttonElement) return;
-        
-        // Show loading state on button
-        const originalContent = buttonElement.innerHTML;
-        buttonElement.innerHTML = `
-            <div class="share-option-icon bg-warning bg-opacity-10 text-warning">
-                <div class="spinner-border spinner-border-sm text-warning" role="status"></div>
-            </div>
-            <div class="share-option-text">
-                <div class="share-option-title">Membuat Gambar...</div>
-                <div class="share-option-desc">Mohon tunggu sebentar</div>
-            </div>
-        `;
-        buttonElement.style.pointerEvents = 'none';
+        const hasButton = !!buttonElement;
+        let originalContent = '';
+        if (hasButton) {
+            // Show loading state on button
+            originalContent = buttonElement.innerHTML;
+            buttonElement.innerHTML = `
+                <div class="share-option-icon bg-warning bg-opacity-10 text-warning">
+                    <div class="spinner-border spinner-border-sm text-warning" role="status"></div>
+                </div>
+                <div class="share-option-text">
+                    <div class="share-option-title">Membuat Gambar...</div>
+                    <div class="share-option-desc">Mohon tunggu sebentar</div>
+                </div>
+            `;
+            buttonElement.style.pointerEvents = 'none';
+        }
 
         this.generateRouteImage(routeId).then(canvas => {
-            if (canvas) {
-                try {
-                    const link = document.createElement('a');
-                    link.download = `rute-${routeId}-transjakarta.png`;
-                    link.href = canvas.toDataURL();
-                    link.click();
-                    
-                    // Show success state briefly
-                    buttonElement.innerHTML = `
-                        <div class="share-option-icon bg-success bg-opacity-10 text-success">
-                            <iconify-icon icon="mdi:check" inline></iconify-icon>
-                        </div>
-                        <div class="share-option-text">
-                            <div class="share-option-title">Berhasil!</div>
-                            <div class="share-option-desc">Gambar telah di-download</div>
-                        </div>
-                    `;
-                    
-                    // Restore original content after 2 seconds
-                    setTimeout(() => {
-                        buttonElement.innerHTML = originalContent;
-                        buttonElement.style.pointerEvents = 'auto';
-                    }, 2000);
-                    
-                } catch (error) {
-                    console.error('Error downloading image:', error);
-                    this.showError('Gagal mengunduh gambar. Silakan coba lagi.');
+            if (!canvas) {
+                this.showError('Gagal membuat gambar. Silakan coba lagi.');
+                if (hasButton) {
                     buttonElement.innerHTML = originalContent;
                     buttonElement.style.pointerEvents = 'auto';
                 }
-            } else {
-                this.showError('Gagal membuat gambar. Silakan coba lagi.');
-                buttonElement.innerHTML = originalContent;
-                buttonElement.style.pointerEvents = 'auto';
+                return;
+            }
+            try {
+                canvas.toBlob((blob) => {
+                    if (!blob) {
+                        throw new Error('Blob kosong dari canvas');
+                    }
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.download = `rute-${routeId}-transjakarta.png`;
+                    link.href = url;
+                    document.body.appendChild(link);
+                    link.click();
+                    setTimeout(() => {
+                        URL.revokeObjectURL(url);
+                        link.remove();
+                    }, 0);
+
+                    if (hasButton) {
+                        // Show success state briefly
+                        buttonElement.innerHTML = `
+                            <div class="share-option-icon bg-success bg-opacity-10 text-success">
+                                <iconify-icon icon="mdi:check" inline></iconify-icon>
+                            </div>
+                            <div class="share-option-text">
+                                <div class="share-option-title">Berhasil!</div>
+                                <div class="share-option-desc">Gambar telah di-download</div>
+                            </div>
+                        `;
+                        // Restore original content after 2 seconds
+                        setTimeout(() => {
+                            buttonElement.innerHTML = originalContent;
+                            buttonElement.style.pointerEvents = 'auto';
+                        }, 2000);
+                    }
+                }, 'image/png');
+            } catch (error) {
+                console.error('Error downloading image:', error);
+                this.showError('Gagal mengunduh gambar. Silakan coba lagi.');
+                if (hasButton) {
+                    buttonElement.innerHTML = originalContent;
+                    buttonElement.style.pointerEvents = 'auto';
+                }
             }
         }).catch(error => {
             console.error('Error in downloadRouteImage:', error);
             this.showError('Terjadi kesalahan. Silakan coba lagi.');
-            buttonElement.innerHTML = originalContent;
-            buttonElement.style.pointerEvents = 'auto';
+            if (hasButton) {
+                buttonElement.innerHTML = originalContent;
+                buttonElement.style.pointerEvents = 'auto';
+            }
         });
     }
 
@@ -957,8 +976,9 @@ export class RouteManager {
             const canvas = await html2canvas(cardElement, {
                 backgroundColor: '#ffffff',
                 scale: 2, // Higher quality
+                // Use CORS where possible, but avoid tainting failures breaking export
                 useCORS: true,
-                allowTaint: true,
+                allowTaint: false,
                 width: 380,
                 height: 700, // Increased height to capture entire card including service type
                 logging: false, // Disable logging for production
@@ -1834,6 +1854,15 @@ export class RouteManager {
     // Configure manual intermodal mapping
     setIntermodalMapping(mapping) {
         this._intermodalByStopKey = mapping || {};
+        // Build normalized name mapping for robust lookup (case/space insensitive)
+        try {
+            this._intermodalByStopKeyNormalized = {};
+            Object.keys(this._intermodalByStopKey).forEach((key) => {
+                const value = this._intermodalByStopKey[key];
+                const normalized = this.normalizeStopKey(key);
+                this._intermodalByStopKeyNormalized[normalized] = value;
+            });
+        } catch (e) { this._intermodalByStopKeyNormalized = {}; }
         if (this.selectedRouteId) {
             this.showStopsByRoute(this.selectedRouteId);
         }
@@ -1846,7 +1875,12 @@ export class RouteManager {
             if (settings && !settings.isEnabled('showIntermodalIcons')) return '';
         } catch (e) {}
         if (!this._intermodalByStopKey) return '';
-        const modes = this._intermodalByStopKey[stop.stop_id] || this._intermodalByStopKey[stop.stop_name];
+        // Try by stop_id first (exact), then by exact name, then normalized name
+        let modes = this._intermodalByStopKey[stop.stop_id] || this._intermodalByStopKey[stop.stop_name];
+        if (!modes && this._intermodalByStopKeyNormalized) {
+            const normalizedName = this.normalizeStopKey(stop.stop_name || '');
+            modes = this._intermodalByStopKeyNormalized[normalizedName];
+        }
         if (!modes) return '';
         const arr = Array.isArray(modes) ? modes : [modes];
         const iconUrlMap = {
@@ -1862,6 +1896,15 @@ export class RouteManager {
             const cls = key.toLowerCase();
             return `<img class="intermodal-icon-img ${cls}" src="${url}" alt="${alt}" title="${alt}"/>`;
         }).join('');
+    }
+
+    // Normalize stop key for name-based mapping: trim, collapse spaces, lowercase
+    normalizeStopKey(key) {
+        if (key == null) return '';
+        const s = String(key);
+        // If it looks like an internal stop_id (e.g., starts with capital letter + digits), keep as-is
+        if (/^[A-Z]\d/.test(s)) return s;
+        return s.trim().replace(/\s+/g, ' ').toLowerCase();
     }
 
     // Show error message
