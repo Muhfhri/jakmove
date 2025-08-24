@@ -164,6 +164,7 @@ export class RouteManager {
                     ${this.buildRouteBadgeHTML(route)}
                     ${this.buildRouteJurusanHTML(route)}
                     ${this.buildServiceTypeHTML(route)}
+                    ${this.buildShareRouteButton(route)}
                 </div>
                 <div class='route-info-main'>
                     <div class='route-info-details'>
@@ -199,7 +200,6 @@ export class RouteManager {
                       style='background:${badgeColor};color:#fff;font-weight:bold;font-size:2rem !important;padding:0.8em 1.6em;box-shadow:0 4px 15px rgba(38,70,151,0.2);border-radius:2em;letter-spacing:2px;'>
                     ${badgeText}
                 </span>
-                <div class='route-badge-subtitle'>Koridor TransJakarta</div>
             </div>
         `;
     }
@@ -208,8 +208,16 @@ export class RouteManager {
     buildRouteJurusanHTML(route) {
         if (!route.route_long_name) return '';
         
+        // Check if route has via
+        const hasVia = route.route_long_name.toLowerCase().includes('via');
+        const routeName = hasVia ? route.route_long_name.split('via')[0].trim() : route.route_long_name;
+        const viaInfo = hasVia ? route.route_long_name.split('via')[1].trim() : null;
+        
         return `
-            <h4 class='route-jurusan plus-jakarta-sans fw-bold'>${route.route_long_name}</h4>
+            <div class='route-jurusan-container text-center'>
+                <h3 class='route-jurusan pt-sans fw-bold mb-1' style='font-size: 1.8rem;'>${routeName}</h3>
+                ${hasVia ? `<div class='route-via-info pt-sans' style='font-size: 1rem; margin-bottom: 0.5rem;'><strong>VIA ${viaInfo.toUpperCase()}</strong></div>` : ''}
+            </div>
         `;
     }
 
@@ -250,16 +258,732 @@ export class RouteManager {
         }
 
         return `
-            <span class='badge ${serviceBadgeClass} fs-6 px-3 py-2 rounded-pill'>
-                <iconify-icon icon="mdi:bus" inline></iconify-icon>
-                ${displayServiceType}
-            </span>
+            <div class='service-type-container text-center'>
+                <span class='badge ${serviceBadgeClass} fs-6 px-3 py-2 rounded-pill' style='font-weight: 600; letter-spacing: 0.5px; margin-top: 0.5rem;'>
+                    ${displayServiceType}
+                </span>
+            </div>
         `;
     }
 
     infoIconLink(url, title) {
         if (!url) return '';
         return `<a href="${url}" target="_blank" title="${title}" class="info-link" style="margin-left:6px; text-decoration:none; display:inline-flex; align-items:center;"><iconify-icon icon="mdi:information-outline" inline></iconify-icon></a>`;
+    }
+
+    // Build share route button HTML
+    buildShareRouteButton(route) {
+        return `
+            <div class='share-route-container mt-3'>
+                <button class='btn btn-outline-primary btn-lg share-route-btn' 
+                        onclick="window.transJakartaApp.modules.routes.shareRoute('${route.route_id}')"
+                        style='border-radius: 25px; padding: 12px 24px; font-weight: 600;'>
+                    <iconify-icon icon="mdi:share-variant" inline style="margin-right: 8px;"></iconify-icon>
+                    Bagikan Rute
+                </button>
+            </div>
+        `;
+    }
+
+    // Share route functionality
+    shareRoute(routeId) {
+        console.log('shareRoute called with routeId:', routeId);
+        
+        const route = window.transJakartaApp.modules.gtfs.getRoutes()
+            .find(r => r.route_id === routeId);
+        
+        if (!route) {
+            console.error('Route not found:', routeId);
+            return;
+        }
+        
+        console.log('Route found:', route);
+
+        const routeInfo = {
+            routeId: route.route_id,
+            routeName: route.route_short_name || route.route_id,
+            routeLongName: route.route_long_name || '',
+            routeType: route.route_desc || 'Bus Rapid Transit',
+            url: window.location.href.split('?')[0] + '?route_id=' + routeId
+        };
+
+        // Get additional route information
+        const trips = window.transJakartaApp.modules.gtfs.getTrips()
+            .filter(t => t.route_id === route.route_id);
+        
+        const variantInfo = this.getRouteVariants(trips);
+        const variants = Object.keys(variantInfo).sort(
+            (a, b) => window.transJakartaApp.modules.gtfs.naturalSort(a, b)
+        );
+        
+        // Get operating hours
+        const frequencies = window.transJakartaApp.modules.gtfs.getFrequencies();
+        const stopTimes = window.transJakartaApp.modules.gtfs.getStopTimes();
+        const tripIds = trips.map(t => t.trip_id);
+        const freqsForRoute = frequencies.filter(f => tripIds.includes(f.trip_id));
+        
+        let operatingHours = '';
+        if (freqsForRoute.length > 0) {
+            const startTimes = freqsForRoute.map(f => f.start_time).filter(Boolean);
+            const endTimes = freqsForRoute.map(f => f.end_time).filter(Boolean);
+            if (startTimes.length > 0 && endTimes.length > 0) {
+                const minStart = startTimes.reduce((a, b) => this.timeToSeconds(a) < this.timeToSeconds(b) ? a : b);
+                const maxEnd = endTimes.reduce((a, b) => this.timeToSeconds(a) > this.timeToSeconds(b) ? a : b);
+                operatingHours = `Jam Operasi: ${this.formatOperatingHours(minStart, maxEnd)}`;
+            }
+        }
+
+        // Get service days for share text
+        const serviceIds = Array.from(new Set(trips.map(t => t.service_id)));
+        const serviceIdMap = {
+            'SH': 'Setiap Hari',
+            'HK': 'Hari Kerja',
+            'HL': 'Hari Libur',
+            'HM': 'Hanya Minggu',
+            'X': 'Khusus',
+        };
+        const operatingDays = serviceIds.map(sid => serviceIdMap[sid] || sid).join(' / ');
+
+        // Create share text with complete information
+        const shareText = `JakMove - Transjakarta Fan Made Website
+
+📱 ${routeInfo.routeName} - ${routeInfo.routeLongName}
+🏢 ${routeInfo.routeType}
+💰 Tarif: ${this.getFareInfo(route.route_id)}
+⏰ ${operatingHours}
+📅 ${operatingDays}
+
+🔗 Link Rute: ${routeInfo.url}
+🌐 github.com/muhfhri/jakmove
+
+#INTEGRASI #KINILEBIHBAIK #JakLingko`;
+
+        // Always show modal first for better user experience
+        // Web Share API can be accessed from within the modal if needed
+        this.showShareOptions(routeInfo, shareText);
+    }
+
+    // Show share options modal
+    showShareOptions(routeInfo, shareText) {
+        // Get route object for card generation
+        const route = window.transJakartaApp.modules.gtfs.getRoutes()
+            .find(r => r.route_id === routeInfo.routeId);
+        
+        if (!route) {
+            console.error('Route not found for card generation');
+            return;
+        }
+        // Remove existing modal if any
+        const existingModal = document.getElementById('shareRouteModal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+
+        const modalHTML = `
+            <div class="modal fade" id="shareRouteModal" tabindex="-1" aria-labelledby="shareRouteModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-lg">
+                    <div class="modal-content border-0 shadow-lg">
+                        <div class="modal-header bg-primary text-white border-0">
+                            <h5 class="modal-title fw-bold" id="shareRouteModalLabel">
+                                <iconify-icon icon="mdi:share-variant" inline style="margin-right: 12px; font-size: 1.2em;"></iconify-icon>
+                                Bagikan Rute ${routeInfo.routeName}
+                            </h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body p-4">
+                            <!-- Route Preview -->
+                            <div class="route-preview mb-4">
+                                <div class="route-preview-header text-center mb-3">
+                                    <h6 class="text-primary fw-semibold mb-3">
+                                        <iconify-icon icon="mdi:eye" inline style="margin-right: 8px;"></iconify-icon>
+                                        Preview Kartu Rute
+                                        <small class="d-block text-muted mt-1" style="font-size: 0.8rem;">
+                                            <iconify-icon icon="mdi:arrow-up-down" inline style="margin-right: 4px;"></iconify-icon>
+                                            Geser untuk melihat seluruh konten
+                                        </small>
+                                    </h6>
+                                    <div class="route-preview-content p-0 bg-gradient-light rounded-3 border overflow-hidden">
+                                        <div class="route-preview-scrollable" style="max-height: 400px; overflow-y: auto; padding: 20px;">
+                                            <div class="route-card" id="routeCard_${routeInfo.routeId}" style="width: 100%; max-width: 380px; margin: 0 auto;">
+                                                <!-- Route card content will be generated here -->
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="share-options">
+                                <h6 class="text-center text-muted mb-3 fw-semibold">
+                                    <iconify-icon icon="mdi:share-variant-outline" inline style="margin-right: 8px;"></iconify-icon>
+                                    Pilih Metode Berbagi
+                                </h6>
+                                <p class="text-center text-muted mb-4" style="font-size: 0.9rem;">
+                                    <iconify-icon icon="mdi:information-outline" inline style="margin-right: 4px;"></iconify-icon>
+                                    Pilih metode berbagi yang paling sesuai dengan kebutuhan Anda
+                                </p>
+                                
+                                <!-- Image Share Options -->
+                                <div class="share-option" onclick="window.transJakartaApp.modules.routes.downloadRouteImage('${routeInfo.routeId}', this)">
+                                    <div class="share-option-icon bg-warning bg-opacity-10 text-warning">
+                                        <iconify-icon icon="mdi:download" inline></iconify-icon>
+                                    </div>
+                                    <div class="share-option-text">
+                                        <div class="share-option-title">Download Gambar</div>
+                                        <div class="share-option-desc">Simpan kartu rute sebagai gambar</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="share-option" onclick="window.transJakartaApp.modules.routes.nativeShare('${routeInfo.routeName}', '${encodeURIComponent(shareText)}', '${routeInfo.url}', this)">
+                                    <div class="share-option-icon bg-secondary bg-opacity-10 text-secondary">
+                                        <iconify-icon icon="mdi:share-variant" inline></iconify-icon>
+                                    </div>
+                                    <div class="share-option-text">
+                                        <div class="share-option-title">Bagikan</div>
+                                        <div class="share-option-desc">Gunakan fitur share sistem</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="share-option" onclick="window.transJakartaApp.modules.routes.shareRouteTextToWhatsApp('${routeInfo.routeId}', '${routeInfo.routeName}', this, '${encodeURIComponent(shareText)}')">
+                                    <div class="share-option-icon bg-success bg-opacity-10 text-success">
+                                        <iconify-icon icon="mdi:whatsapp" inline></iconify-icon>
+                                    </div>
+                                    <div class="share-option-text">
+                                        <div class="share-option-title">Bagikan di WhatsApp</div>
+                                        <div class="share-option-desc">Bagikan teks rute ke WhatsApp</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="share-option" onclick="window.transJakartaApp.modules.routes.shareRouteTextToTelegram('${routeInfo.routeId}', '${routeInfo.routeName}', this, '${encodeURIComponent(shareText)}', '${encodeURIComponent(routeInfo.url)}')">
+                                    <div class="share-option-icon bg-primary bg-opacity-10 text-primary">
+                                        <iconify-icon icon="mdi:telegram" inline></iconify-icon>
+                                    </div>
+                                    <div class="share-option-text">
+                                        <div class="share-option-title">Bagikan di Telegram</div>
+                                        <div class="share-option-desc">Bagikan teks rute ke Telegram</div>
+                                    </div>
+                                </div>
+                                
+
+                            </div>
+                        </div>
+                        <div class="modal-footer border-0 pt-0">
+                            <button type="button" class="btn btn-outline-secondary px-4 py-2 rounded-pill" data-bs-dismiss="modal">
+                                <iconify-icon icon="mdi:close" inline style="margin-right: 8px;"></iconify-icon>
+                                Tutup
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Add modal to body
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+        // Show modal
+        try {
+            const modal = new bootstrap.Modal(document.getElementById('shareRouteModal'));
+            modal.show();
+            
+            // Generate route card after modal is shown
+            setTimeout(() => {
+                this.generateRouteCard(routeInfo, route);
+            }, 100);
+        } catch (error) {
+            console.error('Error showing modal:', error);
+            // Fallback: show alert with share options
+            alert(`Bagikan Rute ${routeInfo.routeName}:\n\n${shareText}`);
+        }
+    }
+
+    // Generate route card for sharing
+    generateRouteCard(routeInfo, route) {
+        const cardContainer = document.getElementById(`routeCard_${routeInfo.routeId}`);
+        if (!cardContainer) return;
+
+        // Get additional route information
+        const trips = window.transJakartaApp.modules.gtfs.getTrips()
+            .filter(t => t.route_id === route.route_id);
+        
+        const frequencies = window.transJakartaApp.modules.gtfs.getFrequencies();
+        const stopTimes = window.transJakartaApp.modules.gtfs.getStopTimes();
+        const tripIds = trips.map(t => t.trip_id);
+        const freqsForRoute = frequencies.filter(f => tripIds.includes(f.trip_id));
+        
+        // Get operating hours
+        let operatingHours = 'Tidak tersedia';
+        if (freqsForRoute.length > 0) {
+            const startTimes = freqsForRoute.map(f => f.start_time).filter(Boolean);
+            const endTimes = freqsForRoute.map(f => f.end_time).filter(Boolean);
+            if (startTimes.length > 0 && endTimes.length > 0) {
+                const minStart = startTimes.reduce((a, b) => this.timeToSeconds(a) < this.timeToSeconds(b) ? a : b);
+                const maxEnd = endTimes.reduce((a, b) => this.timeToSeconds(a) > this.timeToSeconds(b) ? a : b);
+                operatingHours = this.formatOperatingHours(minStart, maxEnd);
+            }
+        }
+
+        // Get operating days
+        const serviceIds = Array.from(new Set(trips.map(t => t.service_id)));
+        const serviceIdMap = {
+            'SH': 'Setiap Hari',
+            'HK': 'Hari Kerja',
+            'HL': 'Hari Libur',
+            'HM': 'Hanya Minggu',
+            'X': 'Khusus',
+        };
+        const operatingDays = serviceIds.map(sid => serviceIdMap[sid] || sid).join(' / ');
+
+        // Get fare info
+        const fareInfo = this.getFareInfo(route.route_id) || 'Tidak tersedia';
+
+        // Get frequency info
+        let frequencyInfo = 'Tidak tersedia';
+        if (freqsForRoute.length > 0) {
+            const avgHeadway = freqsForRoute.reduce((sum, f) => sum + (parseInt(f.headway_secs) || 0), 0) / freqsForRoute.length;
+            if (avgHeadway > 0) {
+                const minutes = Math.round(avgHeadway / 60);
+                frequencyInfo = `Setiap ${minutes} menit`;
+            }
+        }
+
+        // Create route card HTML - Improved layout
+        const routeCardHTML = `
+            <div class="route-card-container" style="width: 380px; background: white; border: 2px solid #e5e7eb; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+                <!-- Header dengan badge warna rute -->
+                <div class="route-card-header" style="background: ${route.route_color ? '#' + route.route_color : '#3b82f6'}; color: white; padding: 24px 20px; text-align: center;">
+                    <div class="route-badge" style="background: white; color: ${route.route_color ? '#' + route.route_color : '#3b82f6'}; border-radius: 12px; padding: 10px 20px; font-size: 1.8rem; font-weight: bold; display: inline-block; margin-bottom: 16px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
+                        ${routeInfo.routeName}
+                    </div>
+                    <div class="route-jurusan" style="font-size: 1.3rem; font-weight: 600; line-height: 1.4; color: white; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5); max-width: 320px; margin: 0 auto;">
+                        ${routeInfo.routeLongName && routeInfo.routeLongName.toLowerCase().includes('via') ? 
+                            routeInfo.routeLongName.split('via')[0].trim() : 
+                            (routeInfo.routeLongName || 'Tidak tersedia')
+                        }
+                    </div>
+                    ${routeInfo.routeLongName && routeInfo.routeLongName.toLowerCase().includes('via') ? 
+                        `<div class="route-via pt-sans" style="font-size: 1rem; margin-top: 8px; color: white; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);">
+                            <strong>VIA ${routeInfo.routeLongName.split('via')[1].trim().toUpperCase()}</strong>
+                        </div>` : ''
+                    }
+                    <div class="route-service-type" style="font-size: 1rem; font-weight: 500; line-height: 1.3; color: rgba(255, 255, 255, 0.9); margin-top: 12px; padding: 6px 16px; background: rgba(255, 255, 255, 0.15); border-radius: 20px; display: inline-block; backdrop-filter: blur(10px);">
+                        ${routeInfo.routeType}
+                    </div>
+                </div>
+                
+                <!-- Body dengan informasi rute -->
+                <div class="route-card-body" style="padding: 24px 20px; background: white;">
+                    <div class="route-info-list" style="display: flex; flex-direction: column; gap: 14px;">
+                        <div class="route-info-item" style="display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; background: #f8fafc; border-radius: 10px; border-left: 4px solid #3b82f6;">
+                            <span style="font-weight: 600; color: #374151; font-size: 0.95rem;">Tarif:</span>
+                            <span style="font-weight: 600; color: #1f2937; font-size: 0.95rem;">${fareInfo}</span>
+                        </div>
+                        
+                        <div class="route-info-item" style="display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; background: #f8fafc; border-radius: 10px; border-left: 4px solid #10b981;">
+                            <span style="font-weight: 600; color: #374151; font-size: 0.95rem;">Jam Operasi:</span>
+                            <span style="font-weight: 600; color: #1f2937; font-size: 0.95rem;">${operatingHours}</span>
+                        </div>
+                        
+                        <div class="route-info-item" style="display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; background: #f8fafc; border-radius: 10px; border-left: 4px solid #f59e0b;">
+                            <span style="font-weight: 600; color: #374151; font-size: 0.95rem;">Hari Operasi:</span>
+                            <span style="font-weight: 600; color: #1f2937; font-size: 0.95rem;">${operatingDays}</span>
+                        </div>
+                        
+                        <div class="route-info-item" style="display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; background: #f8fafc; border-radius: 10px; border-left: 4px solid #8b5cf6;">
+                            <span style="font-weight: 600; color: #374151; font-size: 0.95rem;">Frekuensi:</span>
+                            <span style="font-weight: 600; color: #1f2937; font-size: 0.95rem;">${frequencyInfo}</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Web Info section -->
+                    <div class="route-web-section" style="text-align: center; margin-top: 24px; padding: 20px; background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); border-radius: 12px; border: 1px solid #e2e8f0;">
+                        <div class="web-info" style="text-align: center; margin-bottom: 12px;">
+                            <div style="font-size: 1.2rem; color: #3b82f6; font-weight: 700; margin-bottom: 6px; font-family: 'PT Sans Narrow', sans-serif; letter-spacing: 0.5px;">github.com/muhfhri/jakmove</div>
+                            <div style="font-size: 1rem; color: #64748b; font-weight: 500; font-family: 'PT Sans Narrow', sans-serif; font-style: italic;">Smart Transit Experience</div>
+                        </div>
+                        <div class="web-url" style="margin-top: 8px;">
+                            <a href="https://github.com/muhfhri/jakmove" target="_blank" style="color: #3b82f6; text-decoration: none; font-weight: 600; font-size: 0.9rem; padding: 8px 16px; background: white; border-radius: 8px; border: 1px solid #e2e8f0; transition: all 0.2s ease;">
+                                🔗 Lihat di GitHub
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        cardContainer.innerHTML = routeCardHTML;
+    }
+
+    // Get fare information
+    getFareInfo(routeId) {
+        try {
+            const fareRules = window.transJakartaApp.modules.gtfs.getFareRules();
+            const fareAttributes = window.transJakartaApp.modules.gtfs.getFareAttributes();
+            
+            const routeFare = fareRules.find(rule => rule.route_id === routeId);
+            if (routeFare) {
+                const fare = fareAttributes.find(attr => attr.fare_id === routeFare.fare_id);
+                if (fare && fare.price) {
+                    return `Rp ${parseInt(fare.price).toLocaleString('id-ID')}`;
+                }
+            }
+            
+            // Default fare for TransJakarta
+            return 'Rp 3.500';
+        } catch (error) {
+            return 'Rp 3.500';
+        }
+    }
+
+    // Download route image
+    downloadRouteImage(routeId, buttonElement) {
+        if (!buttonElement) return;
+        
+        // Show loading state on button
+        const originalContent = buttonElement.innerHTML;
+        buttonElement.innerHTML = `
+            <div class="share-option-icon bg-warning bg-opacity-10 text-warning">
+                <div class="spinner-border spinner-border-sm text-warning" role="status"></div>
+            </div>
+            <div class="share-option-text">
+                <div class="share-option-title">Membuat Gambar...</div>
+                <div class="share-option-desc">Mohon tunggu sebentar</div>
+            </div>
+        `;
+        buttonElement.style.pointerEvents = 'none';
+
+        this.generateRouteImage(routeId).then(canvas => {
+            if (canvas) {
+                try {
+                    const link = document.createElement('a');
+                    link.download = `rute-${routeId}-transjakarta.png`;
+                    link.href = canvas.toDataURL();
+                    link.click();
+                    
+                    // Show success state briefly
+                    buttonElement.innerHTML = `
+                        <div class="share-option-icon bg-success bg-opacity-10 text-success">
+                            <iconify-icon icon="mdi:check" inline></iconify-icon>
+                        </div>
+                        <div class="share-option-text">
+                            <div class="share-option-title">Berhasil!</div>
+                            <div class="share-option-desc">Gambar telah di-download</div>
+                        </div>
+                    `;
+                    
+                    // Restore original content after 2 seconds
+                    setTimeout(() => {
+                        buttonElement.innerHTML = originalContent;
+                        buttonElement.style.pointerEvents = 'auto';
+                    }, 2000);
+                    
+                } catch (error) {
+                    console.error('Error downloading image:', error);
+                    this.showError('Gagal mengunduh gambar. Silakan coba lagi.');
+                    buttonElement.innerHTML = originalContent;
+                    buttonElement.style.pointerEvents = 'auto';
+                }
+            } else {
+                this.showError('Gagal membuat gambar. Silakan coba lagi.');
+                buttonElement.innerHTML = originalContent;
+                buttonElement.style.pointerEvents = 'auto';
+            }
+        }).catch(error => {
+            console.error('Error in downloadRouteImage:', error);
+            this.showError('Terjadi kesalahan. Silakan coba lagi.');
+            buttonElement.innerHTML = originalContent;
+            buttonElement.style.pointerEvents = 'auto';
+        });
+    }
+
+    // Share route image using Web Share API
+    shareRouteImage(routeId, routeName, buttonElement) {
+        if (!buttonElement) return;
+        
+        // Show loading state on button
+        const originalContent = buttonElement.innerHTML;
+        buttonElement.innerHTML = `
+            <div class="share-option-icon bg-success bg-opacity-10 text-success">
+                <div class="spinner-border spinner-border-sm text-success" role="status"></div>
+            </div>
+            <div class="share-option-text">
+                <div class="share-option-title">Membuat Gambar...</div>
+                <div class="share-option-desc">Mohon tunggu sebentar</div>
+            </div>
+        `;
+        buttonElement.style.pointerEvents = 'none';
+
+        this.generateRouteImage(routeId).then(canvas => {
+            if (canvas) {
+                canvas.toBlob(blob => {
+                    if (navigator.share && navigator.canShare) {
+                        const file = new File([blob], `rute-${routeId}.png`, { type: 'image/png' });
+                        navigator.share({
+                            title: `Rute ${routeName} - TransJakarta`,
+                            text: `Kartu rute ${routeName} TransJakarta`,
+                            files: [file]
+                        }).catch(err => {
+                            console.log('Share failed:', err);
+                            this.downloadRouteImage(routeId);
+                        });
+                    } else {
+                        this.downloadRouteImage(routeId);
+                    }
+                });
+                
+                // Restore button content
+                buttonElement.innerHTML = originalContent;
+                buttonElement.style.pointerEvents = 'auto';
+            } else {
+                this.showError('Gagal membuat gambar untuk dibagikan.');
+                buttonElement.innerHTML = originalContent;
+                buttonElement.style.pointerEvents = 'auto';
+            }
+        }).catch(error => {
+            console.error('Error in shareRouteImage:', error);
+            this.showError('Terjadi kesalahan saat membagikan gambar.');
+            buttonElement.innerHTML = originalContent;
+            buttonElement.style.pointerEvents = 'auto';
+        });
+    }
+
+    // Share route text to WhatsApp/Telegram
+    shareRouteTextToWhatsApp(routeId, routeName, buttonElement, shareText) {
+        if (!buttonElement) return;
+        
+        // Show loading state on button
+        const originalContent = buttonElement.innerHTML;
+        buttonElement.innerHTML = `
+            <div class="share-option-icon bg-success bg-opacity-10 text-success">
+                <div class="spinner-border spinner-border-sm text-success" role="status"></div>
+            </div>
+            <div class="share-option-text">
+                <div class="share-option-title">Membuka WhatsApp...</div>
+                <div class="share-option-desc">Mohon tunggu sebentar</div>
+            </div>
+        `;
+        buttonElement.style.pointerEvents = 'none';
+
+        try {
+            // Decode the share text
+            const decodedText = decodeURIComponent(shareText);
+            
+            // Create WhatsApp share URL
+            const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(decodedText)}`;
+            
+            // Open WhatsApp in new tab
+            window.open(whatsappUrl, '_blank');
+            
+            // Show success state briefly
+            buttonElement.innerHTML = `
+                <div class="share-option-icon bg-success bg-opacity-10 text-success">
+                    <iconify-icon icon="mdi:check" inline style="color: #10b981;"></iconify-icon>
+                </div>
+                <div class="share-option-text">
+                    <div class="share-option-title">Berhasil!</div>
+                    <div class="share-option-desc">WhatsApp telah dibuka</div>
+                </div>
+            `;
+            
+            // Restore original content after 2 seconds
+            setTimeout(() => {
+                buttonElement.innerHTML = originalContent;
+                buttonElement.style.pointerEvents = 'auto';
+            }, 2000);
+            
+        } catch (error) {
+            console.error('Error in shareRouteTextToWhatsApp:', error);
+            this.showError('Terjadi kesalahan saat membuka WhatsApp.');
+            buttonElement.innerHTML = originalContent;
+            buttonElement.style.pointerEvents = 'auto';
+        }
+    }
+
+    // Native share using Web Share API
+    nativeShare(routeName, shareText, routeUrl, buttonElement) {
+        if (!buttonElement) return;
+        
+        // Check if Web Share API is available
+        if (!navigator.share || !navigator.canShare) {
+            this.showError('Native share tidak tersedia di browser ini. Gunakan opsi share lainnya.');
+            return;
+        }
+        
+        // Show loading state on button
+        const originalContent = buttonElement.innerHTML;
+        buttonElement.innerHTML = `
+            <div class="share-option-icon bg-secondary bg-opacity-10 text-secondary">
+                <div class="spinner-border spinner-border-sm text-secondary" role="status"></div>
+            </div>
+            <div class="share-option-text">
+                <div class="share-option-title">Membuka Share...</div>
+                <div class="share-option-desc">Mohon tunggu sebentar</div>
+            </div>
+        `;
+        buttonElement.style.pointerEvents = 'none';
+
+        try {
+            // Decode the share text and URL
+            const decodedText = decodeURIComponent(shareText);
+            const decodedUrl = decodeURIComponent(routeUrl);
+            
+            // Use Web Share API
+            navigator.share({
+                title: `Rute ${routeName} - TransJakarta`,
+                text: decodedText,
+                url: decodedUrl
+            }).then(() => {
+                // Show success state briefly
+                buttonElement.innerHTML = `
+                    <div class="share-option-icon bg-success bg-opacity-10 text-success">
+                        <iconify-icon icon="mdi:check" inline style="color: #10b981;"></iconify-icon>
+                    </div>
+                    <div class="share-option-text">
+                        <div class="share-option-title">Berhasil!</div>
+                        <div class="share-option-desc">Share dialog telah dibuka</div>
+                    </div>
+                `;
+                
+                // Restore original content after 2 seconds
+                setTimeout(() => {
+                    buttonElement.innerHTML = originalContent;
+                    buttonElement.style.pointerEvents = 'auto';
+                }, 2000);
+                
+            }).catch(err => {
+                console.error('Native share failed:', err);
+                this.showError('Gagal membuka native share. Gunakan opsi share lainnya.');
+                buttonElement.innerHTML = originalContent;
+                buttonElement.style.pointerEvents = 'auto';
+            });
+            
+        } catch (error) {
+            console.error('Error in nativeShare:', error);
+            this.showError('Terjadi kesalahan saat membuka native share.');
+            buttonElement.innerHTML = originalContent;
+            buttonElement.style.pointerEvents = 'auto';
+        }
+    }
+
+    // Share route text to Telegram
+    shareRouteTextToTelegram(routeId, routeName, buttonElement, shareText, routeUrl) {
+        if (!buttonElement) return;
+        
+        // Show loading state on button
+        const originalContent = buttonElement.innerHTML;
+        buttonElement.innerHTML = `
+            <div class="share-option-icon bg-primary bg-opacity-10 text-primary">
+                <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+            </div>
+            <div class="share-option-text">
+                <div class="share-option-title">Membuka Telegram...</div>
+                <div class="share-option-desc">Mohon tunggu sebentar</div>
+            </div>
+        `;
+        buttonElement.style.pointerEvents = 'none';
+
+        try {
+            // Decode the share text and URL
+            const decodedText = decodeURIComponent(shareText);
+            const decodedUrl = decodeURIComponent(routeUrl);
+            
+            // Create Telegram share URL
+            const telegramUrl = `https://t.me/share/url?url=${encodeURIComponent(decodedUrl)}&text=${encodeURIComponent(decodedText)}`;
+            
+            // Open Telegram in new tab
+            window.open(telegramUrl, '_blank');
+            
+            // Show success state briefly
+            buttonElement.innerHTML = `
+                <div class="share-option-icon bg-primary bg-opacity-10 text-primary">
+                    <iconify-icon icon="mdi:check" inline style="color: #3b82f6;"></iconify-icon>
+                </div>
+                <div class="share-option-text">
+                    <div class="share-option-title">Berhasil!</div>
+                    <div class="share-option-desc">Telegram telah dibuka</div>
+                </div>
+            `;
+            
+            // Restore original content after 2 seconds
+            setTimeout(() => {
+                buttonElement.innerHTML = originalContent;
+                buttonElement.style.pointerEvents = 'auto';
+            }, 2000);
+            
+        } catch (error) {
+            console.error('Error in shareRouteTextToTelegram:', error);
+            this.showError('Terjadi kesalahan saat membuka Telegram.');
+            buttonElement.innerHTML = originalContent;
+            buttonElement.style.pointerEvents = 'auto';
+        }
+    }
+
+    // Generate route image from HTML
+    async generateRouteImage(routeId) {
+        const cardElement = document.getElementById(`routeCard_${routeId}`);
+        if (!cardElement) {
+            console.error('Card element not found:', `routeCard_${routeId}`);
+            return null;
+        }
+        
+        if (!window.html2canvas) {
+            console.error('HTML2Canvas not available');
+            return null;
+        }
+
+        try {
+            // Wait for QR code to be fully generated
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // Check if card content is loaded
+            const cardContent = cardElement.innerHTML;
+            
+            if (cardContent.length < 100) {
+                // Try to regenerate the card
+                const route = window.transJakartaApp.modules.gtfs.getRoutes()
+                    .find(r => r.route_id === routeId);
+                if (route) {
+                    const routeInfo = {
+                        routeId: route.route_id,
+                        routeName: route.route_short_name || route.route_id,
+                        routeLongName: route.route_long_name || '',
+                        routeType: route.route_desc || 'Bus Rapid Transit',
+                        url: window.location.href.split('?')[0] + '?route_id=' + routeId
+                    };
+                    this.generateRouteCard(routeInfo, route);
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+            }
+            // Generate canvas with optimized settings - increased height to capture web info
+            const canvas = await html2canvas(cardElement, {
+                backgroundColor: '#ffffff',
+                scale: 2, // Higher quality
+                useCORS: true,
+                allowTaint: true,
+                width: 380,
+                height: 700, // Increased height to capture entire card including service type
+                logging: false, // Disable logging for production
+                removeContainer: true,
+                foreignObjectRendering: false,
+                imageTimeout: 15000,
+                onclone: (clonedDoc) => {
+                    const clonedElement = clonedDoc.getElementById(`routeCard_${routeId}`);
+                    if (clonedElement) {
+                        // Set font family
+                        clonedElement.style.fontFamily = "'PT Sans Narrow', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+                        
+                        // Ensure the card is fully visible for screenshot
+                        clonedElement.style.height = 'auto';
+                        clonedElement.style.overflow = 'visible';
+                        clonedElement.style.maxHeight = 'none';
+                    }
+                }
+            });
+
+            return canvas;
+        } catch (error) {
+            console.error('Error generating image:', error);
+            return null;
+        }
     }
 
     // Build operating days HTML
@@ -639,7 +1363,7 @@ export class RouteManager {
         stopHeader.className = 'stop-header';
         
         const stopNumber = document.createElement('div');
-        stopNumber.className = 'stop-number';
+        stopNumber.className = 'stop-number pt-sans';
         stopNumber.textContent = (idx + 1).toString().padStart(2, '0');
         // Use current route color for the number background
         try {
@@ -651,7 +1375,7 @@ export class RouteManager {
         } catch (e) {}
         
         const stopName = document.createElement('div');
-        stopName.className = 'stop-name';
+        stopName.className = 'stop-name pt-sans';
         stopName.textContent = stop.stop_name;
         
         // Intermodal icons next to stop name (manual mapping by stop_id or stop_name)
@@ -782,13 +1506,13 @@ export class RouteManager {
     createStopTypeBadge(stop) {
         let stopTypeBadge = '';
         if (stop.stop_id && stop.stop_id.startsWith('B')) {
-            stopTypeBadge = `<div class='stop-type-badge feeder'>Pengumpan</div>`;
+            stopTypeBadge = `<div class='stop-type-badge feeder pt-sans'>Pengumpan</div>`;
         } else if (stop.stop_id && stop.stop_id.startsWith('G') && stop.platform_code) {
-            stopTypeBadge = `<div class='stop-type-badge platform'>Platform ${stop.platform_code}</div>`;
+            stopTypeBadge = `<div class='stop-type-badge platform pt-sans'>Platform ${stop.platform_code}</div>`;
         } else if (stop.stop_id && (stop.stop_id.startsWith('E') || stop.stop_id.startsWith('H'))) {
-            stopTypeBadge = `<div class='stop-type-badge access'>Akses Masuk</div>`;
+            stopTypeBadge = `<div class='stop-type-badge access pt-sans'>Akses Masuk</div>`;
         } else {
-            stopTypeBadge = `<div class='stop-type-badge corridor'>Koridor</div>`;
+            stopTypeBadge = `<div class='stop-type-badge corridor pt-sans'>Koridor</div>`;
         }
         return stopTypeBadge;
     }
@@ -835,13 +1559,13 @@ export class RouteManager {
         const others = unionRouteIds.filter(rid => String(rid) !== String(this.selectedRouteId));
         if (others.length === 0) return '';
         let otherRoutesBadges = `<div class='other-routes'>
-            <div class='other-routes-label'>Layanan lain:</div>
+            <div class='other-routes-label pt-sans'>Layanan lain:</div>
             <div class='other-routes-badges'>`;
         others.forEach(rid => {
             const route = routesAll.find(r => String(r.route_id) === String(rid));
             if (route) {
                 const badgeColor = route.route_color ? ('#' + route.route_color) : '#6c757d';
-                otherRoutesBadges += `<span class='badge badge-koridor-interaktif rounded-pill me-1 mb-1 other-route-badge' data-routeid='${route.route_id}' style='background:${badgeColor};color:#fff;font-weight:bold;font-size:0.8em;padding:4px 8px;' title='${route.route_long_name || ''}'>${route.route_short_name || route.route_id}</span>`;
+                otherRoutesBadges += `<span class='badge badge-koridor-interaktif rounded-pill me-1 mb-1 other-route-badge pt-sans' data-routeid='${route.route_id}' style='background:${badgeColor};color:#fff;font-weight:bold;font-size:0.8em;padding:4px 8px;' title='${route.route_long_name || ''}'>${route.route_short_name || route.route_id}</span>`;
             }
         });
         otherRoutesBadges += `</div></div>`;
@@ -1138,6 +1862,89 @@ export class RouteManager {
             const cls = key.toLowerCase();
             return `<img class="intermodal-icon-img ${cls}" src="${url}" alt="${alt}" title="${alt}"/>`;
         }).join('');
+    }
+
+    // Show error message
+    showError(message) {
+        alert(message);
+    }
+
+    // Copy to clipboard with visual feedback
+    copyToClipboard(text, buttonElement, successMessage) {
+        if (!buttonElement) return;
+        
+        // Show loading state
+        const originalContent = buttonElement.innerHTML;
+        buttonElement.innerHTML = `
+            <div class="share-option-icon bg-success bg-opacity-10 text-success">
+                <div class="spinner-border spinner-border-sm text-success" role="status"></div>
+            </div>
+            <div class="share-option-text">
+                <div class="share-option-title">Menyalin...</div>
+                <div class="share-option-desc">Mohon tunggu sebentar</div>
+            </div>
+        `;
+        buttonElement.style.pointerEvents = 'none';
+
+        // Try to copy to clipboard
+        navigator.clipboard.writeText(text).then(() => {
+            // Show success state
+            buttonElement.innerHTML = `
+                <div class="share-option-icon bg-success bg-opacity-10 text-success">
+                    <iconify-icon icon="mdi:check" inline style="color: #10b981;"></iconify-icon>
+                </div>
+                <div class="share-option-text">
+                    <div class="share-option-title">Berhasil!</div>
+                    <div class="share-option-desc">${successMessage}</div>
+                </div>
+            `;
+            
+            // Show alert
+            alert(successMessage);
+            
+            // Restore original content after 2 seconds
+            setTimeout(() => {
+                buttonElement.innerHTML = originalContent;
+                buttonElement.style.pointerEvents = 'auto';
+            }, 2000);
+            
+        }).catch(err => {
+            console.error('Failed to copy:', err);
+            
+            // Fallback: try old method
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                alert(successMessage);
+                
+                // Show success state
+                buttonElement.innerHTML = `
+                    <div class="share-option-icon bg-success bg-opacity-10 text-success">
+                        <iconify-icon icon="mdi:check" inline style="color: #10b981;"></iconify-icon>
+                    </div>
+                    <div class="share-option-text">
+                        <div class="share-option-title">Berhasil!</div>
+                        <div class="share-option-desc">${successMessage}</div>
+                    </div>
+                `;
+                
+                // Restore original content after 2 seconds
+                setTimeout(() => {
+                    buttonElement.innerHTML = originalContent;
+                    buttonElement.style.pointerEvents = 'auto';
+                }, 2000);
+                
+            } catch (fallbackErr) {
+                console.error('Fallback copy failed:', fallbackErr);
+                alert('Gagal menyalin ke clipboard. Silakan salin manual.');
+                buttonElement.innerHTML = originalContent;
+                buttonElement.style.pointerEvents = 'auto';
+            }
+            document.body.removeChild(textArea);
+        });
     }
 } 
  

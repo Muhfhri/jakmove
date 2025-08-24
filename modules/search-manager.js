@@ -213,7 +213,7 @@ export class SearchManager {
 
         const nameSpan = document.createElement('span');
         nameSpan.innerHTML = this.highlight(stop.stop_name);
-        nameSpan.className = 'plus-jakarta-sans fw-semibold';
+        nameSpan.className = 'pt-sans fw-semibold';
         left.appendChild(nameSpan);
 
         // Intermodal icons using RouteManager mapping
