@@ -943,16 +943,23 @@ export class RouteManager {
             console.error('Card element not found:', `routeCard_${routeId}`);
             return null;
         }
+        
         if (!window.html2canvas) {
             console.error('HTML2Canvas not available');
             return null;
         }
 
-        // Ensure content is present; if not, rebuild and wait a moment
         try {
-            const contentLen = (cardElement.innerHTML || '').length;
-            if (contentLen < 100) {
-                const route = window.transJakartaApp.modules.gtfs.getRoutes().find(r => r.route_id === routeId);
+            // Wait for QR code to be fully generated
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // Check if card content is loaded
+            const cardContent = cardElement.innerHTML;
+            
+            if (cardContent.length < 100) {
+                // Try to regenerate the card
+                const route = window.transJakartaApp.modules.gtfs.getRoutes()
+                    .find(r => r.route_id === routeId);
                 if (route) {
                     const routeInfo = {
                         routeId: route.route_id,
@@ -962,50 +969,41 @@ export class RouteManager {
                         url: window.location.href.split('?')[0] + '?route_id=' + routeId
                     };
                     this.generateRouteCard(routeInfo, route);
-                    await new Promise(r => setTimeout(r, 300));
+                    await new Promise(resolve => setTimeout(resolve, 500));
                 }
             }
-        } catch (e) {}
-
-        // Calculate exact size to avoid cropping on various environments
-        const width = Math.max(cardElement.scrollWidth, cardElement.offsetWidth, 380);
-        const height = Math.max(cardElement.scrollHeight, cardElement.offsetHeight, 600);
-
-        const baseOpts = {
-            backgroundColor: '#ffffff',
-            scale: 2,
-            useCORS: true,
-            allowTaint: false,
-            width,
-            height,
-            logging: false,
-            removeContainer: true,
-            imageTimeout: 15000,
-            onclone: (clonedDoc) => {
-                const clonedElement = clonedDoc.getElementById(`routeCard_${routeId}`);
-                if (clonedElement) {
-                    clonedElement.style.fontFamily = "'PT Sans Narrow', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-                    clonedElement.style.height = 'auto';
-                    clonedElement.style.overflow = 'visible';
-                    clonedElement.style.maxHeight = 'none';
+            // Generate canvas with optimized settings - increased height to capture web info
+            const canvas = await html2canvas(cardElement, {
+                backgroundColor: '#ffffff',
+                scale: 2, // Higher quality
+                // Use CORS where possible, but avoid tainting failures breaking export
+                useCORS: true,
+                allowTaint: false,
+                width: 380,
+                height: 700, // Increased height to capture entire card including service type
+                logging: false, // Disable logging for production
+                removeContainer: true,
+                foreignObjectRendering: false,
+                imageTimeout: 15000,
+                onclone: (clonedDoc) => {
+                    const clonedElement = clonedDoc.getElementById(`routeCard_${routeId}`);
+                    if (clonedElement) {
+                        // Set font family
+                        clonedElement.style.fontFamily = "'PT Sans Narrow', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+                        
+                        // Ensure the card is fully visible for screenshot
+                        clonedElement.style.height = 'auto';
+                        clonedElement.style.overflow = 'visible';
+                        clonedElement.style.maxHeight = 'none';
+                    }
                 }
-            }
-        };
+            });
 
-        // Try twice: first with foreignObjectRendering true (SVG), then fallback to canvas renderer
-        try {
-            const canvas = await html2canvas(cardElement, { ...baseOpts, foreignObjectRendering: true });
-            if (canvas) return canvas;
-        } catch (err1) {
-            console.warn('html2canvas FO render failed, retrying with canvas renderer:', err1);
+            return canvas;
+        } catch (error) {
+            console.error('Error generating image:', error);
+            return null;
         }
-        try {
-            const canvas2 = await html2canvas(cardElement, { ...baseOpts, foreignObjectRendering: false });
-            if (canvas2) return canvas2;
-        } catch (err2) {
-            console.error('html2canvas canvas render failed:', err2);
-        }
-        return null;
     }
 
     // Build operating days HTML
