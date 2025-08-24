@@ -1,5 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=PT+Sans+Narrow:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=PT+Sans+Narrow:wght@400;700&display=swap');
 @font-face {
     font-family: 'Plus Jakarta Sans Lurus';
     src: url('PlusJakartaSans-Regular.ttf');
@@ -360,7 +361,7 @@ box-sizing: border-box;
 
 .info-item {
 display: flex;
-align-items: flex-start;
+align-items: center;
 gap: 15px;
 padding: 20px;
 background: rgba(255, 255, 255, 0.7);
@@ -368,6 +369,12 @@ border-radius: 15px;
 border: 1px solid rgba(38, 70, 151, 0.1);
 transition: all 0.3s ease;
 min-height: 80px;
+}
+
+/* Ensure perfect alignment */
+.info-item > * {
+display: flex;
+align-items: center;
 }
 
 .info-item:hover {
@@ -386,12 +393,89 @@ justify-content: center;
 background: rgba(38, 70, 151, 0.1);
 border-radius: 12px;
 font-size: 1.3rem;
+position: relative;
 }
+
+/* Ensure proper alignment for iconify icons */
+.info-icon iconify-icon {
+display: flex !important;
+align-items: center !important;
+justify-content: center !important;
+width: 100% !important;
+height: 100% !important;
+position: absolute !important;
+top: 50% !important;
+left: 50% !important;
+transform: translate(-50%, -50%) !important;
+}
+
+/* Force vertical alignment for info items */
+.info-item {
+align-items: center !important;
+}
+
+.info-icon {
+align-self: center;
+flex-shrink: 0;
+}
+
+.info-content {
+align-self: center;
+flex: 1;
+}
+
+/* Route info styling improvements */
+.route-jurusan-container {
+margin-bottom: 0.5rem;
+}
+
+.route-jurusan {
+color: #3b82f6;
+}
+
+.route-via-info {
+font-family: 'PT Sans Narrow', sans-serif;
+letter-spacing: 0.3px;
+color: #6b7280;
+}
+
+/* Dark mode support untuk route info */
+[data-theme="dark"] .route-jurusan {
+color: white;
+}
+
+[data-theme="dark"] .route-via-info {
+color: white;
+}
+
+.service-type-container {
+margin-top: 0.5rem;
+}
+
+/* Additional fixes for icon alignment */
+.info-icon iconify-icon {
+vertical-align: middle;
+line-height: 1;
+}
+
+.info-label {
+line-height: 1.2;
+margin-bottom: 8px;
+}
+
+.info-value {
+line-height: 1.4;
+}
+
+
 
 .info-content {
 flex: 1;
 min-width: 0;
 padding-right: 10px;
+display: flex;
+flex-direction: column;
+justify-content: center;
 }
 
 .info-label {
@@ -5319,6 +5403,381 @@ body {
 /* Dark mode tweaks for service-info card */
 [data-theme="dark"] #stopsTitle .service-info-container { background: #0f172a; border: 1px solid #1e293b; }
 [data-theme="dark"] #stopsTitle .service-info-container .info-item { background: #0b1220; border-color: #122135; }
+
+/* Share Route Button Styles */
+.share-route-container {
+    text-align: center;
+    margin-top: 20px;
+}
+
+.share-route-btn {
+    transition: all 0.3s ease;
+    border-width: 2px;
+    font-size: 1.1rem;
+    min-width: 200px;
+    position: relative;
+    overflow: hidden;
+}
+
+.share-route-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s ease;
+}
+
+.share-route-btn:hover::before {
+    left: 100%;
+}
+
+.share-route-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 30px rgba(59, 130, 246, 0.4);
+    border-width: 2px;
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    color: white;
+}
+
+.share-route-btn:active {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.3);
+}
+
+.share-route-btn .iconify-icon {
+    transition: transform 0.3s ease;
+}
+
+.share-route-btn:hover .iconify-icon {
+    transform: scale(1.1) rotate(5deg);
+}
+
+/* Share Options Modal Styles */
+.share-options {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.share-option {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 20px;
+    border: 2px solid #e5e7eb;
+    border-radius: 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: #ffffff;
+    position: relative;
+    overflow: hidden;
+}
+
+.share-option::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(147, 51, 234, 0.05) 100%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.share-option:hover {
+    background: #f8fafc;
+    border-color: #3b82f6;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(59, 130, 246, 0.15);
+}
+
+.share-option:hover::before {
+    opacity: 1;
+}
+
+.share-option:active {
+    transform: translateY(0);
+}
+
+.share-option-icon {
+    width: 56px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 16px;
+    font-size: 1.8rem;
+    position: relative;
+    z-index: 1;
+    transition: all 0.3s ease;
+}
+
+.share-option:hover .share-option-icon {
+    transform: scale(1.1);
+}
+
+.share-option-text {
+    flex: 1;
+    position: relative;
+    z-index: 1;
+}
+
+.share-option-title {
+    font-weight: 700;
+    font-size: 1.2rem;
+    color: #1e293b;
+    margin-bottom: 6px;
+    transition: color 0.3s ease;
+}
+
+.share-option-desc {
+    font-size: 0.95rem;
+    color: #64748b;
+    line-height: 1.5;
+    transition: color 0.3s ease;
+}
+
+.share-option:hover .share-option-title {
+    color: #1e40af;
+}
+
+.share-option:hover .share-option-desc {
+    color: #475569;
+}
+
+/* Dark mode styles for share options */
+[data-theme="dark"] .share-option {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+[data-theme="dark"] .share-option:hover {
+    background: #334155;
+    border-color: #60a5fa;
+    box-shadow: 0 8px 25px rgba(96, 165, 250, 0.2);
+}
+
+[data-theme="dark"] .share-option:hover::before {
+    background: linear-gradient(135deg, rgba(96, 165, 250, 0.1) 0%, rgba(147, 51, 234, 0.1) 100%);
+}
+
+[data-theme="dark"] .share-option-icon {
+    background: #0f172a;
+    border-color: #334155;
+    color: #e2e8f0;
+}
+
+[data-theme="dark"] .share-option-title {
+    color: #f1f5f9;
+}
+
+[data-theme="dark"] .share-option-desc {
+    color: #94a3b8;
+}
+
+[data-theme="dark"] .share-option:hover .share-option-title {
+    color: #60a5fa;
+}
+
+[data-theme="dark"] .share-option:hover .share-option-desc {
+    color: #cbd5e1;
+}
+
+/* Route Preview Styles */
+.route-preview {
+    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 24px;
+}
+
+/* Route Card Styles */
+.route-card-container {
+    border-radius: 16px;
+    overflow: hidden;
+    border: 2px solid #e5e7eb;
+}
+
+.route-card-header {
+    position: relative;
+}
+
+.route-info-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.route-info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background: #f9fafb;
+    border-radius: 8px;
+}
+
+.route-web-section {
+    background: #f9fafb;
+    border-radius: 8px;
+    padding: 15px;
+}
+
+.web-info {
+    text-align: center;
+}
+
+.web-info div:first-child {
+    font-family: 'PT Sans Narrow', sans-serif;
+    letter-spacing: 0.5px;
+}
+
+.web-info div:last-child {
+    font-family: 'PT Sans Narrow', sans-serif;
+    font-style: italic;
+}
+
+.web-url a {
+    transition: color 0.2s ease;
+}
+
+.web-url a:hover {
+    color: #1d4ed8 !important;
+    text-decoration: underline !important;
+}
+
+/* Route service type styling */
+.route-service-type {
+    font-family: 'PT Sans Narrow', sans-serif;
+    letter-spacing: 0.3px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transition: all 0.2s ease;
+}
+
+.route-service-type:hover {
+    background: rgba(255, 255, 255, 0.2) !important;
+    transform: translateY(-1px);
+}
+
+
+/* PT Sans Narrow Font Class */
+.pt-sans {
+    font-family: 'PT Sans Narrow', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Image Generation Optimizations */
+.route-card-container {
+    font-family: 'PT Sans Narrow', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Ensure route card is fully visible for screenshot */
+.route-card-container[style*="height: auto"] {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+}
+
+.route-card-container * {
+    box-sizing: border-box;
+}
+
+.route-preview-header h6 {
+    color: #3b82f6;
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.route-preview-content {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%) !important;
+    border: 2px solid #e2e8f0;
+    color: #1e293b;
+    line-height: 1.8;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+}
+
+.route-preview-scrollable {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+.route-preview-scrollable::-webkit-scrollbar {
+    width: 8px;
+}
+
+.route-preview-scrollable::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+}
+
+.route-preview-scrollable::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+
+.route-preview-scrollable::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+.route-preview-content:hover {
+    border-color: #3b82f6;
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.1);
+}
+
+.route-preview-text {
+    font-weight: 500;
+}
+
+
+
+/* Modal Enhancements */
+.modal-content {
+    border-radius: 20px;
+    overflow: hidden;
+}
+
+/* Dark mode for modal footer */
+[data-theme="dark"] .modal-footer {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    border-top-color: #334155;
+}
+
+[data-theme="dark"] .modal-footer .btn-outline-secondary {
+    border-color: #475569;
+    color: #cbd5e1;
+}
+
+[data-theme="dark"] .modal-footer .btn-outline-secondary:hover {
+    background-color: #475569;
+    border-color: #64748b;
+    color: #e2e8f0;
+}
+
+.modal-header.bg-primary {
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%) !important;
+}
+
+.modal-header .btn-close-white {
+    filter: brightness(0) invert(1);
+}
+
+[data-theme="dark"] .modal-header .btn-close-white {
+    filter: brightness(0) invert(1);
+}
+
+.modal-body {
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+}
+
+[data-theme="dark"] .modal-body {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+}
+
+.modal-footer {
+    background: transparent;
+}
 
 /* Spacing adjustments for route info and stops list */
 
