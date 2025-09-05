@@ -648,10 +648,10 @@ export class MapManager {
                         this.map.addSource(pfSourceId, { type: 'geojson', data: pfData });
                     }
                     if (!this.map.getLayer(pfDotsId)) {
-                        this.map.addLayer({ id: pfDotsId, type: 'circle', source: pfSourceId, paint: { 'circle-radius': 2.6, 'circle-color': '#64748b', 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 0.8 } });
+                        this.map.addLayer({ id: pfDotsId, type: 'circle', source: pfSourceId, paint: { 'circle-radius': 4.2, 'circle-color': '#64748b', 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 1.2 } });
                     }
                     if (!this.map.getLayer(pfHitId)) {
-                        this.map.addLayer({ id: pfHitId, type: 'circle', source: pfSourceId, paint: { 'circle-radius': 10, 'circle-color': 'rgba(0,0,0,0)' } });
+                        this.map.addLayer({ id: pfHitId, type: 'circle', source: pfSourceId, paint: { 'circle-radius': 14, 'circle-color': 'rgba(0,0,0,0)' } });
                     }
                     this.layers.set(pfDotsId, { sourceId: pfSourceId, layerId: pfDotsId });
                     this.layers.set(pfHitId, { sourceId: pfSourceId, layerId: pfHitId });
@@ -1295,7 +1295,7 @@ export class MapManager {
                 this.map.addSource(pfSrcId, { type: 'geojson', data: pfData });
             }
             if (!this.map.getLayer(pfLyId)) {
-                this.map.addLayer({ id: pfLyId, type: 'circle', source: pfSrcId, paint: { 'circle-radius': 2.2, 'circle-color': '#64748b', 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 0.8 } });
+                this.map.addLayer({ id: pfLyId, type: 'circle', source: pfSrcId, paint: { 'circle-radius': 4.0, 'circle-color': '#64748b', 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 1.2 } });
             }
 
             // Click handler for platform dots

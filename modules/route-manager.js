@@ -59,6 +59,9 @@ export class RouteManager {
 
     // Reset route selection
     resetRoute() {
+        // Stop countdown timers
+        this.stopCountdownTimers();
+        
         this.selectedRouteId = null;
         this.selectedRouteVariant = null;
         this.lastRouteId = null;
@@ -139,6 +142,9 @@ export class RouteManager {
 
         // Setup variant dropdown if needed
         this.setupVariantDropdown(route);
+        
+        // Start countdown timers
+        this.startCountdownTimers();
     }
 
     // Build route info HTML
@@ -159,19 +165,24 @@ export class RouteManager {
         const serviceInfo = this.buildServiceInfoHTML(route, trips);
         
         return `
-            <div class='route-info-card'>
-                <div class='route-info-header'>
+            <div class='route-info-modern-card'>
+                <!-- Header Section -->
+                <div class='route-header-section'>
                     ${this.buildRouteBadgeHTML(route)}
                     ${this.buildRouteJurusanHTML(route)}
                     ${this.buildServiceTypeHTML(route)}
-                    ${this.buildShareRouteButton(route)}
                 </div>
-                <div class='route-info-main'>
-                    <div class='route-info-details'>
-                        <div class='route-info-details-content'>
+                
+                <!-- Service Details Section -->
+                <div class='route-details-section'>
+                    <div class='route-details-grid'>
                             ${serviceInfo}
                         </div>
                     </div>
+                
+                <!-- Actions Section -->
+                <div class='route-actions-section'>
+                    ${this.buildShareRouteButton(route)}
                 </div>
             </div>
             ${variantDropdownHTML}
@@ -195,11 +206,10 @@ export class RouteManager {
         const badgeColor = route.route_color ? ('#' + route.route_color) : '#264697';
         
         return `
-            <div class='route-badge-container'>
-                <span class='badge badge-koridor-interaktif rounded-pill me-2' 
-                      style='background:${badgeColor};color:#fff;font-weight:bold;font-size:2rem !important;padding:0.8em 1.6em;box-shadow:0 4px 15px rgba(38,70,151,0.2);border-radius:2em;letter-spacing:2px;'>
-                    ${badgeText}
-                </span>
+            <div class='modern-route-badge'>
+                <div class='route-code-badge' style='background: linear-gradient(135deg, ${badgeColor} 0%, ${badgeColor}dd 100%);'>
+                    <span class='route-code-text'>${badgeText}</span>
+                </div>
             </div>
         `;
     }
@@ -214,9 +224,9 @@ export class RouteManager {
         const viaInfo = hasVia ? route.route_long_name.split('via')[1].trim() : null;
         
         return `
-            <div class='route-jurusan-container text-center'>
-                <h3 class='route-jurusan pt-sans fw-bold mb-1' style='font-size: 1.8rem;'>${routeName}</h3>
-                ${hasVia ? `<div class='route-via-info pt-sans' style='font-size: 1rem; margin-bottom: 0.5rem;'><strong>VIA ${viaInfo.toUpperCase()}</strong></div>` : ''}
+            <div class='modern-route-destination'>
+                <h2 class='route-name'>${routeName}</h2>
+                ${hasVia ? `<div class='route-via'><iconify-icon icon="mdi:map-marker-path"></iconify-icon>Via ${viaInfo}</div>` : ''}
             </div>
         `;
     }
@@ -232,36 +242,22 @@ export class RouteManager {
         }
 
         const serviceTypeMap = {
-            'BRT': 'Bus Rapid Transit',
-            'TransJakarta': 'Bus Rapid Transit',
-            'Angkutan Umum Integrasi': 'Angkutan Umum Integrasi',
-            'MikroTrans': 'MikroTrans',
-            'Royal Trans': 'Royal Trans',
-            'Bus Wisata': 'Bus Wisata'
+            'BRT': { name: 'Bus Rapid Transit', icon: 'mdi:bus-multiple', color: '#2563eb' },
+            'TransJakarta': { name: 'Bus Rapid Transit', icon: 'mdi:bus-multiple', color: '#2563eb' },
+            'Angkutan Umum Integrasi': { name: 'Angkutan Umum Integrasi', icon: 'mdi:bus', color: '#f59e0b' },
+            'MikroTrans': { name: 'MikroTrans', icon: 'mdi:bus-side', color: '#06b6d4' },
+            'Royal Trans': { name: 'Royal Trans', icon: 'mdi:bus-clock', color: '#10b981' },
+            'Bus Wisata': { name: 'Bus Wisata', icon: 'mdi:bus-marker', color: '#ef4444' }
         };
 
-        const displayServiceType = serviceTypeMap[serviceType] || serviceType;
-        
-        let serviceBadgeClass = 'bg-primary';
-        if (serviceType.includes('BRT') || serviceType.includes('TransJakarta')) {
-            serviceBadgeClass = 'bg-primary';
-        } else if (serviceType.includes('Angkutan Umum Integrasi')) {
-            serviceBadgeClass = 'bg-warning';
-        } else if (serviceType.includes('Royal')) {
-            serviceBadgeClass = 'bg-success text-dark';
-        } else if (serviceType.includes('Wisata')) {
-            serviceBadgeClass = 'bg-danger';
-        } else if (serviceType.includes('Rusun')) {
-            serviceBadgeClass = 'bg-secondary';
-        } else if (serviceType.includes('Mikro')) {
-            serviceBadgeClass = 'bg-info';
-        }
+        const serviceInfo = serviceTypeMap[serviceType] || { name: serviceType, icon: 'mdi:bus', color: '#6b7280' };
 
         return `
-            <div class='service-type-container text-center'>
-                <span class='badge ${serviceBadgeClass} fs-6 px-3 py-2 rounded-pill' style='font-weight: 600; letter-spacing: 0.5px; margin-top: 0.5rem;'>
-                ${displayServiceType}
-            </span>
+            <div class='modern-service-type'>
+                <div class='service-badge' style='background: ${serviceInfo.color}15; color: ${serviceInfo.color}; border: 1px solid ${serviceInfo.color}30;'>
+                    <iconify-icon icon="${serviceInfo.icon}"></iconify-icon>
+                    <span>${serviceInfo.name}</span>
+                </div>
             </div>
         `;
     }
@@ -539,10 +535,35 @@ export class RouteManager {
         // Get frequency info
         let frequencyInfo = 'Tidak tersedia';
         if (freqsForRoute.length > 0) {
-            const avgHeadway = freqsForRoute.reduce((sum, f) => sum + (parseInt(f.headway_secs) || 0), 0) / freqsForRoute.length;
-            if (avgHeadway > 0) {
-                const minutes = Math.round(avgHeadway / 60);
-                frequencyInfo = `Setiap ${minutes} menit`;
+            let minHeadways = [];
+            let maxHeadways = [];
+            
+            freqsForRoute.forEach(f => {
+                if (f.min_headway_secs) minHeadways.push(parseInt(f.min_headway_secs));
+                if (f.max_headway_secs) maxHeadways.push(parseInt(f.max_headway_secs));
+                if (f.headway_secs) {
+                    // If only headway_secs is available, use it for both min and max
+                    const headway = parseInt(f.headway_secs);
+                    minHeadways.push(headway);
+                    maxHeadways.push(headway);
+                }
+            });
+
+            // Filter out invalid values and convert to minutes
+            minHeadways = minHeadways.filter(v => !isNaN(v)).map(v => Math.round(v/60));
+            maxHeadways = maxHeadways.filter(v => !isNaN(v)).map(v => Math.round(v/60));
+
+            if (minHeadways.length > 0 && maxHeadways.length > 0) {
+                const minFreq = Math.min(...minHeadways);
+                const maxFreq = Math.max(...maxHeadways);
+                
+                if (minFreq === maxFreq) {
+                    // Same frequency
+                    frequencyInfo = `Setiap ${minFreq} menit`;
+                } else {
+                    // Show range
+                    frequencyInfo = `Setiap ${minFreq}-${maxFreq} menit`;
+                }
             }
         }
 
@@ -1012,26 +1033,29 @@ export class RouteManager {
         if (serviceIds.length === 0) return '';
 
         const serviceIdMap = {
-            'SH': 'Setiap Hari',
-            'HK': 'Hari Kerja',
-            'HL': 'Hari Libur',
-            'HM': 'Hanya Minggu',
-            'X': 'Khusus',
+            'SH': { text: 'Setiap Hari', color: '#10b981', icon: 'mdi:calendar-check' },
+            'HK': { text: 'Hari Kerja', color: '#3b82f6', icon: 'mdi:calendar-month' },
+            'HL': { text: 'Hari Libur', color: '#f59e0b', icon: 'mdi:calendar-weekend' },
+            'HM': { text: 'Hanya Minggu', color: '#8b5cf6', icon: 'mdi:calendar-today' },
+            'X': { text: 'Khusus', color: '#6b7280', icon: 'mdi:calendar-star' },
         };
 
-        const hariText = serviceIds.map(sid => serviceIdMap[sid] || sid).join(' / ');
+        const serviceInfo = serviceIds.map(sid => serviceIdMap[sid] || { text: sid, color: '#6b7280', icon: 'mdi:calendar' });
+        const primaryService = serviceInfo[0];
+        const hariText = serviceInfo.map(s => s.text).join(' / ');
         const rawUrl = `gtfs-raw-viewer.html?file=calendar&service_id=${encodeURIComponent(serviceIds.join(','))}`;
         const infoIcon = this.infoIconLink(rawUrl, 'Lihat data calendar');
         
         return `
-            <div class='info-item mb-2'>
-                <div class='info-icon'>
-                    <iconify-icon icon="mdi:calendar-week" style="color: #264697;"></iconify-icon>
+            <div class='modern-info-card'>
+                <div class='info-header'>
+                    <div class='info-icon-modern' style='background: ${primaryService.color}15; color: ${primaryService.color};'>
+                        <iconify-icon icon="${primaryService.icon}"></iconify-icon>
                 </div>
-                <div class='info-content'>
-                    <div class='info-label'>Hari Operasi</div>
-                    <div class='info-value'>${hariText}${infoIcon}</div>
+                    <div class='info-title'>Hari Operasi</div>
+                    ${infoIcon}
                 </div>
+                <div class='info-content-modern'>${hariText}</div>
             </div>
         `;
     }
@@ -1071,14 +1095,28 @@ export class RouteManager {
         const rawUrl = `gtfs-raw-viewer.html?file=stop_times&trip_id=${encodeURIComponent(tripIds.join(','))}`;
         const infoIcon = this.infoIconLink(rawUrl, 'Lihat data stop_times');
 
+        // Generate unique ID for this instance
+        const countdownId = `countdown-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        
+        // Get countdown info
+        const countdownInfo = this.getOperatingCountdown(minStart, maxEnd);
+
         return `
-            <div class='info-item mb-2'>
-                <div class='info-icon'>
-                    <iconify-icon icon="mdi:clock-outline" style="color: #264697;"></iconify-icon>
+            <div class='modern-info-card operating-hours-card'>
+                <div class='info-header'>
+                    <div class='info-icon-modern' style='background: #3b82f615; color: #3b82f6;'>
+                        <iconify-icon icon="mdi:clock-time-four"></iconify-icon>
                 </div>
-                <div class='info-content'>
-                    <div class='info-label'>Jam Operasi</div>
-                    <div class='info-value'>${this.formatOperatingHours(minStart, maxEnd)}${infoIcon}</div>
+                    <div class='info-title'>Jam Operasi</div>
+                    ${infoIcon}
+                </div>
+                <div class='info-content-modern'>
+                    <div class='operating-hours-main'>
+                        ${this.formatOperatingHours(minStart, maxEnd)}
+                    </div>
+                    <div id='${countdownId}' class='operating-countdown' data-start='${minStart}' data-end='${maxEnd}'>
+                        ${countdownInfo.html}
+                    </div>
                 </div>
             </div>
         `;
@@ -1094,32 +1132,52 @@ export class RouteManager {
         
         if (freqsForRoute.length === 0) return '';
 
-        let headwaySeconds = [];
+        let minHeadways = [];
+        let maxHeadways = [];
+        
         freqsForRoute.forEach(f => {
-            if (f.min_headway_secs) headwaySeconds.push(parseInt(f.min_headway_secs));
-            if (f.max_headway_secs) headwaySeconds.push(parseInt(f.max_headway_secs));
-            if (f.headway_secs) headwaySeconds.push(parseInt(f.headway_secs));
+            if (f.min_headway_secs) minHeadways.push(parseInt(f.min_headway_secs));
+            if (f.max_headway_secs) maxHeadways.push(parseInt(f.max_headway_secs));
+            if (f.headway_secs) {
+                // If only headway_secs is available, use it for both min and max
+                const headway = parseInt(f.headway_secs);
+                minHeadways.push(headway);
+                maxHeadways.push(headway);
+            }
         });
 
-        let headwayMinutes = headwaySeconds
-            .filter(v => !isNaN(v))
-            .map(v => Math.round(v/60))
-            .filter((v, i, arr) => arr.indexOf(v) === i)
-            .sort((a, b) => a - b);
+        // Filter out invalid values and convert to minutes
+        minHeadways = minHeadways.filter(v => !isNaN(v)).map(v => Math.round(v/60));
+        maxHeadways = maxHeadways.filter(v => !isNaN(v)).map(v => Math.round(v/60));
 
-        const headwayText = headwayMinutes.length > 0 ? headwayMinutes.map(v => `${v} menit`).join(', ') : '-';
+        let headwayText = '-';
+        
+        if (minHeadways.length > 0 && maxHeadways.length > 0) {
+            const minFreq = Math.min(...minHeadways);
+            const maxFreq = Math.max(...maxHeadways);
+            
+            if (minFreq === maxFreq) {
+                // Same frequency
+                headwayText = `${minFreq} menit`;
+            } else {
+                // Show range
+                headwayText = `${minFreq}-${maxFreq} menit`;
+            }
+        }
+        
         const rawUrl = `gtfs-raw-viewer.html?file=frequencies&trip_id=${encodeURIComponent(tripIds.join(','))}`;
         const infoIcon = this.infoIconLink(rawUrl, 'Lihat data frequencies');
 
         return `
-            <div class='info-item mb-2'>
-                <div class='info-icon'>
-                    <iconify-icon icon="mdi:repeat" style="color: #264697;"></iconify-icon>
+            <div class='modern-info-card'>
+                <div class='info-header'>
+                    <div class='info-icon-modern' style='background: #8b5cf615; color: #8b5cf6;'>
+                        <iconify-icon icon="mdi:timer-sand"></iconify-icon>
                 </div>
-                <div class='info-content'>
-                    <div class='info-label'>Frekuensi</div>
-                    <div class='info-value'>${headwayText}${infoIcon}</div>
+                    <div class='info-title'>Frekuensi</div>
+                    ${infoIcon}
                 </div>
+                <div class='info-content-modern'>${headwayText}</div>
             </div>
         `;
     }
@@ -1141,13 +1199,16 @@ export class RouteManager {
         const infoIcon = this.infoIconLink(rawUrl, 'Lihat data fare');
 
         return `
-            <div class='info-item mb-2'>
-                <div class='info-icon'>
-                    <iconify-icon icon="mdi:ticket-percent" style="color: #264697;"></iconify-icon>
+            <div class='modern-info-card'>
+                <div class='info-header'>
+                    <div class='info-icon-modern' style='background: #10b98115; color: #10b981;'>
+                        <iconify-icon icon="mdi:cash-multiple"></iconify-icon>
                 </div>
-                <div class='info-content'>
-                    <div class='info-label'>Tarif</div>
-                    <div class='info-value'>${currency}${price}${infoIcon}</div>
+                    <div class='info-title'>Tarif</div>
+                    ${infoIcon}
+                </div>
+                <div class='info-content-modern'>
+                    <span class='price-highlight'>${currency}${price}</span>
                 </div>
             </div>
         `;
@@ -1180,13 +1241,16 @@ export class RouteManager {
         const infoIcon = this.infoIconLink(rawUrl, 'Lihat data shapes');
 
         return `
-            <div class='info-item mb-2'>
-                <div class='info-icon'>
-                    <iconify-icon icon="mdi:ruler" style="color: #264697;"></iconify-icon>
+            <div class='modern-info-card'>
+                <div class='info-header'>
+                    <div class='info-icon-modern' style='background: #f59e0b15; color: #f59e0b;'>
+                        <iconify-icon icon="mdi:map-marker-distance"></iconify-icon>
                 </div>
-                <div class='info-content'>
-                    <div class='info-label'>Panjang Trayek</div>
-                    <div class='info-value'>${(totalLength/1000).toFixed(2)} km${infoIcon}</div>
+                    <div class='info-title'>Panjang Trayek</div>
+                    ${infoIcon}
+                </div>
+                <div class='info-content-modern'>
+                    <span class='distance-highlight'>${(totalLength/1000).toFixed(2)} km</span>
                 </div>
             </div>
         `;
@@ -1775,9 +1839,170 @@ export class RouteManager {
         return h * 3600 + m * 60 + s;
     }
 
+    // Get operating countdown info
+    getOperatingCountdown(startTime, endTime) {
+        const now = new Date();
+        const currentTime = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+        
+        const startSeconds = this.timeToSeconds(startTime);
+        const endSeconds = this.timeToSeconds(endTime);
+        
+        // Check for 24-hour operation (00:00 - 23:59)
+        const is24HourOperation = (startTime === '00:00:00' || startTime === '00:00') && 
+                                  (endTime === '23:59:00' || endTime === '23:59' || endTime === '23:59:59');
+        
+        if (is24HourOperation) {
+            return {
+                status: '24-hour',
+                timeLeft: '24 jam',
+                color: '#10b981',
+                icon: 'mdi:clock-check',
+                message: 'Beroperasi 24 jam',
+                html: `
+                    <div class='countdown-status' style='color: #10b981;'>
+                        <iconify-icon icon='mdi:clock-check' style='margin-right: 4px;'></iconify-icon>
+                        <span class='countdown-message'>Beroperasi 24 jam</span>
+                    </div>
+                `
+            };
+        }
+        
+        // Handle times that go into next day (24+ hours)
+        let actualEndSeconds = endSeconds;
+        if (endSeconds < startSeconds) {
+            actualEndSeconds = endSeconds + 24 * 3600; // Add 24 hours
+        }
+        
+        let status, timeLeft, color, icon, message;
+        
+        if (currentTime < startSeconds) {
+            // Service hasn't started yet
+            timeLeft = startSeconds - currentTime;
+            status = 'waiting';
+            color = '#6b7280';
+            icon = 'mdi:clock-outline';
+            message = 'Belum dimulai';
+        } else if (currentTime >= startSeconds && currentTime <= actualEndSeconds) {
+            // Service is running
+            timeLeft = actualEndSeconds - currentTime;
+            if (timeLeft > 7200) { // > 2 hours
+                status = 'running-good';
+                color = '#10b981';
+                icon = 'mdi:check-circle';
+                message = 'Beroperasi';
+            } else if (timeLeft > 3600) { // > 1 hour
+                status = 'running-warning';
+                color = '#f59e0b';
+                icon = 'mdi:clock-alert';
+                message = 'Segera berakhir';
+            } else if (timeLeft > 0) { // < 1 hour
+                status = 'running-danger';
+                color = '#ef4444';
+                icon = 'mdi:timer-alert';
+                message = 'Hampir berakhir';
+            }
+        } else {
+            // Service has ended
+            timeLeft = 0;
+            status = 'ended';
+            color = '#6b7280';
+            icon = 'mdi:close-circle';
+            message = 'Sudah berakhir';
+        }
+        
+        const timeLeftText = this.formatTimeLeft(timeLeft);
+        
+        return {
+            status,
+            timeLeft: timeLeftText,
+            color,
+            icon,
+            message,
+            html: `
+                <div class='countdown-status' style='color: ${color};'>
+                    <iconify-icon icon='${icon}' style='margin-right: 4px;'></iconify-icon>
+                    <span class='countdown-message'>${message}</span>
+                    ${timeLeft > 0 ? `<span class='countdown-time'> - ${timeLeftText}</span>` : ''}
+                </div>
+            `
+        };
+    }
+
+    // Format time left into readable format
+    formatTimeLeft(seconds) {
+        if (seconds <= 0) return '';
+        
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        
+        if (hours > 0) {
+            return `${hours}j ${minutes}m`;
+        } else {
+            return `${minutes}m`;
+        }
+    }
+
+    // Start countdown timers for all operating hours displays
+    startCountdownTimers() {
+        // Clear existing timers
+        this.stopCountdownTimers();
+        
+        // Find all countdown elements
+        const countdownElements = document.querySelectorAll('.operating-countdown');
+        
+        countdownElements.forEach(element => {
+            const startTime = element.getAttribute('data-start');
+            const endTime = element.getAttribute('data-end');
+            
+            if (startTime && endTime) {
+                // Update immediately
+                this.updateCountdownElement(element, startTime, endTime);
+                
+                // Check if it's 24-hour operation
+                const is24HourOperation = (startTime === '00:00:00' || startTime === '00:00') && 
+                                          (endTime === '23:59:00' || endTime === '23:59' || endTime === '23:59:59');
+                
+                // Don't set interval for 24-hour operations since they don't change
+                if (!is24HourOperation) {
+                    // Set interval to update every minute
+                    const timerId = setInterval(() => {
+                        this.updateCountdownElement(element, startTime, endTime);
+                    }, 60000); // Update every minute
+                    
+                    // Store timer ID for cleanup
+                    element.setAttribute('data-timer-id', timerId);
+                }
+            }
+        });
+    }
+
+    // Stop all countdown timers
+    stopCountdownTimers() {
+        const countdownElements = document.querySelectorAll('.operating-countdown');
+        
+        countdownElements.forEach(element => {
+            const timerId = element.getAttribute('data-timer-id');
+            if (timerId) {
+                clearInterval(parseInt(timerId));
+                element.removeAttribute('data-timer-id');
+            }
+        });
+    }
+
+    // Update individual countdown element
+    updateCountdownElement(element, startTime, endTime) {
+        const countdownInfo = this.getOperatingCountdown(startTime, endTime);
+        element.innerHTML = countdownInfo.html;
+    }
+
     formatOperatingHours(start, end) {
         const [sh, sm] = start.split(':').map(Number);
         const [eh, em] = end.split(':').map(Number);
+        
+        // Check for 24-hour operation (00:00 - 23:59)
+        if ((sh === 0 && sm === 0) && (eh === 23 && em === 59)) {
+            return '24 jam';
+        }
         
         if (eh >= 24) {
             if (sh === 5 && sm === 0 && eh === 29 && em === 0) {
