@@ -6013,3 +6013,365 @@ body.no-scroll { overflow: hidden; height: 100vh; }
 	.category-routes .list-group-item .badge { max-width: 90px; }
 }
 
+/* ====== MODERN ROUTE INFO STYLING ====== */
+
+/* Main route info card */
+.route-info-modern-card {
+    background: #ffffff;
+    border-radius: 20px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+    padding: 24px;
+    margin: 0;
+    transition: all 0.3s ease;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* Fix for stopsTitle container */
+#stopsTitle {
+    margin-bottom: 0 !important;
+}
+
+#stopsTitle .route-info-modern-card {
+    margin-top: 0 !important;
+}
+
+.route-info-modern-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
+}
+
+/* Header section */
+.route-header-section {
+    text-align: center;
+    padding-bottom: 16px;
+    border-bottom: 2px solid #f8fafc;
+    margin-bottom: 20px;
+}
+
+/* Modern route badge */
+.modern-route-badge {
+    margin-bottom: 12px;
+}
+
+.route-code-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 80px;
+    height: 80px;
+    padding: 0 16px;
+    border-radius: 20px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    transform: perspective(100px) rotateX(5deg);
+    transition: all 0.3s ease;
+}
+
+.route-code-badge:hover {
+    transform: perspective(100px) rotateX(0deg) scale(1.05);
+}
+
+.route-code-text {
+    font-size: 2.2rem;
+    font-weight: 900;
+    color: white;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    letter-spacing: 2px;
+    font-family: 'PT Sans Narrow', sans-serif;
+}
+
+/* Modern route destination */
+.modern-route-destination {
+    margin-bottom: 12px;
+}
+
+.route-name {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin-bottom: 12px;
+    line-height: 1.2;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    text-align: center;
+    word-spacing: 2px;
+    letter-spacing: 0.5px;
+}
+
+.route-via {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #f3f4f6;
+    color: #6b7280;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+/* Modern service type */
+.modern-service-type {
+    margin-bottom: 6px;
+}
+
+.service-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 30px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    font-family: 'PT Sans Narrow', sans-serif;
+}
+
+/* Details section */
+.route-details-section {
+    margin-bottom: 20px;
+}
+
+.route-details-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+}
+
+/* Modern info cards */
+.modern-info-card {
+    background: #fafafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    padding: 18px;
+    transition: all 0.2s ease;
+}
+
+.modern-info-card:hover {
+    background: #f9fafb;
+    border-color: #d1d5db;
+    transform: translateY(-1px);
+}
+
+.info-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.info-icon-modern {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+.info-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #6b7280;
+    flex: 1;
+}
+
+.info-content-modern {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #111827;
+    padding: 0;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.price-highlight {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #059669;
+}
+
+.distance-highlight {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #d97706;
+}
+
+/* Actions section */
+.route-actions-section {
+    border-top: 2px solid #f8fafc;
+    padding-top: 20px;
+    display: flex;
+    justify-content: center;
+}
+
+/* Dark mode styles */
+[data-theme="dark"] .route-info-modern-card {
+    background: #0f172a;
+    border-color: #1e293b;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .route-info-modern-card:hover {
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .route-header-section {
+    border-bottom-color: #1e293b;
+}
+
+[data-theme="dark"] .route-name {
+    color: #f9fafb;
+}
+
+[data-theme="dark"] .route-via {
+    background: #1e293b;
+    color: #9ca3af;
+}
+
+[data-theme="dark"] .modern-info-card {
+    background: #1e293b;
+    border-color: #374151;
+}
+
+[data-theme="dark"] .modern-info-card:hover {
+    background: #334155;
+    border-color: #4b5563;
+}
+
+[data-theme="dark"] .info-title {
+    color: #9ca3af;
+}
+
+[data-theme="dark"] .info-content-modern {
+    color: #f9fafb;
+}
+
+[data-theme="dark"] .route-actions-section {
+    border-top-color: #1e293b;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .route-info-modern-card {
+        padding: 20px;
+        margin: 12px 0;
+    }
+    
+    .route-code-badge {
+        min-width: 70px;
+        height: 70px;
+        padding: 0 12px;
+    }
+    
+    .route-code-text {
+        font-size: 1.8rem;
+        font-family: 'PT Sans Narrow', sans-serif;
+    }
+    
+    .route-name {
+        font-size: 1.5rem;
+    }
+    
+    .route-details-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    
+    .modern-info-card {
+        padding: 16px;
+    }
+    
+    .info-content-modern {
+        padding: 0;
+        font-size: 1rem;
+    }
+    
+    .info-icon-modern {
+        width: 36px;
+        height: 36px;
+        font-size: 1.1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .route-details-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .info-header {
+        gap: 10px;
+    }
+    
+    .info-icon-modern {
+        width: 36px;
+        height: 36px;
+        font-size: 1.1rem;
+    }
+    
+    .info-content-modern {
+        padding: 0;
+        font-size: 0.95rem;
+    }
+}
+
+/* ====== OPERATING HOURS COUNTDOWN STYLING ====== */
+
+.operating-hours-card .info-content-modern {
+    flex-direction: column;
+    gap: 8px;
+}
+
+.operating-hours-main {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #111827;
+}
+
+.operating-countdown {
+    font-size: 0.9rem;
+    margin-top: 4px;
+}
+
+.countdown-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    font-weight: 600;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+}
+
+.countdown-status:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.countdown-message {
+    font-weight: 700;
+}
+
+.countdown-time {
+    font-weight: 600;
+    opacity: 0.9;
+}
+
+/* Dark mode for countdown */
+[data-theme="dark"] .operating-hours-main {
+    color: #f9fafb;
+}
+
+[data-theme="dark"] .countdown-status {
+    background: rgba(0, 0, 0, 0.2);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
