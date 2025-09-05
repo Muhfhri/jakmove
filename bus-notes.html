@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catatan Bus - JAKMove</title>
+    <meta name="description" content="Catat nomor bus dan tipe bus TransJakarta untuk memudahkan jika ada barang tertinggal atau keperluan lainnya">
+    <meta name="keywords" content="TransJakarta, catatan bus, nomor bus, tipe bus, BRT, Jakarta">
+    <meta name="author" content="JAKMove">
+
+    <!-- Resource Hints -->
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+    <link rel="dns-prefetch" href="//cdnjs.cloudflare.com">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="dns-prefetch" href="//cdn.jsdelivr.net">
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/dark-mode.css">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/bus-notes.css">
+    
+    <!-- Fallback FA stylesheet -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/css/all.min.css">
+</head>
+<body>
+    <!-- Sticky Navigation Bar -->
+    <nav class="navbar navbar-expand-lg sticky-top bg-white shadow-sm border-bottom" style="top: 0; z-index: 1030;">
+        <div class="container-fluid px-4">
+            <span class="navbar-brand plus-jakarta-sans fw-bold text-primary">
+                <img class="brand-title" alt="JakMove">
+            </span>
+            
+            <!-- Desktop Navigation -->
+            <div class="navbar-nav me-auto d-none d-lg-flex">
+                <a class="nav-link d-flex align-items-center gap-2" href="index.html">
+                    <iconify-icon icon="mdi:map-marker-multiple"></iconify-icon>
+                    <span>Peta Interaktif</span>
+                </a>
+                <a class="nav-link active d-flex align-items-center gap-2" href="transportasi-jakarta.html">
+                    <iconify-icon icon="mdi:bus"></iconify-icon>
+                    <span>Transportasi Jakarta</span>
+                </a>
+                <a class="nav-link d-flex align-items-center gap-2" href="tentang-pembuat.html">
+                    <iconify-icon icon="mdi:account"></iconify-icon>
+                    <span>Tentang Pembuat</span>
+                </a>
+            </div>
+            
+            <!-- Mobile Toggle Button -->
+            <button class="navbar-toggler custom-toggler d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#navbarOffcanvas" aria-controls="navbarOffcanvas" aria-expanded="false" aria-label="Toggle navigation">
+                <div class="hamburger-line"></div>
+                <div class="hamburger-line"></div>
+            </button>
+        </div>
+    </nav>
+    
+    <!-- Offcanvas Sidebar for Mobile -->
+    <div class="offcanvas offcanvas-start" tabindex="-1" id="navbarOffcanvas" aria-labelledby="navbarOffcanvasLabel">
+        <div class="offcanvas-header">
+            <h5 class="offcanvas-title plus-jakarta-sans fw-bold text-primary" id="navbarOffcanvasLabel">
+                <img class="brand-title" alt="JakMove">
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body">
+            <nav class="nav-menu">
+                <a href="index.html" class="nav-menu-item">
+                    <div class="nav-menu-icon">
+                        <iconify-icon icon="mdi:map-marker"></iconify-icon>
+                    </div>
+                    <div class="nav-menu-content">
+                        <div class="nav-menu-title">Peta Interaktif</div>
+                        <div class="nav-menu-desc">Jelajahi rute Transjakarta</div>
+                    </div>
+                </a>
+                <a href="transportasi-jakarta.html" class="nav-menu-item active">
+                    <div class="nav-menu-icon">
+                        <iconify-icon icon="mdi:bus"></iconify-icon>
+                    </div>
+                    <div class="nav-menu-content">
+                        <div class="nav-menu-title">Transportasi Jakarta</div>
+                        <div class="nav-menu-desc">Info lengkap transportasi</div>
+                    </div>
+                </a>
+                <a href="tentang-pembuat.html" class="nav-menu-item">
+                    <div class="nav-menu-icon">
+                        <iconify-icon icon="mdi:account"></iconify-icon>
+                    </div>
+                    <div class="nav-menu-content">
+                        <div class="nav-menu-title">Tentang Pembuat</div>
+                        <div class="nav-menu-desc">Informasi developer website</div>
+                    </div>
+                </a>
+            </nav>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="container-fluid" style="margin-top: 80px; padding: 2rem 1rem;">
+        <div class="row justify-content-center">
+            <div class="col-lg-10">
+                <!-- Header Section -->
+                <div class="hero-section text-center mb-5">
+                    <div class="hero-content">
+                        <div class="hero-icon mb-3">
+                            <iconify-icon icon="mdi:notebook-edit" class="text-primary"></iconify-icon>
+                        </div>
+                        <h1 class="hero-title plus-jakarta-sans fw-bold mb-3">Catatan Bus</h1>
+                        <p class="hero-subtitle text-muted mb-4">
+                            Catat nomor bus dan tipe bus TransJakarta untuk memudahkan jika ada barang tertinggal atau keperluan lainnya
+                        </p>
+                        <div class="hero-stats d-flex justify-content-center gap-4">
+                            <div class="stat-item">
+                                <div class="stat-number" id="totalNotesDisplay">0</div>
+                                <div class="stat-label">Total Catatan</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-number" id="totalRoutesDisplay">0</div>
+                                <div class="stat-label">Rute Berbeda</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-number">∞</div>
+                                <div class="stat-label">Penyimpanan</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Add New Note Form -->
+                <div class="modern-card mb-5">
+                    <div class="card-header-modern">
+                        <div class="header-content">
+                            <div class="header-icon">
+                                <iconify-icon icon="mdi:plus-circle"></iconify-icon>
+                            </div>
+                            <div class="header-text">
+                                <h5 class="header-title mb-0">Tambah Catatan Baru</h5>
+                                <p class="header-subtitle mb-0">Masukkan nomor bus untuk deteksi otomatis</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body-modern">
+                        <form id="busNoteForm">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label for="busNumber" class="form-label">Nomor Bus</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">
+                                            <iconify-icon icon="mdi:bus"></iconify-icon>
+                                        </span>
+                                        <input type="text" class="form-control" id="busNumber" placeholder="Contoh: BMP-001, TJ-347" required>
+                                    </div>
+                                    <div class="form-text">Format: PREFIX-NOMOR (contoh: BMP-001, TJ-347, MYS-19220)</div>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <label for="busType" class="form-label">Tipe Bus</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">
+                                            <iconify-icon icon="mdi:car-info"></iconify-icon>
+                                        </span>
+                                        <input type="text" class="form-control" id="busType" placeholder="Akan terdeteksi otomatis" readonly>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <label for="busOperator" class="form-label">Operator</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">
+                                            <iconify-icon icon="mdi:domain"></iconify-icon>
+                                        </span>
+                                        <input type="text" class="form-control" id="busOperator" placeholder="Akan terdeteksi otomatis" readonly>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <label for="busRoute" class="form-label">Rute (Opsional)</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">
+                                            <iconify-icon icon="mdi:map-marker-path"></iconify-icon>
+                                        </span>
+                                        <input type="text" class="form-control" id="busRoute" placeholder="Contoh: 1, 2F, 13E, dll">
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <label for="noteText" class="form-label">Catatan (Opsional)</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">
+                                            <iconify-icon icon="mdi:note-text"></iconify-icon>
+                                        </span>
+                                        <input type="text" class="form-control" id="noteText" placeholder="Contoh: Tas tertinggal, tempat duduk 15A">
+                                    </div>
+                                </div>
+                                
+                                <div class="col-12">
+                                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                        <button type="button" class="btn btn-outline-secondary me-md-2" id="clearForm">
+                                            <iconify-icon icon="mdi:refresh" class="me-1"></iconify-icon>
+                                            Reset
+                                        </button>
+                                        <button type="submit" class="btn btn-primary">
+                                            <iconify-icon icon="mdi:content-save" class="me-1"></iconify-icon>
+                                            Simpan Catatan
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                        
+                        <!-- Bus Info Preview -->
+                        <div id="busInfoPreview" class="mt-3" style="display: none;"></div>
+                    </div>
+                </div>
+
+                <!-- Saved Notes -->
+                <div class="modern-card">
+                    <div class="card-header-modern">
+                        <div class="header-content">
+                            <div class="header-icon">
+                                <iconify-icon icon="mdi:format-list-bulleted"></iconify-icon>
+                            </div>
+                            <div class="header-text">
+                                <h5 class="header-title mb-0">
+                                    Catatan Tersimpan
+                                    <span id="noteCount" class="modern-badge ms-2">0</span>
+                                </h5>
+                                <p class="header-subtitle mb-0">Kelola semua catatan bus Anda</p>
+                            </div>
+                        </div>
+                        <div class="header-actions">
+                            <select class="form-select form-select-sm me-2" id="routeFilter" style="width: auto;">
+                                <option value="">Semua Rute</option>
+                            </select>
+                            <button type="button" class="btn-action btn-action-primary" id="exportNotes" title="Export ke CSV">
+                                <iconify-icon icon="mdi:download"></iconify-icon>
+                            </button>
+                            <button type="button" class="btn-action btn-action-danger" id="clearAllNotes" title="Hapus Semua">
+                                <iconify-icon icon="mdi:delete-sweep"></iconify-icon>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body-modern">
+                        <div id="savedNotes" class="notes-grid">
+                            <div class="empty-state">
+                                <div class="empty-icon">
+                                    <iconify-icon icon="mdi:note-outline"></iconify-icon>
+                                </div>
+                                <h6 class="empty-title">Belum ada catatan tersimpan</h6>
+                                <p class="empty-subtitle">Mulai catat nomor bus untuk kemudahan di masa depan</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Iconify -->
+    <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+    
+    <!-- TJ Number Search -->
+    <script src="js/tjNumberSearch.js"></script>
+    
+    <!-- Navbar Animation JS -->
+    <script src="js/navbar.js"></script>
+    
+    <!-- Bus Notes JS -->
+    <script src="js/bus-notes.js"></script>
+</body>
+</html>
