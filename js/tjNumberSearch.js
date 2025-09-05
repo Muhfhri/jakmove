@@ -107,6 +107,9 @@ const busRangeData = [
   },
   // SKYWELL
   { 
+    prefix: 'DMR', start: 250215, end: 250270, operator: 'DAMRI', tipe: 'Skywell NJL6126BEV2', warna: 'Putih-Biru Tua', bahanBakar: 'Listrik', karoseri: 'CBU', pool: 'Cakung', catatan: 'BRT', isSkywell: true, isLowdeck: true  
+  },
+  { 
     prefix: 'DMR', start: 240155, end: 240214, operator: 'DAMRI', tipe: 'Skywell NJL6126BEV', warna: 'Putih-Biru Tua', bahanBakar: 'Listrik', karoseri: 'CBU', pool: 'Cakung', catatan: 'BRT', isSkywell: true, isLowdeck: true 
   },
   { 
@@ -603,6 +606,7 @@ const busImages = {
   'Zhongtong Bus LCK6126EVGRA1': 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ee/Transjakarta_Perum_DAMRI_Zhongtong_Bus.jpg/1280px-Transjakarta_Perum_DAMRI_Zhongtong_Bus.jpg',
   'Zhongtong Bus LCK6126EVGRA2': 'https://img.okezone.com/content/2025/06/20/1/3148864/bus_listrik_damri-peyD_large.jpg',
   'Skywell NJL6126BEV': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/48/Transjakarta_-_DMR-240156.jpg/1280px-Transjakarta_-_DMR-240156.jpg',
+  'Skywell NJL6126BEV2': '../image/skywellbatch2.png',
   'Skywell NJL6129BEV': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/45/Transjakarta_Metrotrans_Skywell_Electric_Bus.jpg/1280px-Transjakarta_Metrotrans_Skywell_Electric_Bus.jpg',
   'SAG Golden Dragon Pivot E12 Non BRT': 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e2/Bus_Metrotrans_di_rute_4B.jpg/1280px-Bus_Metrotrans_di_rute_4B.jpg',
   'Mercedes-Benz OH 1626 21xxx': 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/90/Transjakarta_-_MYS-21263_Daimler_OH_1626.jpg/1280px-Transjakarta_-_MYS-21263_Daimler_OH_1626.jpg',
