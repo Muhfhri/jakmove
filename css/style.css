@@ -6356,6 +6356,26 @@ body.no-scroll { overflow: hidden; height: 100vh; }
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
+.countdown-running-good:hover {
+    box-shadow: 0 4px 20px rgba(16, 185, 129, 0.3);
+    transform: translateY(-2px) scale(1.02);
+}
+
+.countdown-running-warning:hover {
+    box-shadow: 0 4px 20px rgba(245, 158, 11, 0.3);
+    transform: translateY(-2px) scale(1.02);
+}
+
+.countdown-running-danger:hover {
+    box-shadow: 0 4px 20px rgba(239, 68, 68, 0.3);
+    transform: translateY(-2px) scale(1.02);
+}
+
+.countdown-24-hour:hover {
+    box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4);
+    transform: translateY(-2px) scale(1.02);
+}
+
 .countdown-message {
     font-weight: 700;
 }
@@ -6363,6 +6383,43 @@ body.no-scroll { overflow: hidden; height: 100vh; }
 .countdown-time {
     font-weight: 600;
     opacity: 0.9;
+}
+
+/* Status-specific countdown colors */
+.countdown-running-good {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(16, 185, 129, 0.25));
+    border-color: rgba(16, 185, 129, 0.4);
+    color: #059669 !important;
+}
+
+.countdown-running-warning {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(245, 158, 11, 0.25));
+    border-color: rgba(245, 158, 11, 0.4);
+    color: #d97706 !important;
+}
+
+.countdown-running-danger {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(239, 68, 68, 0.25));
+    border-color: rgba(239, 68, 68, 0.4);
+    color: #dc2626 !important;
+}
+
+.countdown-waiting {
+    background: linear-gradient(135deg, rgba(107, 114, 128, 0.15), rgba(107, 114, 128, 0.25));
+    border-color: rgba(107, 114, 128, 0.4);
+    color: #4b5563 !important;
+}
+
+.countdown-ended {
+    background: linear-gradient(135deg, rgba(107, 114, 128, 0.15), rgba(107, 114, 128, 0.25));
+    border-color: rgba(107, 114, 128, 0.4);
+    color: #4b5563 !important;
+}
+
+.countdown-24-hour {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(52, 211, 153, 0.3));
+    border-color: rgba(16, 185, 129, 0.5);
+    color: #059669 !important;
 }
 
 /* Dark mode for countdown */
@@ -6373,5 +6430,37 @@ body.no-scroll { overflow: hidden; height: 100vh; }
 [data-theme="dark"] .countdown-status {
     background: rgba(0, 0, 0, 0.2);
     border-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .countdown-running-good {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(16, 185, 129, 0.3));
+    border-color: rgba(16, 185, 129, 0.5);
+}
+
+[data-theme="dark"] .countdown-running-warning {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(245, 158, 11, 0.3));
+    border-color: rgba(245, 158, 11, 0.5);
+}
+
+[data-theme="dark"] .countdown-running-danger {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(239, 68, 68, 0.3));
+    border-color: rgba(239, 68, 68, 0.5);
+}
+
+[data-theme="dark"] .countdown-waiting {
+    background: linear-gradient(135deg, rgba(156, 163, 175, 0.2), rgba(156, 163, 175, 0.3));
+    border-color: rgba(156, 163, 175, 0.5);
+    color: #9ca3af !important;
+}
+
+[data-theme="dark"] .countdown-ended {
+    background: linear-gradient(135deg, rgba(156, 163, 175, 0.2), rgba(156, 163, 175, 0.3));
+    border-color: rgba(156, 163, 175, 0.5);
+    color: #9ca3af !important;
+}
+
+[data-theme="dark"] .countdown-24-hour {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(52, 211, 153, 0.35));
+    border-color: rgba(16, 185, 129, 0.6);
 }
 
