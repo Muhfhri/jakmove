@@ -296,7 +296,7 @@ class BusNotesManager {
             busNumber: busNumber.toUpperCase(),
             busType: busType || 'Tidak diketahui',
             busOperator: busOperator || 'Tidak diketahui',
-            busRoute: busRoute || '',
+            busRoute: busRoute ? busRoute.toUpperCase() : '',
             noteText: noteText,
             busImageUrl: busImageUrl,
             dateAdded: new Date().toISOString(),
@@ -488,16 +488,18 @@ class BusNotesManager {
 
     // Generate route display with color and full name from GTFS
     generateRouteDisplay(routeCode) {
-        const routeInfo = this.getRouteInfo(routeCode);
+        // Otomatis ubah ke kapital (contoh: 6v -> 6V)
+        const normalizedRouteCode = routeCode.toUpperCase();
+        const routeInfo = this.getRouteInfo(normalizedRouteCode);
         
-        console.log('Route lookup for:', routeCode, 'Found:', routeInfo, 'Total routes:', this.gtfsRoutes.length);
+        console.log('Route lookup for:', normalizedRouteCode, 'Found:', routeInfo, 'Total routes:', this.gtfsRoutes.length);
         
         if (routeInfo) {
             return `
                 <div class="bus-note-route mb-3">
                     <iconify-icon icon="mdi:map-marker-path" class="me-2"></iconify-icon>
                     <span class="route-badge" style="background-color: ${routeInfo.color};">
-                        ${routeCode} ${routeInfo.name}
+                        ${normalizedRouteCode} ${routeInfo.name}
                     </span>
                 </div>
             `;
@@ -506,7 +508,7 @@ class BusNotesManager {
             return `
                 <div class="bus-note-route mb-3">
                     <iconify-icon icon="mdi:map-marker-path" class="me-2"></iconify-icon>
-                    <span class="route-badge">Rute ${routeCode}</span>
+                    <span class="route-badge">Rute ${normalizedRouteCode}</span>
                 </div>
             `;
         }

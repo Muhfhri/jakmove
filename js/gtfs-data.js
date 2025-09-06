@@ -70,7 +70,7 @@ function displayRouteCategories() {
         {
             name: 'BRT (Bus Rapid Transit)',
             description: 'Bus yang melintas di jalur khusus dan antar koridor. Layanan utama Transjakarta dengan jalur terpisah untuk kecepatan optimal.',
-            icon: 'mdi:bus-rapid-transit',
+            icon: 'streamline-plump:bus',
             color: '#264697',
             count: gtfsRoutes.filter(route => 
                 route.route_long_name?.includes('BRT') || 

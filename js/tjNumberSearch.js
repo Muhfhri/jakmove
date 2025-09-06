@@ -177,7 +177,12 @@ const busRangeData = [
 
 // --- FUNGSI SEARCH BUS BY NUMBER (PAKAI DATA DI ATAS) ---
 function searchBusByNumber(input) {
-  let norm = input.trim().toUpperCase().replace(/[_\s-]+/g, '');
+  let norm = input.trim().toUpperCase();
+  
+  // Deteksi berbagai format input:
+  // BMP223, BMP-223, BMP 223
+  norm = norm.replace(/[_\s-]+/g, '');
+  
   // Cek pola kode bus: PREFIX + angka
   const match = norm.match(/^([A-Z]+)(\d{1,6})$/);
   if (match) {
@@ -606,7 +611,7 @@ const busImages = {
   'Zhongtong Bus LCK6126EVGRA1': 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ee/Transjakarta_Perum_DAMRI_Zhongtong_Bus.jpg/1280px-Transjakarta_Perum_DAMRI_Zhongtong_Bus.jpg',
   'Zhongtong Bus LCK6126EVGRA2': 'https://img.okezone.com/content/2025/06/20/1/3148864/bus_listrik_damri-peyD_large.jpg',
   'Skywell NJL6126BEV': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/48/Transjakarta_-_DMR-240156.jpg/1280px-Transjakarta_-_DMR-240156.jpg',
-  'Skywell NJL6126BEV2': 'https://raw.githubusercontent.com/Muhfhri/jakmove/refs/heads/main/image/skywellbatch2.png',
+  'Skywell NJL6126BEV2': '../image/skywellbatch2.png',
   'Skywell NJL6129BEV': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/45/Transjakarta_Metrotrans_Skywell_Electric_Bus.jpg/1280px-Transjakarta_Metrotrans_Skywell_Electric_Bus.jpg',
   'SAG Golden Dragon Pivot E12 Non BRT': 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e2/Bus_Metrotrans_di_rute_4B.jpg/1280px-Bus_Metrotrans_di_rute_4B.jpg',
   'Mercedes-Benz OH 1626 21xxx': 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/90/Transjakarta_-_MYS-21263_Daimler_OH_1626.jpg/1280px-Transjakarta_-_MYS-21263_Daimler_OH_1626.jpg',
@@ -671,7 +676,12 @@ function renderBusListByOperator(operator) {
 
 // --- FUNGSI SUGGESTION (PAKAI DATA YANG SAMA) ---
 function getBusSuggestions(input) {
-  let norm = input.trim().toUpperCase().replace(/[_\s-]+/g, '');
+  let norm = input.trim().toUpperCase();
+  
+  // Deteksi berbagai format input seperti di searchBusByNumber:
+  // BMP223, BMP-223, BMP 223
+  norm = norm.replace(/[_\s-]+/g, '');
+  
   if (!norm) return '';
   // Cek jika hanya kode operator
   const operatorCodes = {

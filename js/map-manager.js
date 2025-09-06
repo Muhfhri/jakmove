@@ -530,12 +530,20 @@ export class MapManager {
     }
 
     updateUserPopup(_markerId, html) {
-        const src = this.map.getSource('user-source');
-        if (!src || !src._data) return;
-        const coords = src._data.geometry && src._data.geometry.coordinates;
-        if (!coords) return;
+        // This function is now mainly for content updates
+        // Position updates should use smooth animation via location manager
         if (!this.userPopup) return;
-        this.userPopup.setLngLat(coords).setOffset([0, 20]).setHTML(html).addTo(this.map);
+        this.userPopup.setHTML(html);
+        if (!this.userPopup.isOpen()) {
+            // If popup is not open, we need to position it and show it
+            const src = this.map.getSource('user-source');
+            if (src && src._data) {
+                const coords = src._data.geometry && src._data.geometry.coordinates;
+                if (coords) {
+                    this.userPopup.setLngLat(coords).setOffset([0, 20]).addTo(this.map);
+                }
+            }
+        }
     }
 
     addSearchResultMarker(lat, lng, title) {
@@ -815,7 +823,7 @@ export class MapManager {
         const dx = Math.abs(currentCenter.lng - lon);
         const dy = Math.abs(currentCenter.lat - lat);
         const smallMove = dx < 1e-5 && dy < 1e-5;
-        this.map.easeTo({ center: smallMove ? currentCenter : [lon, lat], zoom, bearing, pitch: Math.max(this.map.getPitch(), 60), duration: 600, easing: t => t });
+        this.map.easeTo({ center: smallMove ? currentCenter : [lon, lat], zoom, bearing, pitch: this.map.getPitch(), duration: 600, easing: t => t });
     }
 
     _resumeAfterIdle() {

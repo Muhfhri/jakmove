@@ -29,6 +29,13 @@ export class LocationManager {
         this._lastNextDist = null;
         this._lastNextStopId = null;
         this._lastUIUpdateTs = 0;
+        // Popup smoothing properties
+        this._popupAnimReqId = null;
+        this._popupAnimFrom = null;
+        this._popupAnimTo = null;
+        this._popupAnimStart = 0;
+        this._popupAnimDurationMs = 300;
+        this._renderedPopupPos = null;
     }
 
     // Toggle live location
@@ -157,28 +164,29 @@ export class LocationManager {
             const mapManager = window.transJakartaApp.modules.map;
             if (mapManager && mapManager.isCameraLock()) {
                 cameraLocked = true;
-                // Pitch adaptif berdasarkan kecepatan (m/s)
-                let pitch = 60;
-                if (typeof speed === 'number') {
-                    if (speed < 0.3) pitch = 30;
-                    else if (speed < 1.0) pitch = 45;
-                    else pitch = 60;
+                // Pitch adaptif berdasarkan kecepatan (m/s) - stabilize when stopped
+                const spdVal = (typeof speed === 'number') ? speed : null;
+                if (spdVal !== null && spdVal >= 0.3) {
+                    let pitch = spdVal < 1.0 ? 45 : 60;
+                    const currentPitch = mapManager.getMap()?.getPitch?.() || 0;
+                    if (Math.abs(currentPitch - pitch) > 10) {
+                        mapManager.getMap().setPitch(pitch);
+                    }
                 }
-                const currentPitch = mapManager.getMap()?.getPitch?.() || 0;
-                if (Math.abs(currentPitch - pitch) > 5) {
-                    mapManager.getMap().setPitch(pitch);
+                // Skip follow when stopped to prevent bounce
+                if (!(spdVal !== null && spdVal < 0.2)) {
+                    // Heading dari smoothed previous -> current
+                    let headingDeg = NaN;
+                    if (this._prevUserPosSmoothed) {
+                        const toRad = d => d * Math.PI / 180;
+                        const toDeg = r => r * 180 / Math.PI;
+                        const y = Math.sin(toRad(this.lastUserPosSmoothed.lon - this._prevUserPosSmoothed.lon)) * Math.cos(toRad(this.lastUserPosSmoothed.lat));
+                        const x = Math.cos(toRad(this._prevUserPosSmoothed.lat)) * Math.sin(toRad(this.lastUserPosSmoothed.lat)) - Math.sin(toRad(this._prevUserPosSmoothed.lat)) * Math.cos(toRad(this.lastUserPosSmoothed.lat)) * Math.cos(toRad(this.lastUserPosSmoothed.lon - this._prevUserPosSmoothed.lon));
+                        let brng = toDeg(Math.atan2(y, x));
+                        headingDeg = (brng + 360) % 360;
+                    }
+                    mapManager.followUserCamera(this.lastUserPosSmoothed.lat, this.lastUserPosSmoothed.lon, headingDeg);
                 }
-                // Heading dari smoothed previous -> current
-                let headingDeg = NaN;
-                if (this._prevUserPosSmoothed) {
-                    const toRad = d => d * Math.PI / 180;
-                    const toDeg = r => r * 180 / Math.PI;
-                    const y = Math.sin(toRad(this.lastUserPosSmoothed.lon - this._prevUserPosSmoothed.lon)) * Math.cos(toRad(this.lastUserPosSmoothed.lat));
-                    const x = Math.cos(toRad(this._prevUserPosSmoothed.lat)) * Math.sin(toRad(this.lastUserPosSmoothed.lat)) - Math.sin(toRad(this._prevUserPosSmoothed.lat)) * Math.cos(toRad(this.lastUserPosSmoothed.lat)) * Math.cos(toRad(this.lastUserPosSmoothed.lon - this._prevUserPosSmoothed.lon));
-                    let brng = toDeg(Math.atan2(y, x));
-                    headingDeg = (brng + 360) % 360;
-                }
-                mapManager.followUserCamera(this.lastUserPosSmoothed.lat, this.lastUserPosSmoothed.lon, headingDeg);
             }
         } catch (e) {}
 
@@ -406,7 +414,14 @@ export class LocationManager {
             .find(r => r.route_id === routeId);
         
         const popupContent = this.buildUserPopupContent(route, currentStop, nextStop, userLat, userLon);
-        mapManager.updateUserPopup(this.userMarker, popupContent);
+        
+        // Update content first
+        if (mapManager.userPopup) {
+            mapManager.userPopup.setHTML(popupContent);
+        }
+        
+        // Then animate position smoothly
+        this.animatePopupTo(userLat, userLon);
     }
 
     // Build user popup content
@@ -755,6 +770,71 @@ export class LocationManager {
         this.currentStopId = null;
         this.lastArrivedStopId = null;
         this.arrivalStop = null;
+    }
+
+    // Animate popup smoothly to target position
+    animatePopupTo(targetLat, targetLon) {
+        const mapManager = window.transJakartaApp.modules.map;
+        if (!mapManager || !mapManager.userPopup || !this.userMarker) return;
+        
+        // Get current popup position
+        const currentPopupPos = mapManager.userPopup.getLngLat();
+        if (!currentPopupPos) {
+            // No current position, set directly
+            this._renderedPopupPos = { lat: targetLat, lon: targetLon };
+            mapManager.userPopup.setLngLat([targetLon, targetLat]);
+            return;
+        }
+        
+        if (!this._renderedPopupPos) {
+            this._renderedPopupPos = { lat: currentPopupPos.lat, lon: currentPopupPos.lng };
+        }
+        
+        // If jump too large, snap directly
+        try {
+            const jump = this.haversine(this._renderedPopupPos.lat, this._renderedPopupPos.lon, targetLat, targetLon);
+            if (jump > 100) {
+                mapManager.userPopup.setLngLat([targetLon, targetLat]);
+                this._renderedPopupPos = { lat: targetLat, lon: targetLon };
+                return;
+            }
+        } catch (e) {}
+        
+        // Start/replace animation
+        if (this._popupAnimReqId) { 
+            try { cancelAnimationFrame(this._popupAnimReqId); } catch(e){} 
+            this._popupAnimReqId = null; 
+        }
+        
+        this._popupAnimFrom = { lat: this._renderedPopupPos.lat, lon: this._renderedPopupPos.lon };
+        this._popupAnimTo = { lat: targetLat, lon: targetLon };
+        this._popupAnimStart = performance.now();
+        
+        const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+        const step = (nowTs) => {
+            if (!this.isActive || !mapManager.userPopup) {
+                this._popupAnimReqId = null;
+                return;
+            }
+            
+            const elapsed = nowTs - this._popupAnimStart;
+            const progress = Math.min(elapsed / this._popupAnimDurationMs, 1);
+            const easedProgress = easeOutCubic(progress);
+            
+            const lat = this._popupAnimFrom.lat + (this._popupAnimTo.lat - this._popupAnimFrom.lat) * easedProgress;
+            const lon = this._popupAnimFrom.lon + (this._popupAnimTo.lon - this._popupAnimFrom.lon) * easedProgress;
+            
+            mapManager.userPopup.setLngLat([lon, lat]);
+            this._renderedPopupPos = { lat, lon };
+            
+            if (progress < 1) {
+                this._popupAnimReqId = requestAnimationFrame(step);
+            } else {
+                this._popupAnimReqId = null;
+            }
+        };
+        
+        this._popupAnimReqId = requestAnimationFrame(step);
     }
 
     // Jadwalkan update UI popup user dengan debounce
