@@ -37,6 +37,13 @@ export class LocationManager {
         this._userAnimStart = 0;
         this._userAnimDurationMs = 450;
         this._lastLiveStopForPopup = null;
+        // Popup smoothing properties
+        this._popupAnimReqId = null;
+        this._popupAnimFrom = null;
+        this._popupAnimTo = null;
+        this._popupAnimStart = 0;
+        this._popupAnimDurationMs = 300;
+        this._renderedPopupPos = null;
     }
 
     // Toggle live location
@@ -522,7 +529,14 @@ export class LocationManager {
             .find(r => String(r.route_id) === String(routeId));
         
         const popupContent = this.buildUserPopupContent(route, currentStop, nextStop, userLat, userLon);
-        mapManager.updateUserPopup(this.userMarker, popupContent);
+        
+        // Update content first
+        if (mapManager.userPopup) {
+            mapManager.userPopup.setHTML(popupContent);
+        }
+        
+        // Then animate position smoothly
+        this.animatePopupTo(userLat, userLon);
     }
 
     // Build user popup content
@@ -1051,6 +1065,71 @@ export class LocationManager {
     }
 
     canAutoStartLive() { return !!this._allowAutoStart; }
+
+    // Animate popup smoothly to target position
+    animatePopupTo(targetLat, targetLon) {
+        const mapManager = window.transJakartaApp.modules.map;
+        if (!mapManager || !mapManager.userPopup || !this.userMarker) return;
+        
+        // Get current popup position
+        const currentPopupPos = mapManager.userPopup.getLngLat();
+        if (!currentPopupPos) {
+            // No current position, set directly
+            this._renderedPopupPos = { lat: targetLat, lon: targetLon };
+            mapManager.userPopup.setLngLat([targetLon, targetLat]);
+            return;
+        }
+        
+        if (!this._renderedPopupPos) {
+            this._renderedPopupPos = { lat: currentPopupPos.lat, lon: currentPopupPos.lng };
+        }
+        
+        // If jump too large, snap directly
+        try {
+            const jump = this.haversine(this._renderedPopupPos.lat, this._renderedPopupPos.lon, targetLat, targetLon);
+            if (jump > 100) {
+                mapManager.userPopup.setLngLat([targetLon, targetLat]);
+                this._renderedPopupPos = { lat: targetLat, lon: targetLon };
+                return;
+            }
+        } catch (e) {}
+        
+        // Start/replace animation
+        if (this._popupAnimReqId) { 
+            try { cancelAnimationFrame(this._popupAnimReqId); } catch(e){} 
+            this._popupAnimReqId = null; 
+        }
+        
+        this._popupAnimFrom = { lat: this._renderedPopupPos.lat, lon: this._renderedPopupPos.lon };
+        this._popupAnimTo = { lat: targetLat, lon: targetLon };
+        this._popupAnimStart = performance.now();
+        
+        const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+        const step = (nowTs) => {
+            if (!this.isActive || !mapManager.userPopup) {
+                this._popupAnimReqId = null;
+                return;
+            }
+            
+            const elapsed = nowTs - this._popupAnimStart;
+            const progress = Math.min(elapsed / this._popupAnimDurationMs, 1);
+            const easedProgress = easeOutCubic(progress);
+            
+            const lat = this._popupAnimFrom.lat + (this._popupAnimTo.lat - this._popupAnimFrom.lat) * easedProgress;
+            const lon = this._popupAnimFrom.lon + (this._popupAnimTo.lon - this._popupAnimFrom.lon) * easedProgress;
+            
+            mapManager.userPopup.setLngLat([lon, lat]);
+            this._renderedPopupPos = { lat, lon };
+            
+            if (progress < 1) {
+                this._popupAnimReqId = requestAnimationFrame(step);
+            } else {
+                this._popupAnimReqId = null;
+            }
+        };
+        
+        this._popupAnimReqId = requestAnimationFrame(step);
+    }
 
     animateUserMarkerTo(targetLat, targetLon) {
         if (!this.isActive) return;

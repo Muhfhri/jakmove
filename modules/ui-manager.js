@@ -418,18 +418,20 @@ export class UIManager {
 			const { x, y } = lonLatToTile(center.lon, center.lat, z);
 			const omtKey = (()=>{ try { return localStorage.getItem('openmaptilesKey') || 'RVJ0OE10B7aw0wl2Tdyl'; } catch(e){ return 'RVJ0OE10B7aw0wl2Tdyl'; } })();
 			const thumbs = [
-				{ id: 'positron', title: 'Positron', url: `https://basemaps.cartocdn.com/rastertiles/light_all/${z}/${x}/${y}.png` },
-				{ id: 'voyager', title: 'Voyager', url: `https://basemaps.cartocdn.com/rastertiles/voyager/${z}/${x}/${y}.png` },
-				{ id: 'dark', title: 'Dark', url: `https://basemaps.cartocdn.com/rastertiles/dark_all/${z}/${x}/${y}.png` },
-				{ id: 'streets', title: 'Esri Streets', url: `https://services.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/${z}/${y}/${x}` },
-				{ id: 'topo', title: 'Esri Topo', url: `https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/${z}/${y}/${x}` },
-				{ id: 'gray', title: 'Esri Gray', url: `https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/${z}/${y}/${x}` },
-				{ id: 'opentopo', title: 'OpenTopo', url: `https://a.tile.opentopomap.org/${z}/${x}/${y}.png` },
-				{ id: 'satellite', title: 'Satellite', url: `https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}` },
-				{ id: 'openmaptiles-streets', title: 'OMT Streets', url: `https://api.maptiler.com/maps/streets/256/${z}/${x}/${y}.png?key=${omtKey}` },
-				{ id: 'openmaptiles-bright', title: 'OMT Bright', url: `https://api.maptiler.com/maps/bright/256/${z}/${x}/${y}.png?key=${omtKey}` },
-				{ id: 'openmaptiles-dark', title: 'OMT Dark', url: `https://api.maptiler.com/maps/darkmatter/256/${z}/${x}/${y}.png?key=${omtKey}` },
-				{ id: 'openmaptiles-positron', title: 'OMT Positron', url: `https://api.maptiler.com/maps/positron/256/${z}/${x}/${y}.png?key=${omtKey}` }
+				{ id: 'positron', title: 'Positron', description: 'Peta dasar terang dengan gaya minimal', url: `https://basemaps.cartocdn.com/rastertiles/light_all/${z}/${x}/${y}.png` },
+				{ id: 'voyager', title: 'Voyager', description: 'Peta jalan lengkap dengan detail topografi', url: `https://basemaps.cartocdn.com/rastertiles/voyager/${z}/${x}/${y}.png` },
+				{ id: 'dark', title: 'Dark', description: 'Peta gelap yang nyaman untuk mata', url: `https://basemaps.cartocdn.com/rastertiles/dark_all/${z}/${x}/${y}.png` },
+				{ id: 'streets', title: 'Esri Streets', description: 'Peta jalan standar dari Esri', url: `https://services.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/${z}/${y}/${x}` },
+				{ id: 'topo', title: 'Esri Topo', description: 'Peta topografi dengan garis kontur', url: `https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/${z}/${y}/${x}` },
+				{ id: 'gray', title: 'Esri Gray', description: 'Peta abu-abu netral untuk overlay', url: `https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/${z}/${y}/${x}` },
+				{ id: 'opentopo', title: 'OpenTopo', description: 'Peta topografi terbuka dengan hiking trails', url: `https://a.tile.opentopomap.org/${z}/${x}/${y}.png` },
+				{ id: 'satellite', title: 'Satelit Esri', description: 'Citra satelit dengan label yang bisa diputar', url: `https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}` },
+				{ id: 'satellite-hybrid', title: 'Satelit + Label', description: 'Citra satelit dengan nama jalan dan tempat', url: `https://mt1.google.com/vt/lyrs=y&x=${x}&y=${y}&z=${z}` },
+				{ id: 'satellite-clean', title: 'Satelit Bersih', description: 'Citra satelit tanpa label apapun', url: `https://mt1.google.com/vt/lyrs=s&x=${x}&y=${y}&z=${z}` },
+				{ id: 'openmaptiles-streets', title: 'OMT Streets', description: 'Peta jalan dari OpenMapTiles', url: `https://api.maptiler.com/maps/streets/256/${z}/${x}/${y}.png?key=${omtKey}` },
+				{ id: 'openmaptiles-bright', title: 'OMT Bright', description: 'Peta terang dan bersih dari OpenMapTiles', url: `https://api.maptiler.com/maps/bright/256/${z}/${x}/${y}.png?key=${omtKey}` },
+				{ id: 'openmaptiles-dark', title: 'OMT Dark', description: 'Peta gelap dari OpenMapTiles', url: `https://api.maptiler.com/maps/darkmatter/256/${z}/${x}/${y}.png?key=${omtKey}` },
+				{ id: 'openmaptiles-positron', title: 'OMT Positron', description: 'Peta minimal terang dari OpenMapTiles', url: `https://api.maptiler.com/maps/positron/256/${z}/${x}/${y}.png?key=${omtKey}` }
 			];
 
 			const saved = (localStorage.getItem('baseMapStyle') || 'positron');
@@ -451,12 +453,12 @@ export class UIManager {
 				} catch (e) {}
 			};
 
-			thumbs.forEach(({ id, title, url }) => {
+			thumbs.forEach(({ id, title, description, url }) => {
 				const item = document.createElement('button');
 				item.type = 'button';
 				item.className = 'bm-thumb';
 				item.setAttribute('data-style', id);
-				item.title = title;
+				item.title = `${title}${description ? ' - ' + description : ''}`;
 				item.style.border = '2px solid rgba(0,0,0,0.08)';
 				item.style.borderRadius = '10px';
 				item.style.padding = '0';
