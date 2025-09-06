@@ -1857,11 +1857,11 @@ export class RouteManager {
                 timeLeft: '24 jam',
                 color: '#10b981',
                 icon: 'mdi:clock-check',
-                message: 'Beroperasi 24 jam',
+                message: '🌟 Beroperasi 24 jam',
                 html: `
-                    <div class='countdown-status' style='color: #10b981;'>
+                    <div class='countdown-status countdown-24-hour' style='color: #10b981; border-color: #10b981;'>
                         <iconify-icon icon='mdi:clock-check' style='margin-right: 4px;'></iconify-icon>
-                        <span class='countdown-message'>Beroperasi 24 jam</span>
+                        <span class='countdown-message'>🌟 Beroperasi 24 jam</span>
                     </div>
                 `
             };
@@ -1881,7 +1881,7 @@ export class RouteManager {
             status = 'waiting';
             color = '#6b7280';
             icon = 'mdi:clock-outline';
-            message = 'Belum dimulai';
+            message = 'Mulai beroperasi dalam';
         } else if (currentTime >= startSeconds && currentTime <= actualEndSeconds) {
             // Service is running
             timeLeft = actualEndSeconds - currentTime;
@@ -1889,25 +1889,34 @@ export class RouteManager {
                 status = 'running-good';
                 color = '#10b981';
                 icon = 'mdi:check-circle';
-                message = 'Beroperasi';
+                message = '✅ Sedang beroperasi - berakhir dalam';
             } else if (timeLeft > 3600) { // > 1 hour
                 status = 'running-warning';
                 color = '#f59e0b';
                 icon = 'mdi:clock-alert';
-                message = 'Segera berakhir';
+                message = '⚠️ Segera berakhir dalam';
             } else if (timeLeft > 0) { // < 1 hour
                 status = 'running-danger';
                 color = '#ef4444';
                 icon = 'mdi:timer-alert';
-                message = 'Hampir berakhir';
+                message = '🚨 Hampir berakhir dalam';
             }
         } else {
-            // Service has ended
-            timeLeft = 0;
+            // Service has ended - calculate time until next operation
+            const timeUntilNextStart = (24 * 3600) - currentTime + startSeconds;
+            timeLeft = timeUntilNextStart;
             status = 'ended';
             color = '#6b7280';
-            icon = 'mdi:close-circle';
-            message = 'Sudah berakhir';
+            icon = 'mdi:clock-outline';
+            
+            if (timeUntilNextStart < 3600) {
+                message = '🔄 Segera beroperasi dalam';
+                color = '#f59e0b';
+                icon = 'mdi:clock-alert';
+                status = 'waiting';
+            } else {
+                message = '⏰ Beroperasi lagi dalam';
+            }
         }
         
         const timeLeftText = this.formatTimeLeft(timeLeft);
@@ -1919,10 +1928,10 @@ export class RouteManager {
             icon,
             message,
             html: `
-                <div class='countdown-status' style='color: ${color};'>
+                <div class='countdown-status countdown-${status}' style='color: ${color}; border-color: ${color};'>
                     <iconify-icon icon='${icon}' style='margin-right: 4px;'></iconify-icon>
                     <span class='countdown-message'>${message}</span>
-                    ${timeLeft > 0 ? `<span class='countdown-time'> - ${timeLeftText}</span>` : ''}
+                    ${timeLeft > 0 && timeLeftText ? `<span class='countdown-time'> ${timeLeftText}</span>` : ''}
                 </div>
             `
         };
@@ -1935,10 +1944,14 @@ export class RouteManager {
         const hours = Math.floor(seconds / 3600);
         const minutes = Math.floor((seconds % 3600) / 60);
         
-        if (hours > 0) {
+        if (hours > 0 && minutes > 0) {
             return `${hours}j ${minutes}m`;
-        } else {
+        } else if (hours > 0) {
+            return `${hours}j`;
+        } else if (minutes > 0) {
             return `${minutes}m`;
+        } else {
+            return 'kurang dari 1m';
         }
     }
 
