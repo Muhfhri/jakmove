@@ -17,7 +17,7 @@ Website ini adalah proyek fan made yang bertujuan untuk memberikan informasi sep
 ## Link Website
 
 - **Main Website**: [muhfhri.github.io/-](https://muhfhri.github.io/-)
-- **Website Fanmade Transjakarta**: [muhfhri.github.io/tj](https://muhfhri.github.io/tj)
+- **Website Fanmade Transjakarta**: [muhfhri.github.io/tj](https://muhfhri.github.io/jakmove)
 
 ---
 
