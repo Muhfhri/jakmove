@@ -23,7 +23,7 @@ export class LocationManager {
         this.arrivalStop = null; // halte yang sedang dicapai (untuk pesan arrival)
         this._prevUserPos = null;
         this._uiDebounceTimer = null;
-        this._uiDebounceMs = 200;
+        this._uiDebounceMs = 50;
         this._smoothAlphaBase = 0.25;
         this._suspend = false;
         this._lastNextDist = null;
@@ -42,7 +42,7 @@ export class LocationManager {
         this._popupAnimFrom = null;
         this._popupAnimTo = null;
         this._popupAnimStart = 0;
-        this._popupAnimDurationMs = 300;
+        this._popupAnimDurationMs = 150;
         this._renderedPopupPos = null;
     }
 
@@ -472,9 +472,9 @@ export class LocationManager {
                 const etaSec = Math.max(1, Math.round(jarakNext / spd));
                 etaText = etaSec < 60 ? `${etaSec}s` : `${Math.floor(etaSec/60)}m ${etaSec%60}s`;
             }
-            // Visual stability: skip UI update if distance change small and <1s
+            // Visual stability: skip UI update if distance change small and <500ms (reduced for better responsiveness)
             const dt = nowTs - (this._lastUIUpdateTs || 0);
-            if (!arrivalTrigger && Math.abs((jarakNext || 0) - (this._prevDistForUi || 0)) < 3 && dt < 1000) {
+            if (!arrivalTrigger && Math.abs((jarakNext || 0) - (this._prevDistForUi || 0)) < 2 && dt < 500) {
                 return; // keep last UI
             }
             this._lastUIUpdateTs = nowTs;
@@ -1084,15 +1084,22 @@ export class LocationManager {
             this._renderedPopupPos = { lat: currentPopupPos.lat, lon: currentPopupPos.lng };
         }
         
+        // Calculate distance to determine animation strategy
+        const distance = this.haversine(this._renderedPopupPos.lat, this._renderedPopupPos.lon, targetLat, targetLon);
+        
         // If jump too large, snap directly
-        try {
-            const jump = this.haversine(this._renderedPopupPos.lat, this._renderedPopupPos.lon, targetLat, targetLon);
-            if (jump > 100) {
-                mapManager.userPopup.setLngLat([targetLon, targetLat]);
-                this._renderedPopupPos = { lat: targetLat, lon: targetLon };
-                return;
-            }
-        } catch (e) {}
+        if (distance > 100) {
+            mapManager.userPopup.setLngLat([targetLon, targetLat]);
+            this._renderedPopupPos = { lat: targetLat, lon: targetLon };
+            return;
+        }
+        
+        // If distance is very small (< 3 meters), snap directly for responsiveness
+        if (distance < 3) {
+            mapManager.userPopup.setLngLat([targetLon, targetLat]);
+            this._renderedPopupPos = { lat: targetLat, lon: targetLon };
+            return;
+        }
         
         // Start/replace animation
         if (this._popupAnimReqId) { 
@@ -1104,7 +1111,10 @@ export class LocationManager {
         this._popupAnimTo = { lat: targetLat, lon: targetLon };
         this._popupAnimStart = performance.now();
         
-        const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+        // Adaptive animation duration based on distance
+        const adaptiveDuration = Math.max(80, Math.min(this._popupAnimDurationMs, distance * 3));
+        
+        const easeOutQuart = (t) => 1 - Math.pow(1 - t, 4); // Faster easing for more responsive feel
         const step = (nowTs) => {
             if (!this.isActive || !mapManager.userPopup) {
                 this._popupAnimReqId = null;
@@ -1112,8 +1122,8 @@ export class LocationManager {
             }
             
             const elapsed = nowTs - this._popupAnimStart;
-            const progress = Math.min(elapsed / this._popupAnimDurationMs, 1);
-            const easedProgress = easeOutCubic(progress);
+            const progress = Math.min(elapsed / adaptiveDuration, 1);
+            const easedProgress = easeOutQuart(progress);
             
             const lat = this._popupAnimFrom.lat + (this._popupAnimTo.lat - this._popupAnimFrom.lat) * easedProgress;
             const lon = this._popupAnimFrom.lon + (this._popupAnimTo.lon - this._popupAnimFrom.lon) * easedProgress;
