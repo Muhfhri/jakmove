@@ -1,0 +1,254 @@
+/* Performance Optimization CSS - Mengatasi Jitter/Lag saat Scrolling */
+
+/* === Hardware Acceleration & GPU Layering === */
+/* Force hardware acceleration untuk elemen yang sering bergerak */
+.leaflet-map-pane,
+.leaflet-tile-pane,
+.leaflet-overlay-pane,
+.list-group,
+.search-results,
+.stops-container,
+.route-card-container {
+    will-change: transform;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+}
+
+/* Optimasi untuk elemen dengan hover effects */
+.badge-koridor-interaktif,
+.list-group-item,
+.btn,
+.card,
+.route-service-type {
+    will-change: transform, opacity;
+    transform: translate3d(0, 0, 0);
+    backface-visibility: hidden;
+}
+
+/* === Scroll Performance === */
+/* Smooth scrolling dengan optimasi performa */
+html {
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch; /* iOS momentum scrolling */
+}
+
+/* Optimasi untuk container yang di-scroll */
+.stops-container,
+.search-results,
+.list-group {
+    /* Gunakan transform alih-alih changing top/left properties */
+    overflow-y: auto;
+    overflow-x: hidden;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    
+    /* Optimasi rendering */
+    contain: layout style paint;
+    transform: translateZ(0);
+}
+
+/* Custom scrollbar yang dioptimalkan */
+.stops-container::-webkit-scrollbar,
+.search-results::-webkit-scrollbar {
+    width: 6px;
+    background-color: transparent;
+}
+
+.stops-container::-webkit-scrollbar-thumb,
+.search-results::-webkit-scrollbar-thumb {
+    background-color: rgba(38, 70, 151, 0.3);
+    border-radius: 3px;
+    /* Gunakan transform untuk smooth hover */
+    transition: background-color 0.15s ease, transform 0.15s ease;
+    transform: translateZ(0);
+}
+
+.stops-container::-webkit-scrollbar-thumb:hover,
+.search-results::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(38, 70, 151, 0.5);
+    transform: translateZ(0) scaleY(1.2);
+}
+
+/* === Animation Performance === */
+/* Optimasi untuk transitions - gunakan properties yang bisa di-GPU accelerate */
+.badge-koridor-interaktif,
+.list-group-item,
+.btn {
+    /* Ganti transition yang expensive dengan yang cheap */
+    transition: transform 0.15s ease, opacity 0.15s ease !important;
+}
+
+/* Ganti translateY dengan transform3d untuk better performance */
+.badge-koridor-interaktif:hover,
+.list-group-item:hover,
+.route-service-type:hover {
+    transform: translate3d(0, -2px, 0) !important;
+}
+
+.btn:hover {
+    transform: translate3d(0, -1px, 0) scale3d(1.02, 1.02, 1) !important;
+}
+
+/* === Reduce Paint & Layout Thrashing === */
+/* Mengurangi repaints yang tidak perlu */
+.card,
+.list-group-item,
+.badge {
+    /* Isolate dari parent untuk mengurangi repaint area */
+    isolation: isolate;
+    contain: layout paint;
+}
+
+/* === Dark Mode Performance === */
+/* Optimasi untuk dark mode transitions */
+[data-theme="dark"] * {
+    /* Kurangi durasi transition untuk responsivitas yang lebih baik */
+    transition-duration: 0.2s !important;
+}
+
+.theme-transition {
+    transition: background-color 0.3s ease, color 0.3s ease !important;
+    will-change: background-color, color;
+}
+
+/* === Map Performance === */
+/* Optimasi untuk Leaflet map */
+.leaflet-container {
+    /* Force GPU acceleration */
+    transform: translate3d(0, 0, 0);
+    will-change: transform;
+    
+    /* Optimasi untuk mobile */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.leaflet-tile {
+    /* Optimasi tile rendering */
+    transform: translate3d(0, 0, 0);
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+}
+
+/* Popup optimizations */
+.leaflet-popup {
+    will-change: transform, opacity;
+    transform: translate3d(0, 0, 0);
+}
+
+/* === Search Results Performance === */
+.search-results .list-group-item {
+    /* Optimasi untuk search results yang sering di-update */
+    contain: layout paint;
+    will-change: contents;
+}
+
+/* === Responsive Performance === */
+/* Optimasi untuk mobile devices */
+@media (max-width: 768px) {
+    /* Kurangi kompleksitas animasi di mobile */
+    * {
+        transition-duration: 0.1s !important;
+    }
+    
+    .badge-koridor-interaktif:hover,
+    .list-group-item:hover,
+    .btn:hover {
+        /* Disable expensive transforms di mobile */
+        transform: none !important;
+    }
+    
+    /* Optimasi scroll untuk mobile */
+    .stops-container,
+    .search-results {
+        -webkit-overflow-scrolling: touch;
+        overflow: auto;
+        /* Disable will-change di mobile untuk memory efficiency */
+        will-change: auto;
+    }
+}
+
+/* === Critical Rendering Path Optimization === */
+/* Priority hints untuk browser */
+.list-group-item img,
+.badge img {
+    /* Lazy load optimization */
+    loading: lazy;
+    /* Prevent layout shifts */
+    width: auto;
+    height: auto;
+    max-width: 100%;
+}
+
+/* === Memory Management === */
+/* Clean up animations yang tidak terlihat */
+.list-group-item:not(:hover),
+.badge-koridor-interaktif:not(:hover),
+.btn:not(:hover) {
+    will-change: auto;
+}
+
+/* Force repaint untuk fix stuck animations */
+@keyframes force-repaint {
+    0% { opacity: 1; }
+    100% { opacity: 1; }
+}
+
+/* === Intersection Observer Optimization === */
+/* Untuk elemen yang masuk/keluar viewport */
+.lazy-animate {
+    will-change: transform, opacity;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.lazy-animate.in-view {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+.lazy-animate.out-view {
+    transform: translateY(20px);
+    opacity: 0;
+}
+
+/* === Browser Specific Optimizations === */
+/* Chrome/Webkit specific */
+@supports (-webkit-appearance: none) {
+    .list-group,
+    .search-results {
+        /* Enable hardware acceleration di webkit */
+        -webkit-transform: translate3d(0, 0, 0);
+        -webkit-backface-visibility: hidden;
+    }
+}
+
+/* Firefox specific */
+@-moz-document url-prefix() {
+    .stops-container,
+    .search-results {
+        /* Firefox scrollbar optimization */
+        scrollbar-width: thin;
+        scrollbar-color: rgba(38, 70, 151, 0.3) transparent;
+    }
+}
+
+/* === Prefetch & Preload Hints === */
+/* Untuk elemen yang akan dimuat */
+.route-card-container[data-loading="true"] {
+    contain: layout;
+    content-visibility: auto;
+}
+
+/* === Final Performance Tweaks === */
+/* Disable pointer events saat scrolling untuk mengurangi jitter */
+.scrolling * {
+    pointer-events: none !important;
+}
+
+/* Re-enable setelah scroll selesai */
+.scroll-ended * {
+    pointer-events: auto !important;
+}
