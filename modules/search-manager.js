@@ -3,6 +3,8 @@ export class SearchManager {
     constructor() {
         this.searchResults = [];
         this._debounceId = null;
+        this._searchCache = new Map();
+        this._lastQuery = '';
     }
 
     // Handle search input
@@ -10,12 +12,24 @@ export class SearchManager {
         const resultsDiv = document.getElementById('searchResults');
         if (!resultsDiv) return;
 
-        // Debounce 250ms
+        // Debounce 100ms untuk pencarian yang lebih responsif
         clearTimeout(this._debounceId);
         this._debounceId = setTimeout(() => {
             resultsDiv.innerHTML = '';
             const q = query.trim().toLowerCase();
-            if (q.length < 1) return;
+            if (q.length < 1) {
+                this._lastQuery = '';
+                return;
+            }
+            
+            // Check cache first untuk performa yang lebih baik
+            if (this._searchCache.has(q)) {
+                resultsDiv.innerHTML = this._searchCache.get(q);
+                this._lastQuery = q;
+                this._reattachEventListeners(resultsDiv);
+                return;
+            }
+            
             // Search for routes (single digit)
             if (q.length === 1 && !isNaN(q)) {
                 this.searchRoutes(q, resultsDiv);
@@ -24,33 +38,56 @@ export class SearchManager {
             if (q.length < 2) return;
             // Search for stops and routes
             this.searchStopsAndRoutes(q, resultsDiv);
-        }, 250);
+        }, 100);
     }
 
     // Search routes by number
     searchRoutes(query, resultsDiv) {
+        // Check cache first
+        if (this._searchCache.has(query)) {
+            resultsDiv.innerHTML = this._searchCache.get(query);
+            this._lastQuery = query;
+            this._reattachEventListeners(resultsDiv);
+            return;
+        }
+
         const routes = window.transJakartaApp.modules.gtfs.getRoutes();
         const foundRoutes = routes.filter(r =>
             r.route_short_name && r.route_short_name.toLowerCase() === query
         );
 
-        if (foundRoutes.length === 0) return;
-
         const ul = this.createResultsList();
         
-        // Add routes header
-        const routesHeader = document.createElement('li');
-        routesHeader.className = 'list-group-item fw-bold bg-light';
-        routesHeader.textContent = 'Layanan';
-        ul.appendChild(routesHeader);
+        if (foundRoutes.length === 0) {
+            this.addNoResultsMessage(ul, query);
+        } else {
+            // Add routes header
+            const routesHeader = document.createElement('li');
+            routesHeader.className = 'list-group-item fw-bold bg-light';
+            routesHeader.textContent = 'Layanan';
+            ul.appendChild(routesHeader);
 
-        // Add route results
-        foundRoutes.forEach(route => {
-            const li = this.createRouteResultItem(route);
-            ul.appendChild(li);
-        });
+            // Add route results
+            foundRoutes.forEach(route => {
+                const li = this.createRouteResultItem(route);
+                ul.appendChild(li);
+            });
+        }
 
         resultsDiv.appendChild(ul);
+        
+        // Optimize performance untuk elemen baru
+        if (typeof window.scrollOptimizer !== 'undefined') {
+            window.scrollOptimizer.optimizeNewElements(ul);
+        }
+        
+        // Cache hasil (max 50 entries)
+        if (this._searchCache.size >= 50) {
+            const firstKey = this._searchCache.keys().next().value;
+            this._searchCache.delete(firstKey);
+        }
+        this._searchCache.set(query, resultsDiv.innerHTML);
+        this._lastQuery = query;
     }
 
     // Search stops and routes
@@ -74,26 +111,52 @@ export class SearchManager {
         );
 
         const ul = this.createResultsList();
+        let hasResults = false;
+        let suggestionMessage = '';
 
         // Add routes results
         if (foundRoutes.length > 0) {
             this.addRoutesResults(foundRoutes, ul);
+            hasResults = true;
         }
 
-        // If no exact matches for stops, try fuzzy matches (edit distance <= 1)
+        // If no exact matches for stops, try fuzzy matches
         if (foundStops.length === 0 && query.length >= 3) {
-            const fuzzyStops = stops
-                .filter(s => !(String(s.stop_id || '').startsWith('E') || String(s.stop_id || '').startsWith('H')))
-                .filter(s => this.isFuzzyMatch(s.stop_name.toLowerCase(), query));
-            if (fuzzyStops.length > 0) foundStops = fuzzyStops;
+            const fuzzyResult = this.findFuzzyMatches(stops, query);
+            foundStops = fuzzyResult.matches;
+            suggestionMessage = fuzzyResult.suggestion;
         }
 
         // Add stops results
         if (foundStops.length > 0) {
             this.addStopsResults(foundStops, stopToRoutes, routes, ul);
+            hasResults = true;
+        }
+
+        // Tampilkan pesan saran jika ada
+        if (suggestionMessage && foundStops.length > 0) {
+            this.addSuggestionMessage(ul, suggestionMessage);
+        }
+
+        // Jika tidak ada hasil sama sekali
+        if (!hasResults) {
+            this.addNoResultsMessage(ul, query);
         }
 
         resultsDiv.appendChild(ul);
+        
+        // Optimize performance untuk elemen baru
+        if (typeof window.scrollOptimizer !== 'undefined') {
+            window.scrollOptimizer.optimizeNewElements(ul);
+        }
+        
+        // Cache hasil untuk performa yang lebih baik (max 50 entries)
+        if (this._searchCache.size >= 50) {
+            const firstKey = this._searchCache.keys().next().value;
+            this._searchCache.delete(firstKey);
+        }
+        this._searchCache.set(query, resultsDiv.innerHTML);
+        this._lastQuery = query;
     }
 
     // Create results list
@@ -171,7 +234,7 @@ export class SearchManager {
     // Create route result item
     createRouteResultItem(route) {
         const li = document.createElement('li');
-        li.className = 'list-group-item d-flex align-items-center gap-2 py-3';
+        li.className = 'list-group-item d-flex align-items-center gap-2 py-3 lazy-animate';
         
         const badgeColor = route.route_color ? ('#' + route.route_color) : '#6c757d';
         li.innerHTML = `
@@ -198,7 +261,13 @@ export class SearchManager {
     // Create stop result item
     createStopResultItem(stop, stopToRoutes, routes) {
         const li = document.createElement('li');
-        li.className = 'list-group-item';
+        li.className = 'list-group-item lazy-animate';
+        
+        // Add data attributes for caching support
+        li.setAttribute('data-stop-id', stop.stop_id || '');
+        li.setAttribute('data-stop-name', stop.stop_name || '');
+        li.setAttribute('data-stop-lat', stop.stop_lat || '');
+        li.setAttribute('data-stop-lon', stop.stop_lon || '');
 
         // Header: name + intermodal icons (left), accessibility icon (right)
         const header = document.createElement('div');
@@ -328,6 +397,8 @@ export class SearchManager {
     reset() {
         this.clearSearchResults();
         this.searchResults = [];
+        this._searchCache.clear();
+        this._lastQuery = '';
     }
 
     // Highlight query terms in a text
@@ -343,16 +414,146 @@ export class SearchManager {
         } catch (e) { return text; }
     }
 
-    // Basic fuzzy match: allow edit distance <= 1 or prefix within 1 error
+    // Enhanced fuzzy match with better typo tolerance
     isFuzzyMatch(text, query) {
         const t = String(text || '').toLowerCase();
         const q = String(query || '').toLowerCase();
+        
+        // Exact substring match
         if (t.includes(q)) return true;
-        // Quick prefix check with one typo allowed
-        if (this.levenshtein(t.substring(0, q.length + 1), q) <= 1) return true;
-        // Full distance threshold 1 for short queries, 2 for longer
-        const thr = q.length >= 6 ? 2 : 1;
-        return this.levenshtein(t, q) <= thr;
+        
+        // Check for common typo patterns
+        if (this.checkCommonTypos(t, q)) return true;
+        
+        // Word-based matching for better results
+        const textWords = t.split(/\s+/);
+        const queryWords = q.split(/\s+/);
+        
+        // Check if query matches any word with typos
+        for (const word of textWords) {
+            if (this.wordSimilarity(word, q) >= 0.7) return true;
+        }
+        
+        // Check word-by-word similarity
+        if (queryWords.length > 1) {
+            let matchedWords = 0;
+            for (const qWord of queryWords) {
+                for (const tWord of textWords) {
+                    if (this.wordSimilarity(tWord, qWord) >= 0.8) {
+                        matchedWords++;
+                        break;
+                    }
+                }
+            }
+            if (matchedWords >= Math.ceil(queryWords.length * 0.7)) return true;
+        }
+        
+        // Fallback to edit distance
+        const threshold = Math.max(1, Math.floor(q.length * 0.3));
+        return this.levenshtein(t, q) <= threshold;
+    }
+    
+    // Check for common typo patterns
+    checkCommonTypos(text, query) {
+        // Handle missing first character (e.g., 'wlikota' -> 'walikota')
+        if (query.length >= 3) {
+            const withFirstChar = this.generateFirstCharCandidates(query);
+            for (const candidate of withFirstChar) {
+                if (text.includes(candidate)) return true;
+            }
+        }
+        
+        // Handle swapped characters (e.g., 'halte' -> 'halte')
+        if (query.length >= 4) {
+            const swapped = this.generateSwappedCandidates(query);
+            for (const candidate of swapped) {
+                if (text.includes(candidate)) return true;
+            }
+        }
+        
+        // Handle extra character (e.g., 'haltte' -> 'halte')
+        if (query.length >= 3) {
+            const withoutExtra = this.generateWithoutExtraCandidates(query);
+            for (const candidate of withoutExtra) {
+                if (text.includes(candidate)) return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    // Generate candidates with first character added
+    generateFirstCharCandidates(query) {
+        // Focus on common Indonesian prefixes and characters
+        const commonFirstChars = ['a', 'b', 'c', 'd', 'e', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'r', 's', 't', 'u', 'w'];
+        const candidates = commonFirstChars.map(char => char + query);
+        
+        // Special handling for Indonesian words
+        const specialPrefixes = {
+            'wlikota': ['walikota'], // Handle the specific example
+            'alimkopi': ['halimkopi'], // Common pattern
+            'onor': ['honor'], // Missing 'h'
+            'alim': ['halim'], // Missing 'h'
+            'arta': ['harta'], // Missing 'h'
+        };
+        
+        if (specialPrefixes[query]) {
+            candidates.push(...specialPrefixes[query]);
+        }
+        
+        return candidates;
+    }
+    
+    // Generate candidates with swapped adjacent characters
+    generateSwappedCandidates(query) {
+        const candidates = [];
+        for (let i = 0; i < query.length - 1; i++) {
+            const chars = query.split('');
+            [chars[i], chars[i + 1]] = [chars[i + 1], chars[i]];
+            candidates.push(chars.join(''));
+        }
+        return candidates;
+    }
+    
+    // Generate candidates with one character removed
+    generateWithoutExtraCandidates(query) {
+        const candidates = [];
+        for (let i = 0; i < query.length; i++) {
+            candidates.push(query.slice(0, i) + query.slice(i + 1));
+        }
+        return candidates;
+    }
+    
+    // Calculate word similarity using multiple metrics
+    wordSimilarity(word1, word2) {
+        if (word1 === word2) return 1.0;
+        if (word1.length === 0 || word2.length === 0) return 0.0;
+        
+        const maxLen = Math.max(word1.length, word2.length);
+        const editDistance = this.levenshtein(word1, word2);
+        const editSimilarity = 1 - (editDistance / maxLen);
+        
+        // Bonus for common prefixes/suffixes
+        let prefixBonus = 0;
+        let suffixBonus = 0;
+        
+        for (let i = 0; i < Math.min(word1.length, word2.length); i++) {
+            if (word1[i] === word2[i]) {
+                prefixBonus += 0.1;
+            } else {
+                break;
+            }
+        }
+        
+        for (let i = 1; i <= Math.min(word1.length, word2.length); i++) {
+            if (word1[word1.length - i] === word2[word2.length - i]) {
+                suffixBonus += 0.1;
+            } else {
+                break;
+            }
+        }
+        
+        return Math.min(1.0, editSimilarity + prefixBonus + suffixBonus);
     }
 
     levenshtein(a, b) {
@@ -374,6 +575,165 @@ export class SearchManager {
             }
         }
         return dp[n];
+    }
+
+    // Improved fuzzy matching with better typo tolerance
+    findFuzzyMatches(stops, query) {
+        const cleanQuery = query.toLowerCase().trim();
+        const filteredStops = stops.filter(s => 
+            !(String(s.stop_id || '').startsWith('E') || String(s.stop_id || '').startsWith('H'))
+        );
+        
+        let bestMatches = [];
+        let suggestionText = '';
+        
+        // First try: exact fuzzy matches
+        const fuzzyMatches = filteredStops.filter(s => 
+            this.isFuzzyMatch(s.stop_name.toLowerCase(), cleanQuery)
+        );
+        
+        if (fuzzyMatches.length > 0) {
+            bestMatches = fuzzyMatches;
+        } else {
+            // Advanced typo correction - check for common patterns
+            const suggestions = this.findTypoSuggestions(filteredStops, cleanQuery);
+            if (suggestions.length > 0) {
+                const bestSuggestion = suggestions[0];
+                suggestionText = `Mungkin maksud Anda: ${bestSuggestion.name}`;
+                bestMatches = [bestSuggestion.stop];
+            }
+        }
+        
+        return {
+            matches: bestMatches,
+            suggestion: suggestionText
+        };
+    }
+    
+    // Advanced typo suggestion finder
+    findTypoSuggestions(stops, query) {
+        const suggestions = [];
+        const queryLen = query.length;
+        
+        stops.forEach(stop => {
+            const stopName = stop.stop_name.toLowerCase();
+            const words = stopName.split(/\s+/);
+            
+            // Check each word for typo similarity
+            words.forEach(word => {
+                if (Math.abs(word.length - queryLen) <= 2) {
+                    const distance = this.levenshtein(word, query);
+                    const similarity = 1 - (distance / Math.max(word.length, queryLen));
+                    
+                    // More lenient threshold for better typo detection
+                    if (similarity >= 0.6 || distance <= 2) {
+                        suggestions.push({
+                            stop: stop,
+                            name: stop.stop_name,
+                            similarity: similarity,
+                            distance: distance
+                        });
+                    }
+                }
+            });
+            
+            // Also check full name similarity
+            const fullDistance = this.levenshtein(stopName, query);
+            const fullSimilarity = 1 - (fullDistance / Math.max(stopName.length, queryLen));
+            if (fullSimilarity >= 0.5) {
+                suggestions.push({
+                    stop: stop,
+                    name: stop.stop_name,
+                    similarity: fullSimilarity,
+                    distance: fullDistance
+                });
+            }
+        });
+        
+        // Sort by similarity (highest first) and remove duplicates
+        const uniqueSuggestions = suggestions
+            .filter((item, index, arr) => 
+                arr.findIndex(s => s.stop.stop_id === item.stop.stop_id) === index
+            )
+            .sort((a, b) => b.similarity - a.similarity)
+            .slice(0, 3); // Top 3 suggestions
+            
+        return uniqueSuggestions;
+    }
+    
+    // Add no results message
+    addNoResultsMessage(ul, query) {
+        const li = document.createElement('li');
+        li.className = 'list-group-item text-center text-muted py-4';
+        li.innerHTML = `
+            <div class="d-flex flex-column align-items-center gap-2">
+                <iconify-icon icon="mdi:magnify-remove-outline" style="font-size: 2rem; opacity: 0.6;"></iconify-icon>
+                <div>
+                    <div class="fw-bold">Tidak ada hasil ditemukan</div>
+                    <div class="small">untuk pencarian "<span class="fw-semibold">${this.escapeHtml(query)}</span>"</div>
+                    <div class="small mt-2 text-muted">Coba kata kunci yang berbeda atau periksa ejaan</div>
+                </div>
+            </div>
+        `;
+        ul.appendChild(li);
+    }
+    
+    // Add suggestion message
+    addSuggestionMessage(ul, suggestion) {
+        const li = document.createElement('li');
+        li.className = 'list-group-item bg-light border-0';
+        li.innerHTML = `
+            <div class="d-flex align-items-center gap-2 text-primary">
+                <iconify-icon icon="mdi:lightbulb-outline" style="font-size: 1.2rem;"></iconify-icon>
+                <small class="fw-semibold">${suggestion}</small>
+            </div>
+        `;
+        ul.insertBefore(li, ul.firstChild);
+    }
+    
+    // Reattach event listeners after loading from cache
+    _reattachEventListeners(container) {
+        // Reattach click events for route badges
+        container.querySelectorAll('.badge[data-routeid]').forEach(badge => {
+            badge.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const routeId = badge.getAttribute('data-routeid');
+                window.transJakartaApp.modules.routes.selectRoute(routeId);
+                this.clearSearchResults();
+            });
+        });
+        
+        // Reattach click events for list items
+        container.querySelectorAll('.list-group-item').forEach(item => {
+            if (item.onclick) {
+                // Item already has onclick, skip
+                return;
+            }
+            
+            // Check if this is a stop item (has data attributes or coordinates)
+            const stopLat = item.getAttribute('data-stop-lat');
+            const stopLon = item.getAttribute('data-stop-lon');
+            if (stopLat && stopLon) {
+                item.onclick = () => {
+                    const stop = {
+                        stop_lat: parseFloat(stopLat),
+                        stop_lon: parseFloat(stopLon),
+                        stop_name: item.getAttribute('data-stop-name') || '',
+                        stop_id: item.getAttribute('data-stop-id') || ''
+                    };
+                    this.showStopOnMap(stop);
+                    this.clearSearchResults();
+                };
+            }
+        });
+    }
+    
+    // HTML escape utility
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 } 
  
