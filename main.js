@@ -35,8 +35,8 @@ class TransJakartaApp {
                 this.modules.settings.init()
             ]);
             
-            // Step 2: Initialize map immediately (lightweight)
-            this.modules.map.initLightweight();
+            // Step 2: Initialize map immediately
+            this.modules.map.init();
             
             // Step 3: Setup basic event listeners and clock
             this.setupEventListeners();
@@ -68,8 +68,18 @@ class TransJakartaApp {
             () => this.modules.ui.init(),
             () => this.modules.journey.init(),
             () => this.loadSavedState(),
-            () => this.modules.map.loadStopsLazy(), // Lazy load stops
-            () => this.modules.ui.populateDropdownsLazy() // Lazy populate dropdowns
+            () => {
+                // Lazy load stops - check if method exists
+                if (this.modules.map.loadStopsLazy) {
+                    this.modules.map.loadStopsLazy();
+                }
+            },
+            () => {
+                // Lazy populate dropdowns - check if method exists
+                if (this.modules.ui.populateDropdownsLazy) {
+                    this.modules.ui.populateDropdownsLazy();
+                }
+            }
         ];
 
         // Execute tasks when browser is idle
