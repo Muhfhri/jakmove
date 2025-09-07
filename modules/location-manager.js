@@ -191,6 +191,17 @@ export class LocationManager {
 
         // Update user marker with smoothed position
         this.animateUserMarkerTo(this.lastUserPosSmoothed.lat, this.lastUserPosSmoothed.lon);
+        
+        // CRITICAL: Also update popup position when user moves (if popup is active)
+        try {
+            const mapManager = window.transJakartaApp.modules.map;
+            if (mapManager && mapManager.userPopup && mapManager.userPopup.isOpen()) {
+                // Update popup position for both detailed route info and simple "Posisi Anda" popup
+                this.animatePopupTo(this.lastUserPosSmoothed.lat, this.lastUserPosSmoothed.lon);
+            }
+        } catch (e) {
+            console.debug('[Location] Error updating popup position:', e);
+        }
 
         // Camera follow if locked + auto-tilt adaptif (avoid oscillation when stopped)
         let cameraLocked = false;
@@ -490,7 +501,11 @@ export class LocationManager {
         if (mapManager && this.userMarker) {
             // Cache stop for interactions
             this._lastLiveStopForPopup = (this.arrivalStop || nextStop) || currentStop;
+            
+            // Update both content AND position
             mapManager.updateUserPopup(this.userMarker, popupContent);
+            this.animatePopupTo(userLat, userLon); // CRITICAL: Update popup position!
+            
             // Bind live popup interactions (route badges + platform badges)
             setTimeout(() => { this._bindLivePopupInteractions(); }, 30);
             // Render label halte berikutnya di peta
@@ -530,13 +545,12 @@ export class LocationManager {
         
         const popupContent = this.buildUserPopupContent(route, currentStop, nextStop, userLat, userLon);
         
-        // Update content first
+        // Update content and position together
         if (mapManager.userPopup) {
             mapManager.userPopup.setHTML(popupContent);
+            // ALWAYS update position when content is updated
+            this.animatePopupTo(userLat, userLon);
         }
-        
-        // Then animate position smoothly
-        this.animatePopupTo(userLat, userLon);
     }
 
     // Build user popup content
@@ -1094,8 +1108,8 @@ export class LocationManager {
             return;
         }
         
-        // If distance is very small (< 3 meters), snap directly for responsiveness
-        if (distance < 3) {
+        // If distance is very small (< 5 meters), snap directly for responsiveness
+        if (distance < 5) {
             mapManager.userPopup.setLngLat([targetLon, targetLat]);
             this._renderedPopupPos = { lat: targetLat, lon: targetLon };
             return;

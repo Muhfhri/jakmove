@@ -1385,16 +1385,29 @@ export class MapManager {
         const coords = src._data.geometry && src._data.geometry.coordinates;
         if (!coords) return;
         if (!this.userPopup) return;
+        
+        // Show popup and ensure it follows user movement
         this.userPopup.setLngLat(coords).setHTML('Posisi Anda').addTo(this.map);
+        
+        // Initialize popup tracking for location manager
+        try {
+            const loc = window.transJakartaApp.modules.location;
+            if (loc) {
+                loc._renderedPopupPos = { lat: coords[1], lon: coords[0] };
+            }
+        } catch (e) {}
     }
 
     updateUserPopup(_markerId, html) {
-        // This function is now mainly for content updates
-        // Position updates should use smooth animation via location manager
+        // This function updates content and ensures popup is visible
+        // Position updates are handled by location manager's animatePopupTo
         if (!this.userPopup) return;
+        
         this.userPopup.setHTML(html);
+        
+        // Ensure popup is always visible and positioned correctly
         if (!this.userPopup.isOpen()) {
-            // If popup is not open, we need to position it and show it
+            // If popup is not open, position it and show it
             const src = this.map.getSource('user-source');
             if (src && src._data) {
                 const coords = src._data.geometry && src._data.geometry.coordinates;
