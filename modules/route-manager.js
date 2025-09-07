@@ -343,14 +343,14 @@ export class RouteManager {
         // Create share text with complete information
         const shareText = `JakMove - Transjakarta Fan Made Website
 
-📱 ${routeInfo.routeName} - ${routeInfo.routeLongName}
-🏢 ${routeInfo.routeType}
-💰 Tarif: ${this.getFareInfo(route.route_id)}
-⏰ ${operatingHours}
-📅 ${operatingDays}
+${routeInfo.routeName} - ${routeInfo.routeLongName}
+Jenis: ${routeInfo.routeType}
+Tarif: ${this.getFareInfo(route.route_id)}
+Jam Operasi: ${operatingHours}
+Hari Operasi: ${operatingDays}
 
-🔗 Link Rute: ${routeInfo.url}
-🌐 github.com/muhfhri/jakmove
+Link Rute: ${routeInfo.url}
+Github: github.com/muhfhri/jakmove
 
 #INTEGRASI #KINILEBIHBAIK #JakLingko`;
 
@@ -1883,11 +1883,11 @@ export class RouteManager {
                 timeLeft: '24 jam',
                 color: '#10b981',
                 icon: 'mdi:clock-check',
-                message: '🌟 Beroperasi 24 jam',
+                message: 'Beroperasi 24 jam',
                 html: `
                     <div class='countdown-status countdown-24-hour' style='color: #10b981; border-color: #10b981;'>
                         <iconify-icon icon='mdi:clock-check' style='margin-right: 4px;'></iconify-icon>
-                        <span class='countdown-message'>🌟 Beroperasi 24 jam</span>
+                        <span class='countdown-message'>Beroperasi 24 jam</span>
                     </div>
                 `
             };
@@ -1915,17 +1915,17 @@ export class RouteManager {
                 status = 'running-good';
                 color = '#10b981';
                 icon = 'mdi:check-circle';
-                message = '✅ Sedang beroperasi - berakhir dalam';
+                message = 'Sedang beroperasi - berakhir dalam';
             } else if (timeLeft > 3600) { // > 1 hour
                 status = 'running-warning';
                 color = '#f59e0b';
                 icon = 'mdi:clock-alert';
-                message = '⚠️ Segera berakhir dalam';
+                message = 'Segera berakhir dalam';
             } else if (timeLeft > 0) { // < 1 hour
                 status = 'running-danger';
                 color = '#ef4444';
                 icon = 'mdi:timer-alert';
-                message = '🚨 Hampir berakhir dalam';
+                message = 'Hampir berakhir dalam';
             }
         } else {
             // Service has ended - calculate time until next operation
@@ -1936,12 +1936,12 @@ export class RouteManager {
             icon = 'mdi:clock-outline';
             
             if (timeUntilNextStart < 3600) {
-                message = '🔄 Segera beroperasi dalam';
+                message = 'Segera beroperasi dalam';
                 color = '#f59e0b';
                 icon = 'mdi:clock-alert';
                 status = 'waiting';
             } else {
-                message = '⏰ Beroperasi lagi dalam';
+                message = 'Beroperasi lagi dalam';
             }
         }
         
