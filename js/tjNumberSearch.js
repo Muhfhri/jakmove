@@ -549,11 +549,11 @@ function renderBusSearchResults(results) {
         <span class="badge rounded-5 bg-primary fs-3 px-4 py-2"
           style="${
             (bus.operator === 'Mayasari Bakti' && tahunBus && tahunBus >= 2021)
-              ? "font-family:'PT Sans Narrow',sans-serif;"
+              ? "font-family:'PT Sans',sans-serif;"
               : (bus.operatorCode === 'SAF' || bus.operatorCode === 'BMP' || (tahunBus && tahunBus < 2021 && bus.operatorCode !== 'MB' && bus.operatorCode !== 'MYS' && bus.operatorCode !== 'DMR'))
                 ? (
                     bus.operator === 'Bianglala Metropolitan' && nomorBus.length === 6 && (nomorBus.startsWith('23') || nomorBus.startsWith('24'))
-                      ? "font-family:'PT Sans Narrow',sans-serif;"
+                      ? "font-family:'PT Sans',sans-serif;"
                       : "font-family:'Rubik','New Rubik',sans-serif;"
                   )
                 : ((bus.operatorCode === 'MB' || bus.operatorCode === 'MYS' || (bus.operatorCode === 'DMR' && nomorBus.length === 3))
@@ -564,12 +564,12 @@ function renderBusSearchResults(results) {
         >${badgeNomor}</span>
         ${bus.operator === 'Sinar Jaya' ? '<div class="fw-bold mt-1">Sinar Jaya</div>' : ''}
       </div>
-      <div class="mb-2 fw-bold" style="${bus.operator === 'Bianglala Metropolitan' && nomorBus.length === 6 && (nomorBus.startsWith('23') || nomorBus.startsWith('24')) ? "font-family:'PT Sans Narrow',sans-serif;" : ''}">${infoRingkas}</div>
+      <div class="mb-2 fw-bold" style="${bus.operator === 'Bianglala Metropolitan' && nomorBus.length === 6 && (nomorBus.startsWith('23') || nomorBus.startsWith('24')) ? "font-family:'PT Sans',sans-serif;" : ''}">${infoRingkas}</div>
       <div class="mb-2">
         <div>${bus.tipe}</div>
         <div>${bus.warna}</div>
         <div class="fw-bold">
-          ${bus.bahanBakar === 'Listrik' ? '<span style="font-family:\'PT Sans Narrow\',sans-serif;">Bus Listrik <iconify-icon inline icon="streamline:electric-cord-3-remix"></iconify-icon></span>' : ''}
+          ${bus.bahanBakar === 'Listrik' ? '<span style="font-family:\'PT Sans\',sans-serif;">Bus Listrik <iconify-icon inline icon="streamline:electric-cord-3-remix"></iconify-icon></span>' : ''}
           ${bus.bahanBakar === 'BBG' ? 'Bus BBG / Gas Alam Terkompresi <iconify-icon inline icon="icon-park-outline:gas"></iconify-icon>' : ''}
           ${bus.bahanBakar === 'Diesel' ? 'Diesel <iconify-icon inline icon="bi:fuel-pump-diesel"></iconify-icon>' : ''}
         </div>

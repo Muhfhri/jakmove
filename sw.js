@@ -24,7 +24,12 @@ const PRECACHE_URLS = [
 	'gtfs/fare_attributes.txt',
 	'gtfs/transfers.txt',
 	'gtfs/calendar.txt',
-	'gtfs/agency.txt'
+	'gtfs/agency.txt',
+	// Critical app files
+	'main.js',
+	'modules/gtfs-loader.js',
+	'modules/map-manager.js',
+	'css/style.css'
 ];
 
 self.addEventListener('install', (event) => {

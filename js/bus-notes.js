@@ -28,7 +28,7 @@ class BusNotesManager {
 
         // Clear form button
         document.getElementById('clearForm').addEventListener('click', () => {
-            this.clearForm();
+            this.resetForm();
         });
 
         // Export notes button
@@ -47,16 +47,47 @@ class BusNotesManager {
         });
     }
 
-    // Load GTFS routes data
+    // Load GTFS routes data with caching
     async loadGTFSRoutes() {
+        const CACHE_KEY = 'jakMove_gtfs_routes_cache';
+        const CACHE_EXPIRY_KEY = 'jakMove_gtfs_routes_expiry';
+        const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+        
         try {
+            // Check if we have cached data
+            const cachedData = localStorage.getItem(CACHE_KEY);
+            const cacheExpiry = localStorage.getItem(CACHE_EXPIRY_KEY);
+            const now = Date.now();
+            
+            // Use cached data if it exists and hasn't expired
+            if (cachedData && cacheExpiry && now < parseInt(cacheExpiry)) {
+                this.gtfsRoutes = JSON.parse(cachedData);
+                console.log('GTFS routes loaded from cache:', this.gtfsRoutes.length);
+                return;
+            }
+            
+            // Load from server if no cache or cache expired
+            console.log('Loading GTFS routes from server...');
             const response = await fetch('gtfs/routes.txt');
             const csvText = await response.text();
             this.gtfsRoutes = this.parseCSV(csvText);
-            console.log('GTFS routes loaded:', this.gtfsRoutes.length);
+            
+            // Cache the data
+            localStorage.setItem(CACHE_KEY, JSON.stringify(this.gtfsRoutes));
+            localStorage.setItem(CACHE_EXPIRY_KEY, (now + CACHE_DURATION).toString());
+            
+            console.log('GTFS routes loaded and cached:', this.gtfsRoutes.length);
         } catch (error) {
             console.error('Error loading GTFS routes:', error);
-            this.gtfsRoutes = [];
+            
+            // Try to use cached data even if expired as fallback
+            const cachedData = localStorage.getItem(CACHE_KEY);
+            if (cachedData) {
+                this.gtfsRoutes = JSON.parse(cachedData);
+                console.log('Using expired cache as fallback:', this.gtfsRoutes.length);
+            } else {
+                this.gtfsRoutes = [];
+            }
         }
     }
 
@@ -262,26 +293,22 @@ class BusNotesManager {
         `;
     }
 
-    // Add new note
+    // Add new note or update existing note
     addNote() {
         const busNumber = document.getElementById('busNumber').value.trim();
         const busType = document.getElementById('busType').value.trim();
         const busOperator = document.getElementById('busOperator').value.trim();
         const busRoute = document.getElementById('busRoute').value.trim();
         const noteText = document.getElementById('noteText').value.trim();
+        const editingId = document.getElementById('busNoteForm').dataset.editingId;
 
         if (!busNumber) {
             this.showAlert('Nomor bus harus diisi!', 'warning');
             return;
         }
 
-        // Check if note already exists
-        const existingNote = this.notes.find(note => 
-            note.busNumber.toLowerCase() === busNumber.toLowerCase()
-        );
-
-        if (existingNote) {
-            this.showAlert('Catatan untuk nomor bus ini sudah ada!', 'warning');
+        if (!busRoute) {
+            this.showAlert('Rute bus harus diisi!', 'warning');
             return;
         }
 
@@ -291,23 +318,58 @@ class BusNotesManager {
             busImageUrl = this.getBusImageUrl(busType, busOperator, busNumber);
         }
 
-        const newNote = {
-            id: Date.now().toString(),
-            busNumber: busNumber.toUpperCase(),
-            busType: busType || 'Tidak diketahui',
-            busOperator: busOperator || 'Tidak diketahui',
-            busRoute: busRoute ? busRoute.toUpperCase() : '',
-            noteText: noteText,
-            busImageUrl: busImageUrl,
-            dateAdded: new Date().toISOString(),
-            timestamp: Date.now()
-        };
+        if (editingId) {
+            // Update existing note
+            const noteIndex = this.notes.findIndex(note => note.id === editingId);
+            if (noteIndex !== -1) {
+                // Keep original date and timestamp, update other fields
+                const originalNote = this.notes[noteIndex];
+                this.notes[noteIndex] = {
+                    ...originalNote,
+                    busNumber: busNumber.toUpperCase(),
+                    busType: busType || 'Tidak diketahui',
+                    busOperator: busOperator || 'Tidak diketahui',
+                    busRoute: busRoute ? busRoute.toUpperCase() : '',
+                    noteText: noteText,
+                    busImageUrl: busImageUrl,
+                    lastModified: new Date().toISOString()
+                };
+                
+                this.saveNotes();
+                this.updateNotesDisplay();
+                this.resetForm();
+                this.showAlert('Catatan berhasil diperbarui!', 'success');
+            }
+        } else {
+            // Check if note already exists (for new notes only)
+            const existingNote = this.notes.find(note => 
+                note.busNumber.toLowerCase() === busNumber.toLowerCase()
+            );
 
-        this.notes.unshift(newNote); // Add to beginning of array
-        this.saveNotes();
-        this.updateNotesDisplay();
-        this.clearForm();
-        this.showAlert('Catatan berhasil disimpan!', 'success');
+            if (existingNote) {
+                this.showAlert('Catatan untuk nomor bus ini sudah ada!', 'warning');
+                return;
+            }
+
+            // Add new note
+            const newNote = {
+                id: Date.now().toString(),
+                busNumber: busNumber.toUpperCase(),
+                busType: busType || 'Tidak diketahui',
+                busOperator: busOperator || 'Tidak diketahui',
+                busRoute: busRoute ? busRoute.toUpperCase() : '',
+                noteText: noteText,
+                busImageUrl: busImageUrl,
+                dateAdded: new Date().toISOString(),
+                timestamp: Date.now()
+            };
+
+            this.notes.unshift(newNote); // Add to beginning of array
+            this.saveNotes();
+            this.updateNotesDisplay();
+            this.clearForm();
+            this.showAlert('Catatan berhasil disimpan!', 'success');
+        }
     }
 
     // Get bus image URL from busImages
@@ -345,6 +407,58 @@ class BusNotesManager {
         return imageUrl || '';
     }
 
+    // Edit note
+    editNote(noteId) {
+        const note = this.notes.find(n => n.id === noteId);
+        if (!note) {
+            this.showAlert('Catatan tidak ditemukan!', 'warning');
+            return;
+        }
+
+        // Populate form with note data
+        document.getElementById('busNumber').value = note.busNumber;
+        document.getElementById('busType').value = note.busType;
+        document.getElementById('busOperator').value = note.busOperator;
+        document.getElementById('busRoute').value = note.busRoute;
+        document.getElementById('noteText').value = note.noteText || '';
+
+        // Show bus info preview if available
+        if (note.busType && note.busType !== 'Tidak diketahui') {
+            this.showBusPreviewForEdit(note.busNumber, note.busType, note.busOperator);
+        }
+
+        // Store the ID of note being edited
+        document.getElementById('busNoteForm').dataset.editingId = noteId;
+        
+        // Change form title and button text
+        const headerTitle = document.querySelector('.card-header-modern .header-title');
+        const submitBtn = document.querySelector('#busNoteForm button[type="submit"]');
+        
+        if (headerTitle) headerTitle.textContent = 'Edit Catatan';
+        if (submitBtn) submitBtn.innerHTML = '<iconify-icon icon="mdi:content-save"></iconify-icon> Update Catatan';
+
+        // Scroll to form
+        document.querySelector('.modern-card').scrollIntoView({ behavior: 'smooth' });
+        
+        this.showAlert('Mode edit diaktifkan. Silakan ubah data lalu klik Update Catatan.', 'info');
+    }
+
+    // Show bus preview for edit mode
+    showBusPreviewForEdit(busNumber, busType, busOperator) {
+        const busInfoPreview = document.getElementById('busInfoPreview');
+        
+        // Create mock bus object for preview
+        const bus = {
+            number: busNumber,
+            tipe: busType,
+            operator: busOperator
+        };
+        
+        // Show preview
+        busInfoPreview.innerHTML = this.generateBusPreview(bus);
+        busInfoPreview.style.display = 'block';
+    }
+
     // Delete note
     deleteNote(noteId) {
         if (confirm('Yakin ingin menghapus catatan ini?')) {
@@ -353,6 +467,21 @@ class BusNotesManager {
             this.updateNotesDisplay();
             this.showAlert('Catatan berhasil dihapus!', 'info');
         }
+    }
+
+    // Reset form after edit
+    resetForm() {
+        this.clearForm();
+        
+        // Reset form to add mode
+        delete document.getElementById('busNoteForm').dataset.editingId;
+        
+        // Reset form title and button text
+        const headerTitle = document.querySelector('.card-header-modern .header-title');
+        const submitBtn = document.querySelector('#busNoteForm button[type="submit"]');
+        
+        if (headerTitle) headerTitle.textContent = 'Tambah Catatan Baru';
+        if (submitBtn) submitBtn.innerHTML = '<iconify-icon icon="mdi:content-save"></iconify-icon> Simpan Catatan';
     }
 
     // Clear form
@@ -543,9 +672,14 @@ class BusNotesManager {
                 
                 <div class="d-flex justify-content-between align-items-start mb-3">
                     <span class="badge bg-primary bus-note-number">${note.busNumber}</span>
-                    <button class="btn-action btn-action-danger delete-note-btn" onclick="busNotesManager.deleteNote('${note.id}')" title="Hapus catatan">
-                        <iconify-icon icon="mdi:delete"></iconify-icon>
-                    </button>
+                    <div class="d-flex gap-2">
+                        <button class="btn-action btn-action-primary edit-note-btn" onclick="busNotesManager.editNote('${note.id}')" title="Edit catatan">
+                            <iconify-icon icon="mdi:pencil"></iconify-icon>
+                        </button>
+                        <button class="btn-action btn-action-danger delete-note-btn" onclick="busNotesManager.deleteNote('${note.id}')" title="Hapus catatan">
+                            <iconify-icon icon="mdi:delete"></iconify-icon>
+                        </button>
+                    </div>
                 </div>
                 
                 <div class="bus-note-operator mb-2">${note.busOperator}</div>

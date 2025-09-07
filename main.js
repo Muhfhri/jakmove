@@ -29,25 +29,21 @@ class TransJakartaApp {
             this.modules.ui = new UIManager();
             this.modules.journey = new JourneyPlanner(this);
 
-            // Load GTFS data
-            await this.modules.gtfs.loadData();
-            this.modules.settings.init();
+            // Step 1: Load GTFS data and basic settings
+            const [gtfsData] = await Promise.all([
+                this.modules.gtfs.loadData(),
+                this.modules.settings.init()
+            ]);
             
-            // Initialize map
-            this.modules.map.init();
+            // Step 2: Initialize map immediately (lightweight)
+            this.modules.map.initLightweight();
             
-            // Setup UI (dropdowns, buttons)
-            this.modules.ui.init();
-            this.modules.journey.init();
-
-            // Setup event listeners
+            // Step 3: Setup basic event listeners and clock
             this.setupEventListeners();
-            
-            // Start live clock
             this.initLiveClock();
             
-            // Load saved state
-            this.loadSavedState();
+            // Step 4: Lazy load heavy UI components in background
+            this.deferredUIInit();
 
             // Handle URL parameter for direct route selection (e.g., index.html?route_id=3F)
             try {
@@ -62,6 +58,45 @@ class TransJakartaApp {
         } catch (error) {
             console.error('Failed to initialize app:', error);
             this.showError('Gagal memuat aplikasi');
+        }
+    }
+
+    // Deferred initialization for heavy UI components
+    async deferredUIInit() {
+        // Use requestIdleCallback for non-blocking background tasks
+        const deferredTasks = [
+            () => this.modules.ui.init(),
+            () => this.modules.journey.init(),
+            () => this.loadSavedState(),
+            () => this.modules.map.loadStopsLazy(), // Lazy load stops
+            () => this.modules.ui.populateDropdownsLazy() // Lazy populate dropdowns
+        ];
+
+        // Execute tasks when browser is idle
+        let taskIndex = 0;
+        const executeNextTask = () => {
+            if (taskIndex < deferredTasks.length) {
+                try {
+                    deferredTasks[taskIndex]();
+                } catch (e) {
+                    console.warn('Deferred task failed:', e);
+                }
+                taskIndex++;
+                
+                // Schedule next task
+                if (window.requestIdleCallback) {
+                    requestIdleCallback(executeNextTask, { timeout: 1000 });
+                } else {
+                    setTimeout(executeNextTask, 16); // ~60fps fallback
+                }
+            }
+        };
+
+        // Start executing deferred tasks
+        if (window.requestIdleCallback) {
+            requestIdleCallback(executeNextTask, { timeout: 1000 });
+        } else {
+            setTimeout(executeNextTask, 0);
         }
     }
 

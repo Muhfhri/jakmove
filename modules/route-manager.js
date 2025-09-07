@@ -618,8 +618,8 @@ export class RouteManager {
                     <!-- Web Info section -->
                     <div class="route-web-section" style="text-align: center; margin-top: 24px; padding: 20px; background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); border-radius: 12px; border: 1px solid #e2e8f0;">
                         <div class="web-info" style="text-align: center; margin-bottom: 12px;">
-                            <div style="font-size: 1.2rem; color: #3b82f6; font-weight: 700; margin-bottom: 6px; font-family: 'PT Sans Narrow', sans-serif; letter-spacing: 0.5px;">github.com/muhfhri/jakmove</div>
-                            <div style="font-size: 1rem; color: #64748b; font-weight: 500; font-family: 'PT Sans Narrow', sans-serif; font-style: italic;">Smart Transit Experience</div>
+                            <div style="font-size: 1.2rem; color: #3b82f6; font-weight: 700; margin-bottom: 6px; font-family: 'PT Sans', sans-serif; letter-spacing: 0.5px;">github.com/muhfhri/jakmove</div>
+                            <div style="font-size: 1rem; color: #64748b; font-weight: 500; font-family: 'PT Sans', sans-serif; font-style: italic;">Smart Transit Experience</div>
                         </div>
                         <div class="web-url" style="margin-top: 8px;">
                             <a href="https://github.com/muhfhri/jakmove" target="_blank" style="color: #3b82f6; text-decoration: none; font-weight: 600; font-size: 0.9rem; padding: 8px 16px; background: white; border-radius: 8px; border: 1px solid #e2e8f0; transition: all 0.2s ease;">
@@ -958,6 +958,28 @@ export class RouteManager {
     }
 
     // Generate route image from HTML
+    // Load HTML2Canvas library dynamically
+    async loadHTML2Canvas() {
+        return new Promise((resolve, reject) => {
+            if (window.html2canvas) {
+                resolve();
+                return;
+            }
+            
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+            script.onload = () => {
+                console.log('HTML2Canvas loaded successfully');
+                resolve();
+            };
+            script.onerror = () => {
+                console.error('Failed to load HTML2Canvas');
+                reject();
+            };
+            document.head.appendChild(script);
+        });
+    }
+
     async generateRouteImage(routeId) {
         const cardElement = document.getElementById(`routeCard_${routeId}`);
         if (!cardElement) {
@@ -966,8 +988,12 @@ export class RouteManager {
         }
         
         if (!window.html2canvas) {
-            console.error('HTML2Canvas not available');
+            console.log('Loading HTML2Canvas...');
+            await this.loadHTML2Canvas();
+            if (!window.html2canvas) {
+                console.error('Failed to load HTML2Canvas');
             return null;
+            }
         }
 
         try {
@@ -1010,7 +1036,7 @@ export class RouteManager {
                     const clonedElement = clonedDoc.getElementById(`routeCard_${routeId}`);
                     if (clonedElement) {
                         // Set font family
-                        clonedElement.style.fontFamily = "'PT Sans Narrow', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+                        clonedElement.style.fontFamily = "'PT Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
                         
                         // Ensure the card is fully visible for screenshot
                         clonedElement.style.height = 'auto';

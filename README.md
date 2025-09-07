@@ -88,7 +88,7 @@ JakMove adalah aplikasi web interaktif yang menyediakan informasi lengkap tentan
 
 ### Libraries & Icons
 - **Iconify** - Icon system
-- **Plus Jakarta Sans** - Typography
+- **PT Sans** - Typography
 - **HTML2Canvas** - Screenshot functionality
 
 ## 📱 Halaman Aplikasi

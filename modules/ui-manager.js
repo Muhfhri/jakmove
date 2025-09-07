@@ -8,9 +8,17 @@ export class UIManager {
     init() {
         if (this.isInitialized) return;
         
-        this.setupRouteDropdowns();
+        console.log('🔄 Initializing UI components...');
         this.setupMapControls();
         this.isInitialized = true;
+        console.log('✅ UI components initialized');
+    }
+
+    // Lazy populate dropdowns when needed
+    populateDropdownsLazy() {
+        console.log('🔄 Lazy loading dropdown data...');
+        this.setupRouteDropdowns();
+        console.log('✅ Dropdowns populated');
     }
 
     // Setup route dropdowns
@@ -22,25 +30,40 @@ export class UIManager {
         this.setupMapRouteDropdown();
     }
 
-    // Setup main route dropdown
+    // Setup main route dropdown with optimized loading
     setupMainRouteDropdown() {
         const select = document.getElementById('routesDropdown');
         if (!select) return;
 
-        select.innerHTML = '';
+        // Clear and add placeholder
+        select.innerHTML = '<option value="">Pilih rute...</option>';
         
-        const routes = window.transJakartaApp.modules.gtfs.getRoutes();
-        const sortedRoutes = [...routes].sort((a, b) => 
-            window.transJakartaApp.modules.gtfs.naturalSort(a, b)
-        );
+        // Use requestIdleCallback for non-blocking population
+        const populateOptions = () => {
+            const routes = window.transJakartaApp.modules.gtfs.getRoutes();
+            const sortedRoutes = [...routes].sort((a, b) => 
+                window.transJakartaApp.modules.gtfs.naturalSort(a, b)
+            );
 
-        sortedRoutes.forEach(route => {
-            const opt = document.createElement('option');
-            opt.value = route.route_id;
-            opt.textContent = (route.route_short_name ? route.route_short_name : route.route_id) + 
-                            (route.route_long_name ? ' - ' + route.route_long_name : '');
-            select.appendChild(opt);
-        });
+            // Batch DOM updates for better performance
+            const fragment = document.createDocumentFragment();
+            sortedRoutes.forEach(route => {
+                const opt = document.createElement('option');
+                opt.value = route.route_id;
+                opt.textContent = (route.route_short_name ? route.route_short_name : route.route_id) + 
+                                (route.route_long_name ? ' - ' + route.route_long_name : '');
+                fragment.appendChild(opt);
+            });
+            
+            select.appendChild(fragment);
+        };
+
+        // Populate when browser is idle
+        if (window.requestIdleCallback) {
+            requestIdleCallback(populateOptions, { timeout: 2000 });
+        } else {
+            setTimeout(populateOptions, 0);
+        }
 
         select.onchange = (e) => {
             window.transJakartaApp.modules.routes.selectRoute(e.target.value);
@@ -118,34 +141,46 @@ export class UIManager {
 
     // Populate map route dropdown
     populateMapRouteDropdown(dropdown) {
-        dropdown.innerHTML = '';
+        dropdown.innerHTML = '<option value="">Pilih rute...</option>';
         
-        const routes = window.transJakartaApp.modules.gtfs.getRoutes();
-        const sortedRoutes = [...routes].sort((a, b) => 
-            window.transJakartaApp.modules.gtfs.naturalSort(a, b)
-        );
+        const populateOptions = () => {
+            const routes = window.transJakartaApp.modules.gtfs.getRoutes();
+            const sortedRoutes = [...routes].sort((a, b) => 
+                window.transJakartaApp.modules.gtfs.naturalSort(a, b)
+            );
 
-        sortedRoutes.forEach(route => {
-            const opt = document.createElement('option');
-            opt.value = route.route_id;
-            // Truncate long names to keep dropdown compact
-            let displayText = route.route_short_name || route.route_id;
-            if (route.route_long_name) {
-                const longName = route.route_long_name.length > 25 ? 
-                    route.route_long_name.substring(0, 25) + '...' : 
-                    route.route_long_name;
-                displayText += ' - ' + longName;
+            // Batch DOM updates
+            const fragment = document.createDocumentFragment();
+            sortedRoutes.forEach(route => {
+                const opt = document.createElement('option');
+                opt.value = route.route_id;
+                // Truncate long names to keep dropdown compact
+                let displayText = route.route_short_name || route.route_id;
+                if (route.route_long_name) {
+                    const longName = route.route_long_name.length > 25 ? 
+                        route.route_long_name.substring(0, 25) + '...' : 
+                        route.route_long_name;
+                    displayText += ' - ' + longName;
+                }
+                opt.textContent = displayText;
+                fragment.appendChild(opt);
+            });
+            dropdown.appendChild(fragment);
+
+            // Set selected value
+            const selectedRouteId = window.transJakartaApp.modules.routes.selectedRouteId;
+            if (selectedRouteId) {
+                dropdown.value = selectedRouteId;
+            } else if (sortedRoutes.length > 0) {
+                dropdown.value = sortedRoutes[0].route_id;
             }
-            opt.textContent = displayText;
-            dropdown.appendChild(opt);
-        });
+        };
 
-        // Set selected value
-        const selectedRouteId = window.transJakartaApp.modules.routes.selectedRouteId;
-        if (selectedRouteId) {
-            dropdown.value = selectedRouteId;
-        } else if (sortedRoutes.length > 0) {
-            dropdown.value = sortedRoutes[0].route_id;
+        // Populate when browser is idle
+        if (window.requestIdleCallback) {
+            requestIdleCallback(populateOptions, { timeout: 2000 });
+        } else {
+            setTimeout(populateOptions, 0);
         }
     }
 
