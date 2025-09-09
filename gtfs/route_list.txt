@@ -188,7 +188,7 @@ route_id,trip_id,direction_id,stop_headsign,start_time,end_time
 3E,3E-R06,1,Puri Kembangan,05:00:00,22:00:00
 3E,3E-R06,1,Sentraland Cengkareng,05:00:00,22:00:00
 3F,3F-L01,0,Kalideres,05:00:00,22:00:00
-3F,3F-L01,0,Senayan Bank DKI,05:00:00,22:00:00
+3F,3F-L01,0,Senayan Bank Jakarta,05:00:00,22:00:00
 3H,3H-L04,0,Damai,05:00:00,22:00:00
 3H,3H-L04,0,Kota,05:00:00,22:00:00
 3H,3H-L04,1,Damai,05:00:00,22:00:00
@@ -219,18 +219,14 @@ route_id,trip_id,direction_id,stop_headsign,start_time,end_time
 4K,4K-L03,0,Pulo Gadung,05:00:00,22:00:00
 5,5-R01,0,Ancol,00:00:00,23:59:00
 5,5-R01,0,Kampung Melayu,00:00:00,23:59:00
-5,5-R01,0,Senen,00:00:00,23:59:00
+5,5-R01,0,Jaga Jakarta,00:00:00,23:59:00
 5,5-R02,1,Ancol,00:00:00,23:59:00
 5,5-R02,1,Kampung Melayu,00:00:00,23:59:00
-5,5-R02,1,Senen,00:00:00,23:59:00
+5,5-R02,1,Jaga Jakarta,00:00:00,23:59:00
 5B,5B-L03,0,Bidara Cina,05:00:00,22:00:00
 5B,5B-L03,0,St. Tebet,05:00:00,22:00:00
-5C,5C-R09,0,Cililitan,05:00:00,22:00:00
 5C,5C-R09,0,Juanda,05:00:00,22:00:00
-5C,5C-R09,0,PGC,05:00:00,22:00:00
 5C,5C-R10,1,Cililitan,05:00:00,22:00:00
-5C,5C-R10,1,Juanda,05:00:00,22:00:00
-5C,5C-R10,1,PGC,05:00:00,22:00:00
 5F,5F-L02,0,Kampung Melayu,05:00:00,22:00:00
 5F,5F-L02,0,Tanah Abang,05:00:00,22:00:00
 5M,5M-L04,0,Jati Baru,05:00:00,22:00:00
@@ -293,7 +289,7 @@ route_id,trip_id,direction_id,stop_headsign,start_time,end_time
 6U,6U-R04,1,Blok M,05:00:00,22:00:00
 6U,6U-R04,1,Pasar Minggu,05:00:00,22:00:00
 6V,6V-L01,0,Ragunan,05:00:00,22:00:00
-6V,6V-L01,0,Senayan Bank DKI,05:00:00,22:00:00
+6V,6V-L01,0,Senayan Bank Jakarta,05:00:00,22:00:00
 6W,6W-L02,0,Blok M,05:00:00,22:00:00
 6W,6W-L02,0,Duren Tiga,05:00:00,22:00:00
 7,7-R01,0,Kampung Melayu,00:00:00,23:59:00
@@ -320,8 +316,8 @@ route_id,trip_id,direction_id,stop_headsign,start_time,end_time
 7B,7B-R04,1,Kampung Rambutan,05:00:00,22:00:00
 7B,7B-R04,1,PGC,05:00:00,22:00:00
 7B,7B-R04,1,Tegal Mampang,05:00:00,22:00:00
-7C,7C-L03,0,Cawang Sentral,05:00:00,22:00:00
-7C,7C-L03,0,Cibubur,05:00:00,22:00:00
+7C,7C-L01,0,Cawang Cililitan,05:00:00,22:00:00
+7C,7C-L01,1,Cibubur,05:00:00,22:00:00
 7D,7D-L09,0,Pancoran,05:00:00,22:00:00
 7D,7D-L09,0,TMII,05:00:00,22:00:00
 7E,7E-R01,0,Kampung Rambutan,05:00:00,22:00:00
@@ -332,8 +328,8 @@ route_id,trip_id,direction_id,stop_headsign,start_time,end_time
 7F,7F-R05,0,Kampung Rambutan,05:00:00,22:00:00
 7F,7F-R06,1,Juanda,05:00:00,22:00:00
 7F,7F-R06,1,Kampung Rambutan,05:00:00,22:00:00
-7P,7P-L02,0,Cawang Sentral,05:00:00,22:00:00
-7P,7P-L02,0,Pondok Kelapa,05:00:00,22:00:00
+7P,7P-L03,0,Cawang Cililitan,05:00:00,22:00:00
+7P,7P-L03,1,Pondok Kelapa,05:00:00,22:00:00
 7Q,7Q-L02,0,Blok M,05:00:00,22:00:00
 7Q,7Q-L02,0,Cililitan,05:00:00,22:00:00
 7Q,7Q-L02,0,Kalibata,05:00:00,22:00:00
@@ -790,8 +786,8 @@ T21,T21-R02,1,Taman Banjar Wijaya,05:00:00,22:00:00
 1T,1T-R04,1,Cibubur,05:00:00,20:00:00
 JAK.78A,JAK.78A-L01,0,Benda,05:00:00,22:00:00
 JAK.78A,JAK.78A-L01,0,Cengkareng Timur,05:00:00,22:00:00
-JAK.78B,JAK.78B-L02,0,Teluk Gong,05:00:00,22:00:00
-JAK.78B,JAK.78B-L02,0,Jembatan Tiga,05:00:00,22:00:00
+JAK.78B,JAK.78B-L03,0,Teluk Gong,05:00:00,22:00:00
+JAK.78B,JAK.78B-L03,1,Jembatan Tiga,05:00:00,22:00:00
 JAK.107,JAK.107-R01,0,Jembatan Garden,05:00:00,22:00:00
 JAK.107,JAK.107-R01,0,Puri Beta,05:00:00,22:00:00
 JAK.107,JAK.107-R02,1,Jembatan Garden,05:00:00,22:00:00
@@ -851,5 +847,3 @@ T31,T31-R04,1,PIK 2,05:00:00,22:00:00
 9C,9C-L01,0,Bundaran Senayan,05:00:00,22:00:00
 9C,9C-L01,1,Pinang Ranti,05:00:00,22:00:00
 JAK.58,JAK.58-R01,0,Rorotan,05:00:00,22:00:00
-SOE,SOE-L01,0,Bandara Soekarno-Hatta,07:00:00,22:00:00
-SOE,SOE-L01,1,Bandara Soekarno-Hatta,07:00:00,22:00:00
