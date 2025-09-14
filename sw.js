@@ -1,6 +1,6 @@
 // Enhanced Service Worker for full offline capability  
-const CACHE_NAME = 'jakmove-github-v1';
-const EXTERNAL_CACHE = 'jakmove-external-github-v1';
+const CACHE_NAME = 'jakmove-github-v2';
+const EXTERNAL_CACHE = 'jakmove-external-github-v2';
 
 // Core app files that must be cached for offline functionality
 const CORE_CACHE_URLS = [
@@ -67,6 +67,7 @@ const CORE_CACHE_URLS = [
 	'/jakmove/gtfs/route_list.txt',
 	
 	// Images
+	'/jakmove/image/jakmoveicon.png',
 	'/jakmove/css/image/jakmove.png',
 	'/jakmove/css/image/logo_dark.png',
 	'/jakmove/css/image/logo_light.png',

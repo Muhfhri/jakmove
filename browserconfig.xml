@@ -2,7 +2,7 @@
 <browserconfig>
     <msapplication>
         <tile>
-            <square150x150logo src="css/image/jakmove.png"/>
+            <square150x150logo src="image/jakmoveicon.png"/>
             <TileColor>#007bff</TileColor>
         </tile>
     </msapplication>

@@ -19,7 +19,7 @@
       "url": "/jakmove/index.html",
       "icons": [
         {
-          "src": "css/image/jakmove.png",
+          "src": "image/jakmoveicon.png",
           "sizes": "192x192",
           "type": "image/png"
         }
@@ -32,7 +32,7 @@
       "url": "/jakmove/bus-notes.html",
       "icons": [
         {
-          "src": "css/image/jakmove.png",
+          "src": "image/jakmoveicon.png",
           "sizes": "192x192",
           "type": "image/png"
         }
@@ -45,7 +45,7 @@
       "url": "/jakmove/transportasi-jakarta.html",
       "icons": [
         {
-          "src": "css/image/jakmove.png",
+          "src": "image/jakmoveicon.png",
           "sizes": "192x192",
           "type": "image/png"
         }
@@ -54,13 +54,13 @@
   ],
   "icons": [
     {
-      "src": "css/image/jakmove.png",
+      "src": "image/jakmoveicon.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "css/image/jakmove.png",
+      "src": "image/jakmoveicon.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
@@ -70,7 +70,7 @@
   "prefer_related_applications": false,
   "screenshots": [
     {
-      "src": "css/image/jakmove.png",
+      "src": "image/jakmoveicon.png",
       "sizes": "540x720",
       "type": "image/png",
       "platform": "narrow",
