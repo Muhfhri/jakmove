@@ -2,12 +2,12 @@
   "name": "JakMove - Smart Transit Experience",
   "short_name": "JakMove",
   "description": "Peta interaktif koridor TransJakarta dengan informasi halte, rute, dan fitur live location. Temukan halte terdekat dan rute optimal untuk perjalanan Anda.",
-  "start_url": "/",
+  "start_url": "/jakmove/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#007bff",
   "orientation": "portrait-primary",
-  "scope": "/",
+  "scope": "/jakmove/",
   "lang": "id",
   "dir": "ltr",
   "categories": ["travel", "transportation", "maps", "utilities"],
@@ -16,7 +16,7 @@
       "name": "Peta Interaktif",
       "short_name": "Peta",
       "description": "Buka peta TransJakarta interaktif",
-      "url": "/index.html",
+      "url": "/jakmove/index.html",
       "icons": [
         {
           "src": "css/image/jakmove.png",
@@ -29,7 +29,7 @@
       "name": "Catatan Bus",
       "short_name": "Catatan",
       "description": "Buat catatan bus dan perjalanan",
-      "url": "/bus-notes.html",
+      "url": "/jakmove/bus-notes.html",
       "icons": [
         {
           "src": "css/image/jakmove.png",
@@ -42,7 +42,7 @@
       "name": "Transportasi Jakarta",
       "short_name": "Transportasi",
       "description": "Informasi lengkap transportasi Jakarta",
-      "url": "/transportasi-jakarta.html",
+      "url": "/jakmove/transportasi-jakarta.html",
       "icons": [
         {
           "src": "css/image/jakmove.png",

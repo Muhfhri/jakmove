@@ -1,80 +1,81 @@
-// Enhanced Service Worker for full offline capability
-const CACHE_NAME = 'jakmove-pwa-v2';
-const EXTERNAL_CACHE = 'jakmove-external-v2';
+// Enhanced Service Worker for full offline capability  
+const CACHE_NAME = 'jakmove-github-v1';
+const EXTERNAL_CACHE = 'jakmove-external-github-v1';
 
 // Core app files that must be cached for offline functionality
 const CORE_CACHE_URLS = [
-	'/',
-	'/index.html',
-	'/manifest.json',
-	'/main.js',
-	'/sw.js',
+	'/jakmove/',
+	'/jakmove/index.html',
+	'/jakmove/manifest.json',
+	'/jakmove/main.js',
+	'/jakmove/sw.js',
 	
 	// HTML pages
-	'/bus-notes.html',
-	'/tj.html',
-	'/transportasi-jakarta.html',
-	'/tentang-pembuat.html',
-	'/legal.html',
-	'/gtfs-raw-viewer.html',
+	'/jakmove/bus-notes.html',
+	'/jakmove/tj.html',
+	'/jakmove/transportasi-jakarta.html',
+	'/jakmove/tentang-pembuat.html',
+	'/jakmove/legal.html',
+	'/jakmove/gtfs-raw-viewer.html',
 	
 	// CSS files
-	'/css/style.css',
-	'/css/dark-mode.css',
-	'/css/performance-optimization.css',
-	'/css/theme.css',
-	'/css/bus-notes.css',
+	'/jakmove/css/style.css',
+	'/jakmove/css/dark-mode.css',
+	'/jakmove/css/performance-optimization.css',
+	'/jakmove/css/theme.css',
+	'/jakmove/css/bus-notes.css',
+	'/jakmove/css/pwa.css',
 	
 	// JavaScript modules
-	'/modules/gtfs-loader.js',
-	'/modules/map-manager.js',
-	'/modules/route-manager.js',
-	'/modules/stop-manager.js',
-	'/modules/search-manager.js',
-	'/modules/location-manager.js',
-	'/modules/ui-manager.js',
-	'/modules/settings-manager.js',
-	'/modules/journey-planner.js',
+	'/jakmove/modules/gtfs-loader.js',
+	'/jakmove/modules/map-manager.js',
+	'/jakmove/modules/route-manager.js',
+	'/jakmove/modules/stop-manager.js',
+	'/jakmove/modules/search-manager.js',
+	'/jakmove/modules/location-manager.js',
+	'/jakmove/modules/ui-manager.js',
+	'/jakmove/modules/settings-manager.js',
+	'/jakmove/modules/journey-planner.js',
 	
 	// JavaScript files
-	'/js/bus-notes.js',
-	'/js/dark-mode-switch.js',
-	'/js/dataKoridor.js',
-	'/js/gtfs-data.js',
-	'/js/intermodal.js',
-	'/js/location-manager.js',
-	'/js/map-manager.js',
-	'/js/navbar.js',
-	'/js/scroll-performance.js',
-	'/js/tije.js',
-	'/js/tjNumberSearch.js',
-	'/js/weather.js',
+	'/jakmove/js/bus-notes.js',
+	'/jakmove/js/dark-mode-switch.js',
+	'/jakmove/js/dataKoridor.js',
+	'/jakmove/js/gtfs-data.js',
+	'/jakmove/js/intermodal.js',
+	'/jakmove/js/location-manager.js',
+	'/jakmove/js/map-manager.js',
+	'/jakmove/js/navbar.js',
+	'/jakmove/js/scroll-performance.js',
+	'/jakmove/js/tije.js',
+	'/jakmove/js/tjNumberSearch.js',
+	'/jakmove/js/weather.js',
 	
 	// GTFS data files
-	'/gtfs/stops.txt',
-	'/gtfs/routes.txt',
-	'/gtfs/trips.txt',
-	'/gtfs/stop_times.txt',
-	'/gtfs/shapes.txt',
-	'/gtfs/frequencies.txt',
-	'/gtfs/fare_rules.txt',
-	'/gtfs/fare_attributes.txt',
-	'/gtfs/transfers.txt',
-	'/gtfs/calendar.txt',
-	'/gtfs/calendar_dates.txt',
-	'/gtfs/agency.txt',
-	'/gtfs/route_list.txt',
+	'/jakmove/gtfs/stops.txt',
+	'/jakmove/gtfs/routes.txt',
+	'/jakmove/gtfs/trips.txt',
+	'/jakmove/gtfs/stop_times.txt',
+	'/jakmove/gtfs/shapes.txt',
+	'/jakmove/gtfs/frequencies.txt',
+	'/jakmove/gtfs/fare_rules.txt',
+	'/jakmove/gtfs/fare_attributes.txt',
+	'/jakmove/gtfs/transfers.txt',
+	'/jakmove/gtfs/calendar.txt',
+	'/jakmove/gtfs/calendar_dates.txt',
+	'/jakmove/gtfs/agency.txt',
+	'/jakmove/gtfs/route_list.txt',
 	
 	// Images
-	'/css/image/jakmove.png',
-	'/css/image/logo_dark.png',
-	'/css/image/logo_light.png',
-	'/css/image/animatelogo.gif',
-	'/image/tije.png',
-	'/image/skywellbatch2.png',
+	'/jakmove/css/image/jakmove.png',
+	'/jakmove/css/image/logo_dark.png',
+	'/jakmove/css/image/logo_light.png',
+	'/jakmove/css/image/animatelogo.gif',
+	'/jakmove/image/tije.png',
+	'/jakmove/image/skywellbatch2.png',
 	
 	// Workers
-	'/workers/gtfs-worker.js'
+	'/jakmove/workers/gtfs-worker.js'
 ];
 
 // External resources patterns that should be cached
@@ -89,7 +90,7 @@ const EXTERNAL_PATTERNS = [
 ];
 
 // Offline fallback page
-const OFFLINE_PAGE = '/index.html';
+const OFFLINE_PAGE = '/jakmove/index.html';
 
 // Install event - cache core resources
 self.addEventListener('install', (event) => {
