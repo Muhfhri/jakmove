@@ -1,0 +1,80 @@
+{
+  "name": "JakMove - Smart Transit Experience",
+  "short_name": "JakMove",
+  "description": "Peta interaktif koridor TransJakarta dengan informasi halte, rute, dan fitur live location. Temukan halte terdekat dan rute optimal untuk perjalanan Anda.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#007bff",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "id",
+  "dir": "ltr",
+  "categories": ["travel", "transportation", "maps", "utilities"],
+  "shortcuts": [
+    {
+      "name": "Peta Interaktif",
+      "short_name": "Peta",
+      "description": "Buka peta TransJakarta interaktif",
+      "url": "/index.html",
+      "icons": [
+        {
+          "src": "css/image/jakmove.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Catatan Bus",
+      "short_name": "Catatan",
+      "description": "Buat catatan bus dan perjalanan",
+      "url": "/bus-notes.html",
+      "icons": [
+        {
+          "src": "css/image/jakmove.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Transportasi Jakarta",
+      "short_name": "Transportasi",
+      "description": "Informasi lengkap transportasi Jakarta",
+      "url": "/transportasi-jakarta.html",
+      "icons": [
+        {
+          "src": "css/image/jakmove.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  ],
+  "icons": [
+    {
+      "src": "css/image/jakmove.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "css/image/jakmove.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false,
+  "screenshots": [
+    {
+      "src": "css/image/jakmove.png",
+      "sizes": "540x720",
+      "type": "image/png",
+      "platform": "narrow",
+      "label": "JakMove - Peta TransJakarta Interaktif"
+    }
+  ]
+}

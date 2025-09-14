@@ -36,11 +36,24 @@
     <meta name="twitter:description" content="Peta interaktif koridor TransJakarta dengan informasi halte, rute, dan fitur live location">
     <meta name="twitter:image" content="https://transjakarta-interactive-map.vercel.app/og-image.jpg">
 
-    <!-- Favicon -->
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- PWA Meta Tags -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="JakMove">
+    <meta name="application-name" content="JakMove">
+    <meta name="msapplication-TileColor" content="#007bff">
+    <meta name="msapplication-config" content="browserconfig.xml">
+    
+    <!-- Favicon and Icons -->
     <link rel="icon" type="image/x-icon" href="favicon.ico">
-    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="css/image/jakmove.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="css/image/jakmove.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="css/image/jakmove.png">
+    <link rel="mask-icon" href="css/image/jakmove.png" color="#007bff">
 
     <!-- Resource hints for external domains -->
     <link rel="dns-prefetch" href="//cdn.jsdelivr.net">
@@ -79,6 +92,9 @@
     
     <!-- Performance Optimization CSS -->
     <link rel="stylesheet" href="css/performance-optimization.css">
+    
+    <!-- PWA Specific CSS -->
+    <link rel="stylesheet" href="css/pwa.css">
 </head>
 
 <body>
@@ -533,11 +549,290 @@
     <script defer type="module" src="main.js"></script>
 
     <script>
-        // Register Service Worker for caching tiles/assets
+        // Enhanced Service Worker registration with update handling
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js').catch(() => {});
+            window.addEventListener('load', async () => {
+                try {
+                    const registration = await navigator.serviceWorker.register('sw.js');
+                    console.log('Service Worker registered successfully');
+                    
+                    // Handle service worker updates
+                    registration.addEventListener('updatefound', () => {
+                        const newWorker = registration.installing;
+                        newWorker.addEventListener('statechange', () => {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                // New service worker available, show update prompt
+                                showUpdateAvailable(newWorker);
+                            }
+                        });
+                    });
+                } catch (error) {
+                    console.log('Service Worker registration failed:', error);
+                }
             });
+        }
+
+        // PWA Install Prompt Handler
+        let deferredPrompt;
+        let installPromptShown = false;
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            // Prevent the mini-infobar from appearing on mobile
+            e.preventDefault();
+            // Stash the event so it can be triggered later
+            deferredPrompt = e;
+            
+            // Show install prompt after a delay (if not shown before)
+            if (!localStorage.getItem('pwa-install-dismissed') && !installPromptShown) {
+                setTimeout(() => {
+                    showInstallPrompt();
+                }, 3000); // Show after 3 seconds
+            }
+        });
+
+        // Show PWA install prompt
+        function showInstallPrompt() {
+            if (!deferredPrompt || installPromptShown) return;
+            
+            installPromptShown = true;
+            
+            // Create install prompt UI
+            const installBanner = document.createElement('div');
+            installBanner.id = 'pwa-install-banner';
+            installBanner.className = 'alert alert-info position-fixed bottom-0 start-50 translate-middle-x m-3';
+            installBanner.style.cssText = 'z-index: 9999; max-width: 400px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);';
+            installBanner.innerHTML = `
+                <div class="d-flex align-items-center justify-content-between">
+                    <div class="me-3">
+                        <div class="fw-bold mb-1">
+                            <iconify-icon icon="mdi:download" inline></iconify-icon>
+                            Install JakMove
+                        </div>
+                        <div class="small">Akses cepat & gunakan offline di Android</div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-primary btn-sm" id="pwa-install-btn">
+                            <iconify-icon icon="mdi:plus" inline></iconify-icon>
+                            Install
+                        </button>
+                        <button type="button" class="btn-close" id="pwa-install-close" aria-label="Close"></button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(installBanner);
+            
+            // Handle install button click
+            document.getElementById('pwa-install-btn').addEventListener('click', async () => {
+                if (!deferredPrompt) return;
+                
+                // Show the install prompt
+                deferredPrompt.prompt();
+                
+                // Wait for the user to respond to the prompt
+                const { outcome } = await deferredPrompt.userChoice;
+                
+                if (outcome === 'accepted') {
+                    console.log('User accepted the install prompt');
+                    showInstallSuccess();
+                } else {
+                    console.log('User dismissed the install prompt');
+                }
+                
+                // We've used the prompt, and can't use it again, throw it away
+                deferredPrompt = null;
+                installBanner.remove();
+            });
+            
+            // Handle close button
+            document.getElementById('pwa-install-close').addEventListener('click', () => {
+                localStorage.setItem('pwa-install-dismissed', 'true');
+                installBanner.remove();
+            });
+            
+            // Auto-hide after 10 seconds
+            setTimeout(() => {
+                if (document.body.contains(installBanner)) {
+                    installBanner.remove();
+                }
+            }, 10000);
+        }
+
+        // Show install success message
+        function showInstallSuccess() {
+            const successToast = document.createElement('div');
+            successToast.className = 'alert alert-success position-fixed top-0 start-50 translate-middle-x mt-3';
+            successToast.style.cssText = 'z-index: 9999; max-width: 400px;';
+            successToast.innerHTML = `
+                <div class="d-flex align-items-center">
+                    <iconify-icon icon="mdi:check-circle" class="me-2" style="color: #28a745;"></iconify-icon>
+                    <div>
+                        <div class="fw-bold">JakMove Terinstall!</div>
+                        <div class="small">Aplikasi sekarang tersedia di layar utama</div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(successToast);
+            
+            setTimeout(() => {
+                successToast.remove();
+            }, 4000);
+        }
+
+        // Handle service worker updates
+        function showUpdateAvailable(newWorker) {
+            const updateBanner = document.createElement('div');
+            updateBanner.className = 'alert alert-warning position-fixed top-0 start-50 translate-middle-x mt-3';
+            updateBanner.style.cssText = 'z-index: 9999; max-width: 400px;';
+            updateBanner.innerHTML = `
+                <div class="d-flex align-items-center justify-content-between">
+                    <div class="me-3">
+                        <div class="fw-bold mb-1">
+                            <iconify-icon icon="mdi:update" inline></iconify-icon>
+                            Update Tersedia
+                        </div>
+                        <div class="small">Versi baru JakMove siap digunakan</div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-primary btn-sm" id="update-btn">
+                            <iconify-icon icon="mdi:refresh" inline></iconify-icon>
+                            Update
+                        </button>
+                        <button type="button" class="btn-close" aria-label="Close"></button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(updateBanner);
+            
+            // Handle update button
+            updateBanner.querySelector('#update-btn').addEventListener('click', () => {
+                newWorker.postMessage({ type: 'SKIP_WAITING' });
+                window.location.reload();
+            });
+            
+            // Handle close button
+            updateBanner.querySelector('.btn-close').addEventListener('click', () => {
+                updateBanner.remove();
+            });
+            
+            // Auto-hide after 8 seconds
+            setTimeout(() => {
+                if (document.body.contains(updateBanner)) {
+                    updateBanner.remove();
+                }
+            }, 8000);
+        }
+
+        // Detect when app is launched from home screen
+        window.addEventListener('appinstalled', () => {
+            console.log('PWA was installed');
+            // Hide any install prompts
+            const installBanner = document.getElementById('pwa-install-banner');
+            if (installBanner) {
+                installBanner.remove();
+            }
+            
+            // Show welcome message for installed app
+            setTimeout(() => {
+                const welcomeToast = document.createElement('div');
+                welcomeToast.className = 'alert alert-success position-fixed top-0 start-50 translate-middle-x mt-3';
+                welcomeToast.style.cssText = 'z-index: 9999; max-width: 400px;';
+                welcomeToast.innerHTML = `
+                    <div class="text-center">
+                        <iconify-icon icon="mdi:heart" style="color: #e74c3c;" class="me-2"></iconify-icon>
+                        <strong>Selamat datang di JakMove!</strong><br>
+                        <small>Nikmati akses cepat dan penggunaan offline</small>
+                    </div>
+                `;
+                
+                document.body.appendChild(welcomeToast);
+                
+                setTimeout(() => {
+                    welcomeToast.remove();
+                }, 5000);
+            }, 1000);
+        });
+
+        // Check if app is running in standalone mode (installed PWA)
+        if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
+            console.log('Running as installed PWA');
+            document.body.classList.add('pwa-installed');
+        }
+
+        // Network Status Monitoring
+        function initNetworkStatusMonitoring() {
+            const networkStatus = document.createElement('div');
+            networkStatus.id = 'network-status';
+            networkStatus.className = 'network-status hidden';
+            document.body.appendChild(networkStatus);
+
+            function updateNetworkStatus() {
+                if (navigator.onLine) {
+                    networkStatus.innerHTML = `
+                        <iconify-icon icon="mdi:wifi" inline></iconify-icon>
+                        Kembali online
+                    `;
+                    networkStatus.className = 'network-status online';
+                    setTimeout(() => {
+                        networkStatus.className = 'network-status online hidden';
+                    }, 3000);
+                } else {
+                    networkStatus.innerHTML = `
+                        <iconify-icon icon="mdi:wifi-off" inline></iconify-icon>
+                        Mode offline - Data tersimpan lokal
+                    `;
+                    networkStatus.className = 'network-status';
+                }
+            }
+
+            // Initial check
+            if (!navigator.onLine) {
+                updateNetworkStatus();
+            }
+
+            // Listen for network changes
+            window.addEventListener('online', updateNetworkStatus);
+            window.addEventListener('offline', updateNetworkStatus);
+        }
+
+        // PWA Installation Status
+        function showPWAStatus() {
+            const isInstalled = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+            
+            if (isInstalled) {
+                const statusDiv = document.createElement('div');
+                statusDiv.className = 'pwa-status';
+                statusDiv.innerHTML = `
+                    <iconify-icon icon="mdi:check-circle" inline></iconify-icon>
+                    PWA Mode
+                `;
+                document.body.appendChild(statusDiv);
+                
+                setTimeout(() => {
+                    statusDiv.style.opacity = '0';
+                    setTimeout(() => statusDiv.remove(), 300);
+                }, 2000);
+            }
+        }
+
+        // Initialize everything when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            initNetworkStatusMonitoring();
+            showPWAStatus();
+        });
+
+        // Handle app shortcuts (from manifest.json shortcuts)
+        if ('serviceWorker' in navigator && 'NavigationAPI' in window) {
+            // Handle deep links from PWA shortcuts
+            const urlParams = new URLSearchParams(window.location.search);
+            const shortcut = urlParams.get('shortcut');
+            
+            if (shortcut) {
+                console.log('Opened from PWA shortcut:', shortcut);
+                // Handle specific shortcut actions if needed
+            }
         }
     </script>
 
