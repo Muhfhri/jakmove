@@ -29,7 +29,8 @@
 			'Stasiun Jatinegara': ['KRL'],
 			'Juanda': ['KRL'],
 			'Matraman Baru': ['KRL'],
-			'Cikoko': ['LRT'],
+			'Cikoko Arah Timur': ['LRT','KRL'],
+			'Cikoko Arah Barat': ['LRT','KRL'],
 			'Kuningan': ['LRT'],
 		};
 		try {
