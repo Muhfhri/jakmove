@@ -90,12 +90,20 @@ export class MapManager {
             } catch (e) {}
 
             this.setupMapEvents();
-            this.featurePopup = new maplibregl.Popup({ 
-                closeButton: true, 
-                closeOnClick: false, 
-                maxWidth: '350px',
-                className: 'custom-popup-transparent'
-            });
+        this.featurePopup = new maplibregl.Popup({ 
+            closeButton: true, 
+            closeOnClick: false, 
+            maxWidth: '350px',
+            className: 'custom-popup-transparent'
+        });
+        
+        // Create separate popup for places (non-transparent)
+        this.placePopup = new maplibregl.Popup({ 
+            closeButton: true, 
+            closeOnClick: false, 
+            maxWidth: '350px',
+            className: 'place-popup-container'
+        });
             this.userPopup = new maplibregl.Popup({ 
                 closeButton: false, 
                 closeOnClick: false, 
@@ -1553,6 +1561,7 @@ export class MapManager {
         this.clearLayers();
         this.setView(-6.2, 106.8, 11);
         if (this.featurePopup) this.featurePopup.remove();
+        if (this.placePopup) this.placePopup.remove();
         if (this.userPopup) this.userPopup.remove();
         this._currentPopup = null;
         this._activeRouteData = null;
@@ -1576,10 +1585,14 @@ export class MapManager {
         }
     }
 
-    showHtmlPopupAt(lng, lat, html) {
-        if (!this.featurePopup) return;
+    showHtmlPopupAt(lng, lat, html, options = {}) {
+        const isPlace = options.isPlace || html.includes('place-popup');
+        const popup = isPlace ? this.placePopup : this.featurePopup;
+        
+        if (!popup) return;
         if (this._currentPopup) this._currentPopup.remove();
-        this._currentPopup = this.featurePopup.setLngLat([lng, lat]).setHTML(html).addTo(this.map);
+        this._currentPopup = popup.setLngLat([lng, lat]).setHTML(html).addTo(this.map);
+        
         // Ensure iconify icons render reliably
         try {
             const el = this._currentPopup && this._currentPopup.getElement && this._currentPopup.getElement();
@@ -1588,6 +1601,11 @@ export class MapManager {
             }
         } catch (e) {}
         return this._currentPopup;
+    }
+    
+    // Specific method for place popups (non-transparent)
+    showPlacePopupAt(lng, lat, html) {
+        return this.showHtmlPopupAt(lng, lat, html, { isPlace: true });
     }
     
     // Render/update label text untuk halte berikutnya di peta

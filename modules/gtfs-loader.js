@@ -51,6 +51,9 @@ export class GTFSLoader {
                 // Instant hide for cached data - no loading screen needed
                 this.hideLoadingProgress();
                 
+                // Update UI with last modified date
+                this.updateLastModifiedUI();
+                
                 // Optional: Background check for updates without blocking UI
                 this.checkForUpdatesInBackground();
                 
@@ -130,14 +133,48 @@ export class GTFSLoader {
 
             // Sequential streaming fetch with per-file progress
             const texts = {};
+            let latestModified = null;
+            let latestFile = null;
+            
             for (const f of files) {
-                texts[f.key] = await this._streamFetchWithProgress(f.url, f.range[0], f.range[1], f.label);
+                const result = await this._streamFetchWithProgress(f.url, f.range[0], f.range[1], f.label);
+                texts[f.key] = result.text;
+                
+                // Track the latest modified file
+                if (result.lastModified) {
+                    const fileDate = new Date(result.lastModified);
+                    const fileName = f.url.split('/').pop(); // Get filename from URL
+                    
+                    if (!latestModified || fileDate > new Date(latestModified)) {
+                        latestModified = result.lastModified;
+                        latestFile = fileName;
+                    }
+                }
+            }
+            
+            // Store the latest modification info
+            if (latestModified && latestFile) {
+                localStorage.setItem('jakmove_gtfs_last_modified', latestModified);
+                localStorage.setItem('jakmove_gtfs_latest_file', latestFile);
             }
 
             this.updateLoadingProgress(87, 'Memproses data di latar (tidak membekukan UI)...');
 
+            // Extract text content for parsing
+            const textContents = {};
+            Object.keys(texts).forEach(key => {
+                // Handle both old string format and new object format
+                if (typeof texts[key] === 'string') {
+                    textContents[key] = texts[key];
+                } else if (texts[key] && texts[key].text) {
+                    textContents[key] = texts[key].text;
+                } else {
+                    textContents[key] = '';
+                }
+            });
+
             // Offload parsing to Web Worker for responsiveness
-            const parsed = await this._parseInWorker(texts, (p, s) => this.updateLoadingProgress(p, s));
+            const parsed = await this._parseInWorker(textContents, (p, s) => this.updateLoadingProgress(p, s));
 
             // Assign parsed data
             this.data.stops = parsed.stops;
@@ -167,6 +204,9 @@ export class GTFSLoader {
             
             this.updateLoadingProgress(100, 'Selesai!');
             this.hideLoadingProgress();
+            
+            // Update UI with last modified date
+            this.updateLastModifiedUI();
 
             return this.data;
         } catch (error) {
@@ -181,12 +221,15 @@ export class GTFSLoader {
         try {
             this.updateLoadingProgress(startPercent, `${label} (mulai)`);
             const res = await fetch(url);
-            if (!res.ok) return '';
+            if (!res.ok) return { text: '', lastModified: null };
+            
             const contentLength = parseInt(res.headers.get('Content-Length') || '0', 10);
+            const lastModified = res.headers.get('Last-Modified');
+            
             if (!res.body || !window.ReadableStream) {
                 const text = await res.text();
                 this.updateLoadingProgress(endPercent, `${label} (100%)`);
-                return text;
+                return { text, lastModified };
             }
             const reader = res.body.getReader();
             const decoder = new TextDecoder('utf-8');
@@ -209,12 +252,19 @@ export class GTFSLoader {
             // flush decoder
             chunks += decoder.decode();
             this.updateLoadingProgress(endPercent, `${label} (100%)`);
-            return chunks;
+            return { text: chunks, lastModified };
         } catch (_) {
             // Fallback simple fetch on error
-            const txt = await fetch(url).then(r => r.ok ? r.text() : '');
-            this.updateLoadingProgress(endPercent, `${label} (selesai)`);
-            return txt;
+            try {
+                const res = await fetch(url);
+                const txt = res.ok ? await res.text() : '';
+                const lastModified = res.ok ? res.headers.get('Last-Modified') : null;
+                this.updateLoadingProgress(endPercent, `${label} (selesai)`);
+                return { text: txt, lastModified };
+            } catch (e) {
+                this.updateLoadingProgress(endPercent, `${label} (error)`);
+                return { text: '', lastModified: null };
+            }
         }
     }
 
@@ -236,17 +286,24 @@ export class GTFSLoader {
                 try {
                     const result = {};
                     onProgress && onProgress(90, 'Memproses data (fallback)...');
-                    result.stops = this.parseCSV(texts.stopsTxt);
-                    result.routes = this.parseCSV(texts.routesTxt);
-                    result.trips = this.parseCSV(texts.tripsTxt);
-                    result.stop_times = this.parseCSV(texts.stopTimesTxt);
-                    result.shapes = this.parseCSV(texts.shapesTxt);
-                    result.frequencies = this.parseCSV(texts.frequenciesTxt);
-                    result.fare_rules = this.parseCSV(texts.fareRulesTxt);
-                    result.fare_attributes = this.parseCSV(texts.fareAttributesTxt);
-                    result.transfers = this.parseCSV(texts.transfersTxt);
-                    result.calendar = this.parseCSV(texts.calendarTxt);
-                    result.agency = this.parseCSV(texts.agencyTxt);
+                    
+                    // Extract text from texts object properly
+                    const extractText = (key) => {
+                        const val = texts[key];
+                        return typeof val === 'string' ? val : (val && val.text ? val.text : '');
+                    };
+                    
+                    result.stops = this.parseCSV(extractText('stopsTxt'));
+                    result.routes = this.parseCSV(extractText('routesTxt'));
+                    result.trips = this.parseCSV(extractText('tripsTxt'));
+                    result.stop_times = this.parseCSV(extractText('stopTimesTxt'));
+                    result.shapes = this.parseCSV(extractText('shapesTxt'));
+                    result.frequencies = this.parseCSV(extractText('frequenciesTxt'));
+                    result.fare_rules = this.parseCSV(extractText('fareRulesTxt'));
+                    result.fare_attributes = this.parseCSV(extractText('fareAttributesTxt'));
+                    result.transfers = this.parseCSV(extractText('transfersTxt'));
+                    result.calendar = this.parseCSV(extractText('calendarTxt'));
+                    result.agency = this.parseCSV(extractText('agencyTxt'));
                     // Build mapping
                     const stopToRoutes = {};
                     result.stop_times.forEach(st => {
@@ -616,6 +673,7 @@ export class GTFSLoader {
         localStorage.removeItem(this.CACHE_KEY);
         localStorage.removeItem(this.CACHE_VERSION_KEY);
         localStorage.removeItem('jakmove_gtfs_last_modified');
+        localStorage.removeItem('jakmove_gtfs_latest_file');
         localStorage.removeItem('jakmove_gtfs_etag');
         
         // Clear IndexedDB
@@ -649,6 +707,98 @@ export class GTFSLoader {
         });
     }
 
+    // Get GTFS last modified date for display (check all files and get the latest)
+    async getGTFSLastModified() {
+        try {
+            // First try to get from stored cache
+            const storedLastModified = localStorage.getItem('jakmove_gtfs_last_modified');
+            const storedLatestFile = localStorage.getItem('jakmove_gtfs_latest_file');
+            if (storedLastModified) {
+                const formattedDate = this.formatIndonesianDate(new Date(storedLastModified));
+                return storedLatestFile ? `${formattedDate} (${storedLatestFile})` : formattedDate;
+            }
+
+            // If not in cache, check all GTFS files
+            const latestInfo = await this.checkAllGTFSFiles();
+            
+            if (latestInfo.date) {
+                // Store for future use
+                localStorage.setItem('jakmove_gtfs_last_modified', latestInfo.date);
+                localStorage.setItem('jakmove_gtfs_latest_file', latestInfo.file);
+                const formattedDate = this.formatIndonesianDate(new Date(latestInfo.date));
+                return `${formattedDate} (${latestInfo.file})`;
+            }
+            
+            return 'Tidak diketahui';
+        } catch (error) {
+            console.error('Error getting GTFS last modified date:', error);
+            return 'Tidak diketahui';
+        }
+    }
+
+    // Check all GTFS files and return the latest modification date
+    async checkAllGTFSFiles() {
+        const gtfsFiles = [
+            'agency.txt', 'calendar.txt', 'calendar_dates.txt', 'fare_attributes.txt',
+            'fare_rules.txt', 'frequencies.txt', 'routes.txt', 'shapes.txt',
+            'stop_times.txt', 'stops.txt', 'transfers.txt', 'trips.txt'
+        ];
+
+        let latestDate = null;
+        let latestFile = null;
+
+        for (const file of gtfsFiles) {
+            try {
+                const response = await fetch(`gtfs/${file}`, { method: 'HEAD' });
+                const lastModified = response.headers.get('Last-Modified');
+                
+                if (lastModified) {
+                    const fileDate = new Date(lastModified);
+                    if (!latestDate || fileDate > latestDate) {
+                        latestDate = fileDate;
+                        latestFile = file;
+                    }
+                }
+            } catch (error) {
+                console.warn(`Failed to check modification date for ${file}:`, error);
+            }
+        }
+
+        return {
+            date: latestDate ? latestDate.toUTCString() : null,
+            file: latestFile
+        };
+    }
+
+    // Format date in Indonesian format
+    formatIndonesianDate(date) {
+        const options = {
+            weekday: 'long',
+            year: 'numeric', 
+            month: 'long',
+            day: 'numeric',
+            timeZone: 'Asia/Jakarta'
+        };
+        
+        return new Intl.DateTimeFormat('id-ID', options).format(date);
+    }
+
+    // Update UI with last modified date
+    updateLastModifiedUI() {
+        // Use the global GTFSUtils if available, otherwise fallback to local method
+        if (window.GTFSUtils) {
+            window.GTFSUtils.updateLastModifiedElement('.status-text');
+        } else {
+            this.getGTFSLastModified().then(dateStr => {
+                const statusElement = document.querySelector('.status-text');
+                if (statusElement) {
+                    statusElement.textContent = `Diperbarui ${dateStr}`;
+                    statusElement.title = `Data GTFS terakhir diperbarui pada ${dateStr}`;
+                }
+            });
+        }
+    }
+
     // Background update check (non-blocking)
     checkForUpdatesInBackground() {
         // Run in background without blocking UI
@@ -656,23 +806,27 @@ export class GTFSLoader {
             try {
                 console.log('🔄 Checking for GTFS updates in background...');
                 
-                // Check if any GTFS file has been modified
-                const sampleFileResponse = await fetch('gtfs/routes.txt', { method: 'HEAD' });
-                const lastModified = sampleFileResponse.headers.get('Last-Modified');
-                const eTag = sampleFileResponse.headers.get('ETag');
+                // Check all GTFS files for updates
+                const latestInfo = await this.checkAllGTFSFiles();
                 
                 const storedLastModified = localStorage.getItem('jakmove_gtfs_last_modified');
-                const storedETag = localStorage.getItem('jakmove_gtfs_etag');
+                const storedLatestFile = localStorage.getItem('jakmove_gtfs_latest_file');
                 
-                if (lastModified !== storedLastModified || eTag !== storedETag) {
+                if (latestInfo.date !== storedLastModified || latestInfo.file !== storedLatestFile) {
                     console.log('📥 GTFS update available, will refresh on next visit');
                     // Clear cache so next visit will fetch fresh data
                     await this.clearCache();
+                    
+                    // Update the stored modification info
+                    if (latestInfo.date) {
+                        localStorage.setItem('jakmove_gtfs_last_modified', latestInfo.date);
+                        localStorage.setItem('jakmove_gtfs_latest_file', latestInfo.file);
+                    }
+                    
+                    // Update UI with new date
+                    this.updateLastModifiedUI();
                 } else {
                     console.log('✅ GTFS data is up to date');
-                    // Store current modification info
-                    if (lastModified) localStorage.setItem('jakmove_gtfs_last_modified', lastModified);
-                    if (eTag) localStorage.setItem('jakmove_gtfs_etag', eTag);
                 }
             } catch (error) {
                 console.log('Background update check failed:', error);
