@@ -1,0 +1,165 @@
+/* PWA-specific styles */
+
+/* Hide elements when running as installed PWA */
+.pwa-installed .navbar {
+    padding-top: env(safe-area-inset-top, 0);
+}
+
+/* Adjust for notched displays */
+.pwa-installed .modern-header {
+    padding-top: env(safe-area-inset-top, 0);
+}
+
+/* PWA install banner styling */
+#pwa-install-banner {
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(0, 123, 255, 0.2);
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 12px;
+}
+
+[data-theme="dark"] #pwa-install-banner {
+    background: rgba(33, 37, 41, 0.95);
+    border-color: rgba(0, 123, 255, 0.3);
+    color: #fff;
+}
+
+/* PWA status indicators */
+.pwa-status {
+    position: fixed;
+    top: env(safe-area-inset-top, 20px);
+    right: 20px;
+    z-index: 9999;
+    padding: 8px 12px;
+    background: rgba(40, 167, 69, 0.9);
+    color: white;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    backdrop-filter: blur(10px);
+    animation: slideInRight 0.3s ease-out;
+}
+
+.pwa-status.offline {
+    background: rgba(220, 53, 69, 0.9);
+}
+
+.pwa-status.updating {
+    background: rgba(255, 193, 7, 0.9);
+    color: #000;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Full screen experience for PWA */
+.pwa-installed .container-fluid {
+    padding-left: max(15px, env(safe-area-inset-left));
+    padding-right: max(15px, env(safe-area-inset-right));
+}
+
+/* Improve touch targets for mobile */
+@media (display-mode: standalone) {
+    .action-btn {
+        min-height: 44px;
+        min-width: 44px;
+    }
+    
+    .nav-link {
+        padding: 12px 16px;
+    }
+    
+    .form-control, .form-select {
+        min-height: 44px;
+    }
+}
+
+/* PWA splash screen colors */
+.pwa-splash {
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    color: white;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    text-align: center;
+}
+
+/* Hide address bar when in PWA mode */
+@media (display-mode: standalone) {
+    html, body {
+        overscroll-behavior: none;
+    }
+    
+    /* Remove pull-to-refresh behavior */
+    body {
+        overscroll-behavior-y: contain;
+    }
+}
+
+/* Network status indicator */
+.network-status {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 8999;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    background: rgba(220, 53, 69, 0.9);
+    color: white;
+    backdrop-filter: blur(10px);
+    animation: slideInBottom 0.3s ease-out;
+    transition: all 0.3s ease;
+}
+
+.network-status.online {
+    background: rgba(40, 167, 69, 0.9);
+}
+
+.network-status.hidden {
+    opacity: 0;
+    transform: translateX(-50%) translateY(100px);
+}
+
+@keyframes slideInBottom {
+    from {
+        transform: translateX(-50%) translateY(100px);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+    }
+}
+
+/* PWA-specific dark mode adjustments */
+[data-theme="dark"] .pwa-status {
+    backdrop-filter: blur(10px);
+}
+
+[data-theme="dark"] .network-status {
+    backdrop-filter: blur(10px);
+}
+
+/* Prevent zoom on form inputs in PWA */
+@media (display-mode: standalone) {
+    input[type="text"],
+    input[type="search"],
+    select,
+    textarea {
+        font-size: 16px;
+    }
+}
+
