@@ -35,14 +35,17 @@ class TransJakartaApp {
                 this.modules.settings.init()
             ]);
             
-            // Step 2: Initialize map immediately
+            // Step 2: Update UI with GTFS last modified date
+            this.modules.gtfs.updateLastModifiedUI();
+            
+            // Step 3: Initialize map immediately
             this.modules.map.init();
             
-            // Step 3: Setup basic event listeners and clock
+            // Step 4: Setup basic event listeners and clock
             this.setupEventListeners();
             this.initLiveClock();
             
-            // Step 4: Lazy load heavy UI components in background
+            // Step 5: Lazy load heavy UI components in background
             this.deferredUIInit();
 
             // Handle URL parameter for direct route selection (e.g., index.html?route_id=3F)

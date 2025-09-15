@@ -464,8 +464,8 @@
       <iconify-icon icon="mdi:database-search" style="margin-right: 0.5rem;"></iconify-icon>
       GTFS Raw Data Viewer
     </h1>
-    <p class="gtfs-viewer-subtitle">
-      Data ini diambil dari GTFS Transjakarta (diperbarui 4 September 2025)
+    <p class="gtfs-viewer-subtitle" id="gtfs-update-date">
+      Data ini diambil dari GTFS Transjakarta (memuat...)
     </p>
     <p class="gtfs-viewer-subtitle mb-0">
       Data salah? Hubungi saya di 
@@ -494,7 +494,13 @@
   </div>
 
   <script src="js/dark-mode-switch.js"></script>
+  <script src="js/gtfs-utils.js"></script>
   <script>
+    // Update GTFS date when page loads
+    document.addEventListener('DOMContentLoaded', () => {
+      GTFSUtils.updateGTFSViewerDateElement('#gtfs-update-date');
+    });
+
     function parseCSV(text) {
       const lines = text.split('\n').filter(line => line.trim() !== '');
       const headers = lines[0].split(',').map(h => h.trim());

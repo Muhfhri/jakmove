@@ -313,7 +313,29 @@
                 </div>
                 <div class="search-input-group">
                     <iconify-icon icon="mdi:magnify" class="search-icon"></iconify-icon>
-                    <input type="text" id="searchStop" class="form-control modern-input" placeholder="Cari halte atau koridor...">
+                    <input type="text" id="searchStop" class="form-control modern-input" placeholder="Cari halte, koridor, atau tempat (GBK, Monas, dll)...">
+                </div>
+                
+                <!-- Search Filter Tabs -->
+                <div class="search-filter-tabs mt-2" id="searchFilterTabs" style="display: none;">
+                    <div class="filter-buttons d-flex gap-1">
+                        <button type="button" class="filter-btn active" data-filter="all">
+                            <iconify-icon icon="mdi:view-list"></iconify-icon>
+                            <span>Semua</span>
+                        </button>
+                        <button type="button" class="filter-btn" data-filter="routes">
+                            <iconify-icon icon="mdi:bus"></iconify-icon>
+                            <span>Layanan</span>
+                        </button>
+                        <button type="button" class="filter-btn" data-filter="stops">
+                            <iconify-icon icon="mdi:bus-stop"></iconify-icon>
+                            <span>Halte</span>
+                        </button>
+                        <button type="button" class="filter-btn" data-filter="places">
+                            <iconify-icon icon="mdi:map-marker"></iconify-icon>
+                            <span>Tempat</span>
+                        </button>
+                    </div>
                 </div>
             </div>
             <div id="searchResults" class="search-results"></div>
@@ -837,6 +859,7 @@
     </script>
 
     <!-- Additional Scripts -->
+    <script src="js/gtfs-utils.js" defer></script>
     <script src="js/navbar.js" defer></script>
     <script src="js/dark-mode-switch.js" defer></script>
     <script src="https://code.iconify.design/iconify-icon/1.0.2/iconify-icon.min.js" defer></script>
