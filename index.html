@@ -366,6 +366,10 @@
                         <label class="form-check-label" for="settingFilterAccess">Sembunyikan halte akses (E/H)</label>
                     </div>
                     <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="settingShowWeather">
+                        <label class="form-check-label" for="settingShowWeather">Tampilkan informasi cuaca</label>
+                    </div>
+                    <div class="form-check form-switch">
                         <input class="form-check-input" type="checkbox" id="settingBatterySaver">
                         <label class="form-check-label" for="settingBatterySaver">Mode hemat baterai (minim animasi & peta ringan)</label>
                     </div>
@@ -904,6 +908,7 @@
             const elShowJaklingko = document.getElementById('settingShowJaklingko');
             const elShowAccessibility = document.getElementById('settingShowAccessibility');
             const elFilterAccess = document.getElementById('settingFilterAccess');
+            const elShowWeather = document.getElementById('settingShowWeather');
             const elBatterySaver = document.getElementById('settingBatterySaver');
             const toggleBtn = document.getElementById('toggleSettingsBtn');
             const body = document.getElementById('settingsBody');
@@ -960,6 +965,7 @@
                     bindToggle(app, elShowJaklingko, 'showJaklingkoBadge');
                     bindToggle(app, elShowAccessibility, 'showAccessibilityIcon');
                     bindToggle(app, elFilterAccess, 'filterAccessStops');
+                    bindToggle(app, elShowWeather, 'showWeatherInfo');
                     // Battery Saver binding with side-effects
                     if (elBatterySaver) {
                         elBatterySaver.checked = !!app.modules.settings.get('batterySaver');
