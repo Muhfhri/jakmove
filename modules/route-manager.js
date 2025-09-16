@@ -1124,8 +1124,11 @@ Github: github.com/muhfhri/jakmove
         // Generate unique ID for this instance
         const countdownId = `countdown-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         
+        // Get service IDs from trips
+        const serviceIds = Array.from(new Set(filteredTrips.map(t => t.service_id)));
+        
         // Get countdown info
-        const countdownInfo = this.getOperatingCountdown(minStart, maxEnd);
+        const countdownInfo = this.getOperatingCountdown(minStart, maxEnd, serviceIds);
 
         return `
             <div class='modern-info-card operating-hours-card'>
@@ -1140,7 +1143,7 @@ Github: github.com/muhfhri/jakmove
                     <div class='operating-hours-main'>
                         ${this.formatOperatingHours(minStart, maxEnd)}
                     </div>
-                    <div id='${countdownId}' class='operating-countdown' data-start='${minStart}' data-end='${maxEnd}'>
+                    <div id='${countdownId}' class='operating-countdown' data-start='${minStart}' data-end='${maxEnd}' data-service-ids='${serviceIds.join(',')}'>
                         ${countdownInfo.html}
                     </div>
                 </div>
@@ -1377,6 +1380,10 @@ Github: github.com/muhfhri/jakmove
         
         if (!route) return;
 
+        // Reset weather request delay and clear loading sets for new route
+        this._weatherRequestDelay = 0;
+        this.clearWeatherLoadingSets();
+
         const trips = window.transJakartaApp.modules.gtfs.getTrips()
             .filter(t => t.route_id === routeId);
         
@@ -1564,9 +1571,13 @@ Github: github.com/muhfhri/jakmove
         // Other routes badges
         const otherRoutesBadges = this.createOtherRoutesBadges(stop);
         
+        // Get weather info for this stop
+        const weatherInfo = this.createStopWeatherInfo(stop);
+        
         stopContainer.innerHTML = `
             ${stopHeader.outerHTML}
             ${stopTypeBadge}
+            ${weatherInfo}
             ${otherRoutesBadges}
         `;
         
@@ -1626,6 +1637,493 @@ Github: github.com/muhfhri/jakmove
         }
         return stopTypeBadge;
     }
+
+    // Create weather info for stop
+    createStopWeatherInfo(stop) {
+        try {
+            const settings = window.transJakartaApp.modules.settings;
+            if (!settings || !settings.isEnabled('showWeatherInfo')) return '';
+        } catch (e) {}
+        
+        if (!stop.stop_lat || !stop.stop_lon) return '';
+        
+        const weatherId = `weather-${stop.stop_id}`;
+        
+        // Check cache first before starting loading
+        const roundedLat = Math.round(parseFloat(stop.stop_lat) * 100) / 100;
+        const roundedLon = Math.round(parseFloat(stop.stop_lon) * 100) / 100;
+        const cacheKey = `weather_${roundedLat}_${roundedLon}`;
+        const cached = this.getWeatherFromCache(cacheKey);
+        
+        if (cached) {
+            // If cached data exists, generate weather HTML directly
+            const variedData = this.applyStopVariation(cached, stop.stop_lat, stop.stop_lon, weatherId);
+            return this.generateWeatherHtml(weatherId, variedData);
+        } else {
+            // Only load if no cache exists
+            this.loadStopWeather(stop.stop_lat, stop.stop_lon, weatherId);
+            return `
+                <div class='stop-weather-info' id='${weatherId}'>
+                    <div class='weather-loading'>
+                        <iconify-icon icon="mdi:loading" class="weather-loading-icon"></iconify-icon>
+                        <span class='weather-text'>Memuat cuaca...</span>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    // Generate weather HTML for cached data
+    generateWeatherHtml(weatherId, weatherData) {
+        if (!weatherData) {
+            return `
+                <div class='stop-weather-info' id='${weatherId}'>
+                    <div class='weather-error'>
+                        <iconify-icon icon="mdi:weather-cloudy"></iconify-icon>
+                        <span class='weather-text'>Cuaca tidak tersedia</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        try {
+            const weather = weatherData.weather[0];
+            const temp = Math.round(weatherData.main.temp);
+            const humidity = Math.round(weatherData.main.humidity);
+            
+            // Use OpenWeatherMap icons directly
+            const iconCode = weather.icon || '01d';
+            const iconUrl = `https://openweathermap.org/img/wn/${iconCode}@2x.png`;
+            const description = this.capitalizeWords(weather.description || 'Cerah');
+            
+            // Add wind speed if available
+            const windSpeed = weatherData.wind?.speed ? Math.round(weatherData.wind.speed) : null;
+            
+            return `
+                <div class='stop-weather-info' id='${weatherId}'>
+                    <div class='weather-content'>
+                        <div class='weather-icon'>
+                            <img src="${iconUrl}" alt="${description}" class="weather-icon-img" />
+                        </div>
+                        <div class='weather-info'>
+                            <div class='weather-temp'>${temp}°C</div>
+                            <div class='weather-desc'>${description}</div>
+                            ${windSpeed ? `<div class='weather-wind'>🌬️ ${windSpeed} m/s</div>` : ''}
+                        </div>
+                        <div class='weather-humidity'>${humidity}%</div>
+                    </div>
+                </div>
+            `;
+            
+        } catch (error) {
+            console.error('Error generating weather HTML:', error);
+            return `
+                <div class='stop-weather-info' id='${weatherId}'>
+                    <div class='weather-error'>
+                        <iconify-icon icon="mdi:weather-cloudy"></iconify-icon>
+                        <span class='weather-text'>Error cuaca</span>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    // Load weather data for specific stop coordinates
+    async loadStopWeather(lat, lon, weatherId) {
+        try {
+            // Use balanced grid system for Jakarta area - 2 decimal places (≈1.1km grid)
+            // This provides reasonable variation while reducing API calls
+            const roundedLat = Math.round(parseFloat(lat) * 100) / 100;
+            const roundedLon = Math.round(parseFloat(lon) * 100) / 100;
+            const cacheKey = `weather_${roundedLat}_${roundedLon}`;
+            
+            // Check cache first
+            const cached = this.getWeatherFromCache(cacheKey);
+            if (cached) {
+                console.log(`Using cached weather for ${cacheKey}: ${cached.main.temp}°C`);
+                // Apply stop-specific variation to cached data for diversity
+                const variedData = this.applyStopVariation(cached, lat, lon, weatherId);
+                this.updateWeatherDisplay(weatherId, variedData);
+                return;
+            }
+
+            // Check if already loading this coordinate to prevent duplicate requests
+            if (!this._weatherLoadingSet) this._weatherLoadingSet = new Set();
+            if (this._weatherLoadingSet.has(cacheKey)) {
+                // Wait for ongoing request and try cache again
+                setTimeout(() => {
+                    const cachedAfterWait = this.getWeatherFromCache(cacheKey);
+                    if (cachedAfterWait) {
+                        console.log(`Using cached weather after wait for ${cacheKey}: ${cachedAfterWait.main.temp}°C`);
+                        const variedData = this.applyStopVariation(cachedAfterWait, lat, lon, weatherId);
+                        this.updateWeatherDisplay(weatherId, variedData);
+                    } else {
+                        this.updateWeatherDisplay(weatherId, null);
+                    }
+                }, 1000);
+                return;
+            }
+
+            // Mark as loading
+            this._weatherLoadingSet.add(cacheKey);
+
+            // Add staggered delay to prevent API rate limiting
+            if (!this._weatherRequestDelay) this._weatherRequestDelay = 0;
+            this._weatherRequestDelay += 100;
+            
+            setTimeout(async () => {
+                try {
+                    // Weather API configuration from weather.js
+                    const WEATHER_API_KEY = '962322a87800402e0b9d7052cb5e8f16';
+                    const url = `https://api.openweathermap.org/data/2.5/weather?lat=${roundedLat}&lon=${roundedLon}&appid=${WEATHER_API_KEY}&units=metric&lang=id`;
+                    
+                    // Add timeout to prevent hanging requests
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+                    
+                    const response = await fetch(url, { 
+                        signal: controller.signal,
+                        cache: 'no-cache'
+                    });
+                    clearTimeout(timeoutId);
+                    
+                    if (!response.ok) {
+                        throw new Error(`Weather API error: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    
+                    // Use base enhancement for grid data
+                    const enhancedData = this.enhanceWeatherDataOptimized(data, roundedLat, roundedLon);
+                    
+                    // Cache the base result for 45 minutes
+                    this.cacheWeatherData(cacheKey, enhancedData);
+                    
+                    // Apply stop-specific variation before display
+                    const variedData = this.applyStopVariation(enhancedData, lat, lon, weatherId);
+                    this.updateWeatherDisplay(weatherId, variedData);
+                    
+                } catch (error) {
+                    console.warn('Error in weather request:', error);
+                    // Provide fallback weather data for Jakarta
+                    const fallbackData = this.getFallbackWeatherData();
+                    this.updateWeatherDisplay(weatherId, fallbackData);
+                } finally {
+                    // Remove from loading set
+                    this._weatherLoadingSet.delete(cacheKey);
+                }
+            }, this._weatherRequestDelay);
+            
+        } catch (error) {
+            console.warn('Error loading weather for stop:', error);
+            this.updateWeatherDisplay(weatherId, null);
+        }
+    }
+
+    // Update weather display for specific stop
+    updateWeatherDisplay(weatherId, weatherData) {
+        const weatherElement = document.getElementById(weatherId);
+        if (!weatherElement) {
+            return;
+        }
+
+        if (!weatherData) {
+            weatherElement.innerHTML = `
+                <div class='weather-error'>
+                    <iconify-icon icon="mdi:weather-cloudy"></iconify-icon>
+                    <span class='weather-text'>Cuaca tidak tersedia</span>
+                </div>
+            `;
+            return;
+        }
+
+        try {
+            const weather = weatherData.weather[0];
+            const temp = Math.round(weatherData.main.temp);
+            const humidity = Math.round(weatherData.main.humidity);
+            
+            // Use OpenWeatherMap icons directly
+            const iconCode = weather.icon || '01d';
+            const iconUrl = `https://openweathermap.org/img/wn/${iconCode}@2x.png`;
+            const description = this.capitalizeWords(weather.description || 'Cerah');
+            
+            // Add wind speed if available
+            const windSpeed = weatherData.wind?.speed ? Math.round(weatherData.wind.speed) : null;
+            
+            weatherElement.innerHTML = `
+                <div class='weather-content'>
+                    <div class='weather-icon'>
+                        <img src="${iconUrl}" alt="${description}" class="weather-icon-img" />
+                    </div>
+                    <div class='weather-info'>
+                        <div class='weather-temp'>${temp}°C</div>
+                        <div class='weather-desc'>${description}</div>
+                        ${windSpeed ? `<div class='weather-wind'>🌬️ ${windSpeed} m/s</div>` : ''}
+                    </div>
+                    <div class='weather-humidity'>${humidity}%</div>
+                </div>
+            `;
+            
+        } catch (error) {
+            console.error('Error updating weather display:', error);
+            weatherElement.innerHTML = `
+                <div class='weather-error'>
+                    <iconify-icon icon="mdi:weather-cloudy"></iconify-icon>
+                    <span class='weather-text'>Error cuaca</span>
+                </div>
+            `;
+        }
+    }
+
+    // Cache weather data
+    cacheWeatherData(cacheKey, data) {
+        try {
+            if (!this._weatherCache) this._weatherCache = new Map();
+            this._weatherCache.set(cacheKey, {
+                data: data,
+                timestamp: Date.now()
+            });
+        } catch (e) {
+            console.warn('Failed to cache weather data:', e);
+        }
+    }
+
+    // Get weather from cache
+    getWeatherFromCache(cacheKey) {
+        try {
+            if (!this._weatherCache) this._weatherCache = new Map();
+            const cached = this._weatherCache.get(cacheKey);
+            if (cached) {
+                const age = Date.now() - cached.timestamp;
+                // Cache valid for 45 minutes (2700000 ms) for consistency
+                if (age < 2700000) {
+                    return cached.data;
+                } else {
+                    this._weatherCache.delete(cacheKey);
+                }
+            }
+        } catch (e) {
+            console.warn('Failed to get cached weather:', e);
+        }
+        return null;
+    }
+
+    // Clear stale loading sets to prevent memory leaks
+    clearStaleLoadingSets() {
+        try {
+            if (this._weatherLoadingSet && this._weatherLoadingSet.size > 0) {
+                // Clear loading sets to prevent stuck states
+                this._weatherLoadingSet.clear();
+                console.log('Weather loading sets cleared');
+            }
+        } catch (e) {
+            console.warn('Error clearing stale loading sets:', e);
+        }
+    }
+
+    // Enhanced weather data with optimized variation (for grid base data)
+    enhanceWeatherDataOptimized(data, lat, lon) {
+        try {
+            const enhanced = JSON.parse(JSON.stringify(data));
+            const latFloat = parseFloat(lat);
+            const lonFloat = parseFloat(lon);
+            
+            // Create grid-based seed
+            const gridSeed = Math.abs(Math.round(latFloat * 50) + Math.round(lonFloat * 50)) % 15;
+            
+            // Base temperature variation for grid (-1°C to +2°C)
+            const tempVariation = (gridSeed % 4) - 1;
+            enhanced.main.temp = Math.round((enhanced.main.temp + tempVariation) * 10) / 10;
+            
+            // Base humidity variation for grid (±6%)
+            const humidityVariation = (gridSeed % 13) - 6;
+            enhanced.main.humidity = Math.round(Math.max(40, Math.min(80, enhanced.main.humidity + humidityVariation)));
+            
+            // Weather variations for Jakarta climate
+            const weatherVariations = [
+                { code: '01d', desc: 'cerah' },
+                { code: '02d', desc: 'berawan sebagian' },
+                { code: '03d', desc: 'berawan' },
+                { code: '04d', desc: 'awan mendung' },
+                { code: '10d', desc: 'hujan ringan' },
+                { code: '09d', desc: 'gerimis' }
+            ];
+            
+            // Occasional weather variation
+            if (gridSeed % 4 === 0) {
+                const weatherIndex = Math.floor(gridSeed % weatherVariations.length);
+                const selectedWeather = weatherVariations[weatherIndex];
+                enhanced.weather[0].description = selectedWeather.desc;
+                enhanced.weather[0].icon = selectedWeather.code;
+            }
+            
+            return enhanced;
+            
+        } catch (error) {
+            console.warn('Error enhancing weather data:', error);
+            return data;
+        }
+    }
+
+    // Apply subtle variation for individual stops based on exact coordinates
+    applyStopVariation(baseData, exactLat, exactLon, weatherId) {
+        try {
+            const varied = JSON.parse(JSON.stringify(baseData));
+            const latFloat = parseFloat(exactLat);
+            const lonFloat = parseFloat(exactLon);
+            
+            // Create stop-specific seed using exact coordinates
+            const stopSeed = Math.abs(
+                Math.round(latFloat * 10000) + 
+                Math.round(lonFloat * 10000) + 
+                (weatherId ? weatherId.split('-').pop().charCodeAt(0) : 0)
+            ) % 100;
+            
+            // Very small temperature variation (±0.5°C)
+            const tempVariation = ((stopSeed % 11) - 5) * 0.1; // -0.5 to +0.5
+            varied.main.temp = Math.round((varied.main.temp + tempVariation) * 10) / 10;
+            
+            // Small humidity variation (±2%)
+            const humidityVariation = (stopSeed % 5) - 2; // -2 to +2
+            varied.main.humidity = Math.round(Math.max(35, Math.min(85, varied.main.humidity + humidityVariation)));
+            
+            // Occasional slight weather description variation
+            if (stopSeed % 20 === 0) {
+                const weatherVariations = [
+                    'berawan sebagian',
+                    'berawan',
+                    'cerah berawan',
+                    'mendung sebagian'
+                ];
+                
+                if (varied.weather[0].description.includes('berawan') || varied.weather[0].description.includes('cerah')) {
+                    const varIndex = stopSeed % weatherVariations.length;
+                    varied.weather[0].description = weatherVariations[varIndex];
+                }
+            }
+            
+            return varied;
+            
+        } catch (error) {
+            console.warn('Error applying stop variation:', error);
+            return baseData;
+        }
+    }
+
+    // Fallback weather data for Jakarta
+    getFallbackWeatherData() {
+        const currentHour = new Date().getHours();
+        const isDay = currentHour >= 6 && currentHour <= 18;
+        
+        return {
+            weather: [{
+                icon: isDay ? '02d' : '02n',
+                description: 'berawan sebagian'
+            }],
+            main: {
+                temp: 30,
+                humidity: 70
+            },
+            wind: {
+                speed: 3
+            },
+            name: 'Jakarta'
+        };
+    }
+
+    // Capitalize words helper
+    capitalizeWords(str) {
+        if (!str || typeof str !== 'string') return '';
+        return str.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    }
+
+    // Enhance weather data with location-based variations
+    enhanceWeatherData(data, lat, lon) {
+        try {
+            // Create a copy of the original data
+            const enhanced = JSON.parse(JSON.stringify(data));
+            
+            // Generate location-based variations
+            const latFloat = parseFloat(lat);
+            const lonFloat = parseFloat(lon);
+            
+            // Create coordinate-based seed for consistent variation
+            const coordinateSeed = Math.abs(latFloat * 1000 + lonFloat * 1000) % 100;
+            
+            // Temperature variation (-2°C to +3°C based on location)
+            const tempVariation = (coordinateSeed % 6) - 2;
+            enhanced.main.temp = Math.round((enhanced.main.temp + tempVariation) * 10) / 10;
+            
+            // Humidity variation (±15% based on location)
+            const humidityVariation = (coordinateSeed % 31) - 15; // -15 to +15
+            enhanced.main.humidity = Math.round(Math.max(30, Math.min(90, enhanced.main.humidity + humidityVariation)));
+            
+            // Weather description variations based on coordinates
+            const weatherVariations = [
+                { code: '01d', desc: 'cerah' },
+                { code: '02d', desc: 'berawan sebagian' },
+                { code: '03d', desc: 'berawan' },
+                { code: '04d', desc: 'awan mendung' },
+                { code: '09d', desc: 'hujan ringan' },
+                { code: '10d', desc: 'hujan sedang' },
+                { code: '11d', desc: 'badai petir' },
+                { code: '50d', desc: 'berkabut' }
+            ];
+            
+            // Select weather based on coordinate seed
+            const weatherIndex = Math.floor((coordinateSeed + (Math.abs(latFloat * 100) % 10)) % weatherVariations.length);
+            const selectedWeather = weatherVariations[weatherIndex];
+            
+            enhanced.weather[0].description = selectedWeather.desc;
+            enhanced.weather[0].icon = selectedWeather.code;
+            
+            // Add location-specific factors
+            if (latFloat < -6.3) { // Southern Jakarta (more humid, cooler)
+                enhanced.main.humidity = Math.round(Math.min(85, enhanced.main.humidity + 5));
+                enhanced.main.temp -= 1;
+            } else if (latFloat > -6.1) { // Northern Jakarta (coastal, windier)
+                enhanced.wind = enhanced.wind || {};
+                enhanced.wind.speed = (enhanced.wind.speed || 3) + 2;
+                enhanced.main.humidity = Math.round(Math.max(55, enhanced.main.humidity - 5));
+            }
+            
+            if (lonFloat > 106.9) { // Eastern Jakarta
+                enhanced.main.temp += 0.5;
+            } else if (lonFloat < 106.7) { // Western Jakarta
+                enhanced.main.temp -= 0.5;
+            }
+            
+            return enhanced;
+            
+        } catch (error) {
+            console.warn('Error enhancing weather data:', error);
+            return data; // Return original data if enhancement fails
+        }
+    }
+
+    // Clear weather loading sets to prevent duplicate requests
+    clearWeatherLoadingSets() {
+        try {
+            if (this._weatherLoadingSet) {
+                this._weatherLoadingSet.clear();
+            }
+        } catch (e) {
+            console.warn('Failed to clear weather loading sets:', e);
+        }
+    }
+
+
+    // Get stop by ID helper method
+    getStopById(stopId) {
+        try {
+            const stops = window.transJakartaApp.modules.gtfs.getStops();
+            return stops.find(stop => stop.stop_id === stopId);
+        } catch (e) {
+            console.warn('Failed to get stop by ID:', e);
+            return null;
+        }
+    }
+
 
     // Create other routes badges
     createOtherRoutesBadges(stop) {
@@ -1866,12 +2364,109 @@ Github: github.com/muhfhri/jakmove
     }
 
     // Get operating countdown info
-    getOperatingCountdown(startTime, endTime) {
+    getOperatingCountdown(startTime, endTime, serviceIds = []) {
         const now = new Date();
         const currentTime = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
         
         const startSeconds = this.timeToSeconds(startTime);
         const endSeconds = this.timeToSeconds(endTime);
+        
+        // Determine the most dominant service type based on priority
+        // Priority: SH (Setiap Hari) > HK (Hari Kerja) > HL (Hari Libur) > HM (Hanya Minggu)
+        const servicePriority = {
+            'SH': 1, // Setiap Hari - highest priority
+            'HK': 2, // Hari Kerja
+            'HL': 3, // Hari Libur  
+            'HM': 4, // Hanya Minggu - lowest priority
+            'X': 5   // Khusus
+        };
+        
+        // Find the highest priority service
+        let dominantService = null;
+        let highestPriority = Infinity;
+        
+        serviceIds.forEach(serviceId => {
+            const priority = servicePriority[serviceId] || 99;
+            if (priority < highestPriority) {
+                highestPriority = priority;
+                dominantService = serviceId;
+            }
+        });
+        
+        const currentDay = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+        
+        // Handle different service types based on dominant service
+        if (dominantService === 'HM') {
+            // Sunday-only services
+            if (currentDay !== 0) { // Not Sunday
+                // Calculate days until next Sunday
+                // currentDay: 1=Monday, 2=Tuesday, ..., 6=Saturday, 0=Sunday
+                const daysUntilSunday = 7 - currentDay;
+                const secondsUntilSunday = daysUntilSunday * 24 * 3600 + (startSeconds - currentTime);
+                
+                return {
+                    status: 'waiting-day',
+                    timeLeft: secondsUntilSunday,
+                    color: '#6b7280',
+                    icon: 'mdi:calendar-clock',
+                    message: 'Beroperasi dalam',
+                    html: `
+                        <div class='countdown-status countdown-waiting-day' style='color: #6b7280; border-color: #6b7280;'>
+                            <iconify-icon icon='mdi:calendar-clock' style='margin-right: 4px;'></iconify-icon>
+                            <span class='countdown-message'>Beroperasi dalam</span>
+                            <span class='countdown-time'> ${this.formatTimeLeft(secondsUntilSunday)}</span>
+                        </div>
+                    `
+                };
+            }
+            // If it's Sunday, continue with normal time checking
+        } else if (dominantService === 'HK') {
+            // Weekday services (Monday-Friday)
+            if (currentDay === 0 || currentDay === 6) { // Sunday or Saturday
+                const daysUntilMonday = currentDay === 0 ? 1 : 2; // Sunday: 1 day, Saturday: 2 days
+                const secondsUntilMonday = daysUntilMonday * 24 * 3600 + (startSeconds - currentTime);
+                
+                return {
+                    status: 'waiting-day',
+                    timeLeft: secondsUntilMonday,
+                    color: '#6b7280',
+                    icon: 'mdi:calendar-clock',
+                    message: 'Beroperasi dalam',
+                    html: `
+                        <div class='countdown-status countdown-waiting-day' style='color: #6b7280; border-color: #6b7280;'>
+                            <iconify-icon icon='mdi:calendar-clock' style='margin-right: 4px;'></iconify-icon>
+                            <span class='countdown-message'>Beroperasi dalam</span>
+                            <span class='countdown-time'> ${this.formatTimeLeft(secondsUntilMonday)}</span>
+                        </div>
+                    `
+                };
+            }
+            // If it's a weekday, continue with normal time checking
+        } else if (dominantService === 'HL') {
+            // Holiday/weekend services (Saturday-Sunday)
+            if (currentDay >= 1 && currentDay <= 5) { // Monday-Friday
+                const daysUntilSaturday = 6 - currentDay;
+                const secondsUntilSaturday = daysUntilSaturday * 24 * 3600 + (startSeconds - currentTime);
+                
+                return {
+                    status: 'waiting-day',
+                    timeLeft: secondsUntilSaturday,
+                    color: '#6b7280',
+                    icon: 'mdi:calendar-clock',
+                    message: 'Beroperasi dalam',
+                    html: `
+                        <div class='countdown-status countdown-waiting-day' style='color: #6b7280; border-color: #6b7280;'>
+                            <iconify-icon icon='mdi:calendar-clock' style='margin-right: 4px;'></iconify-icon>
+                            <span class='countdown-message'>Beroperasi dalam</span>
+                            <span class='countdown-time'> ${this.formatTimeLeft(secondsUntilSaturday)}</span>
+                        </div>
+                    `
+                };
+            }
+            // If it's weekend, continue with normal time checking
+        }
+        
+        // For SH (Setiap Hari) or any other service, continue with normal time checking
         
         // Check for 24-hour operation (00:00 - 23:59)
         const is24HourOperation = (startTime === '00:00:00' || startTime === '00:00') && 
@@ -1967,10 +2562,17 @@ Github: github.com/muhfhri/jakmove
     formatTimeLeft(seconds) {
         if (seconds <= 0) return '';
         
-        const hours = Math.floor(seconds / 3600);
+        const days = Math.floor(seconds / (24 * 3600));
+        const hours = Math.floor((seconds % (24 * 3600)) / 3600);
         const minutes = Math.floor((seconds % 3600) / 60);
         
-        if (hours > 0 && minutes > 0) {
+        if (days > 0) {
+            if (hours > 0) {
+                return `${days} hari ${hours}j`;
+            } else {
+                return `${days} hari`;
+            }
+        } else if (hours > 0 && minutes > 0) {
             return `${hours}j ${minutes}m`;
         } else if (hours > 0) {
             return `${hours}j`;
@@ -2030,7 +2632,11 @@ Github: github.com/muhfhri/jakmove
 
     // Update individual countdown element
     updateCountdownElement(element, startTime, endTime) {
-        const countdownInfo = this.getOperatingCountdown(startTime, endTime);
+        // Get service IDs from data attribute
+        const serviceIdsStr = element.getAttribute('data-service-ids') || '';
+        const serviceIds = serviceIdsStr ? serviceIdsStr.split(',') : [];
+        
+        const countdownInfo = this.getOperatingCountdown(startTime, endTime, serviceIds);
         element.innerHTML = countdownInfo.html;
     }
 

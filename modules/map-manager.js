@@ -732,6 +732,12 @@ export class MapManager {
             this._currentPopup.remove();
             this._currentPopup = null;
         }
+        
+        // Clear unified weather loading sets when popup is closed
+        if (window.transJakartaApp?.modules?.routeManager) {
+            window.transJakartaApp.modules.routeManager.clearStaleLoadingSets();
+        }
+        
         const tempPrefixes = ['search-', 'walk-', 'direct-', 'near-'];
         const keys = Array.from(this.layers.keys());
         const tempEntries = keys
@@ -1096,8 +1102,11 @@ export class MapManager {
 
         const wheelchairIconHtml = wheelchair ? `<iconify-icon icon=\"fontisto:paralysis-disability\" inline></iconify-icon>` : '';
 
+        // Get weather info for this stop
+        const weatherHtml = this.getStopWeatherHtml(thisStop);
+
         const popupContent = `
-            <div class=\"stop-popup plus-jakarta-sans\" style=\"min-width: 220px; max-width: 330px; padding: 10px 12px;\">\n                <div style=\"color: #333; padding: 6px 0; border-bottom: 1px solid #eee; margin-bottom: 6px; display:flex; align-items:center; gap:6px;\">\n                    <div style=\"display:flex;align-items:center;gap:6px;\">${activePrefix}<span style=\"font-size: 14px; font-weight: 600;\">${stop.properties.stopName}</span>\n                        ${(() => { try { const rm = window.transJakartaApp.modules.routes; const stopObj = window.transJakartaApp.modules.gtfs.getStops().find(s => String(s.stop_id) === String(stop.properties.stopId)); if (!rm || !stopObj) return ''; const html = rm.buildIntermodalIconsForStop ? rm.buildIntermodalIconsForStop(stopObj) : ''; return html || ''; } catch(e){ return ''; } })()}\n                        ${(() => { try { const rm = window.transJakartaApp.modules.routes; const stopObj = window.transJakartaApp.modules.gtfs.getStops().find(s => String(s.stop_id) === String(stop.properties.stopId)); if (!rm || !stopObj) return ''; if (rm.shouldShowJaklingkoBadge && rm.shouldShowJaklingkoBadge(stopObj)) { return '<img class="jaklingko-badge" src="https://transportforjakarta.or.id/wp-content/uploads/2024/10/jaklingko-w-AR0bObLen0c7yK8n-768x768.png" alt="JakLingko" title="Terintegrasi JakLingko" />'; } return ''; } catch(e){ return ''; } })()}\n                    </div>\n                    ${wheelchairIconHtml}\n                </div>\n                <div class=\"popup-scroll\" style=\"max-height:56vh;overflow:auto;\">\n                ${jenisHtml}\n                    ${semuaBadges ? `\n                <div>\n                        <div style=\"font-size: 11px; color: #666; margin-bottom: 6px;\">Layanan</div>\n                        <div style=\"display:flex;flex-wrap:wrap;gap:4px;\">\n                            ${semuaBadges}\n                    </div>\n                </div>` : ''}\n                    ${platformDetailHtml}\n                </div>\n            </div>\n        `;
+            <div class=\"stop-popup plus-jakarta-sans\" style=\"min-width: 220px; max-width: 330px; padding: 10px 12px;\">\n                <div style=\"color: #333; padding: 6px 0; border-bottom: 1px solid #eee; margin-bottom: 6px; display:flex; align-items:center; gap:6px;\">\n                    <div style=\"display:flex;align-items:center;gap:6px;\">${activePrefix}<span style=\"font-size: 14px; font-weight: 600;\">${stop.properties.stopName}</span>\n                        ${(() => { try { const rm = window.transJakartaApp.modules.routes; const stopObj = window.transJakartaApp.modules.gtfs.getStops().find(s => String(s.stop_id) === String(stop.properties.stopId)); if (!rm || !stopObj) return ''; const html = rm.buildIntermodalIconsForStop ? rm.buildIntermodalIconsForStop(stopObj) : ''; return html || ''; } catch(e){ return ''; } })()}\n                        ${(() => { try { const rm = window.transJakartaApp.modules.routes; const stopObj = window.transJakartaApp.modules.gtfs.getStops().find(s => String(s.stop_id) === String(stop.properties.stopId)); if (!rm || !stopObj) return ''; if (rm.shouldShowJaklingkoBadge && rm.shouldShowJaklingkoBadge(stopObj)) { return '<img class="jaklingko-badge" src="https://transportforjakarta.or.id/wp-content/uploads/2024/10/jaklingko-w-AR0bObLen0c7yK8n-768x768.png" alt="JakLingko" title="Terintegrasi JakLingko" />'; } return ''; } catch(e){ return ''; } })()}\n                    </div>\n                    ${wheelchairIconHtml}\n                </div>\n                ${weatherHtml}\n                <div class=\"popup-scroll\" style=\"max-height:56vh;overflow:auto;\">\n                ${jenisHtml}\n                    ${semuaBadges ? `\n                <div>\n                        <div style=\"font-size: 11px; color: #666; margin-bottom: 6px;\">Layanan</div>\n                        <div style=\"display:flex;flex-wrap:wrap;gap:4px;\">\n                            ${semuaBadges}\n                    </div>\n                </div>` : ''}\n                    ${platformDetailHtml}\n                </div>\n            </div>\n        `;
 
         if (this._currentPopup) this._currentPopup.remove();
         this._currentPopup = this.featurePopup.setLngLat(lngLat).setHTML(popupContent).addTo(this.map);
@@ -1583,6 +1592,11 @@ export class MapManager {
             this._currentPopup.remove();
             this._currentPopup = null;
         }
+        
+        // Clear unified weather loading sets when popup is closed
+        if (window.transJakartaApp?.modules?.routeManager) {
+            window.transJakartaApp.modules.routeManager.clearStaleLoadingSets();
+        }
     }
 
     showHtmlPopupAt(lng, lat, html, options = {}) {
@@ -1859,5 +1873,290 @@ export class MapManager {
                 btn.title = 'Rencana (BETA)';
             }
         } catch (e) {}
+    }
+
+    // Get weather HTML for stop popup
+    getStopWeatherHtml(stop) {
+        try {
+            const settings = window.transJakartaApp.modules.settings;
+            if (!settings || !settings.isEnabled('showWeatherInfo')) return '';
+        } catch (e) {}
+        
+        if (!stop?.stop_lat || !stop?.stop_lon) return '';
+        
+        const weatherId = `popup-weather-${stop.stop_id}`;
+        
+        // Start loading weather data asynchronously
+        this.loadPopupWeather(stop.stop_lat, stop.stop_lon, weatherId);
+        
+        return `
+            <div class='popup-weather-info' id='${weatherId}'>
+                <div class='weather-loading'>
+                    <iconify-icon icon="mdi:loading" class="weather-loading-icon"></iconify-icon>
+                    <span class='weather-text'>Memuat cuaca...</span>
+                </div>
+            </div>
+        `;
+    }
+
+    // Load weather data for popup
+    async loadPopupWeather(lat, lon, weatherId) {
+        try {
+            // Use balanced grid system - 2 decimal places (≈1.1km grid)
+            const roundedLat = Math.round(parseFloat(lat) * 100) / 100;
+            const roundedLon = Math.round(parseFloat(lon) * 100) / 100;
+            // Use unified cache key format across all modules
+            const cacheKey = `weather_${roundedLat}_${roundedLon}`;
+            
+            // Use unified cache only
+            let cached = null;
+            if (window.transJakartaApp?.modules?.routeManager) {
+                cached = window.transJakartaApp.modules.routeManager.getWeatherFromCache(cacheKey);
+            }
+            
+            if (cached) {
+                console.log(`Using cached weather for ${cacheKey}: ${cached.main.temp}°C`);
+                // Apply popup-specific variation
+                const variedData = this.applyPopupVariation(cached, lat, lon, weatherId);
+                this.updatePopupWeatherDisplay(weatherId, variedData);
+                return;
+            }
+
+            // Use unified loading set from route manager
+            const routeManager = window.transJakartaApp?.modules?.routeManager;
+            if (routeManager) {
+                if (!routeManager._weatherLoadingSet) routeManager._weatherLoadingSet = new Set();
+                if (routeManager._weatherLoadingSet.has(cacheKey)) {
+                    setTimeout(() => {
+                        const cachedAfterWait = routeManager.getWeatherFromCache(cacheKey);
+                        if (cachedAfterWait) {
+                            console.log(`Using cached weather after wait for ${cacheKey}: ${cachedAfterWait.main.temp}°C`);
+                            const variedData = this.applyPopupVariation(cachedAfterWait, lat, lon, weatherId);
+                            this.updatePopupWeatherDisplay(weatherId, variedData);
+                        } else {
+                            this.updatePopupWeatherDisplay(weatherId, this.getFallbackWeatherData());
+                        }
+                    }, 500); // Shorter timeout for popup
+                    return;
+                }
+                routeManager._weatherLoadingSet.add(cacheKey);
+            }
+
+            // Reduced delay for popup
+            setTimeout(async () => {
+                try {
+                    const WEATHER_API_KEY = '962322a87800402e0b9d7052cb5e8f16';
+                    const url = `https://api.openweathermap.org/data/2.5/weather?lat=${roundedLat}&lon=${roundedLon}&appid=${WEATHER_API_KEY}&units=metric&lang=id`;
+                    
+                    // Add timeout
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 6000);
+                    
+                    const response = await fetch(url, { signal: controller.signal });
+                    clearTimeout(timeoutId);
+                    
+                    if (!response.ok) throw new Error(`Weather API error: ${response.status}`);
+                    
+                    const data = await response.json();
+                    
+                    // Use optimized enhancement for grid data
+                    const enhancedData = this.enhancePopupWeatherDataOptimized(data, roundedLat, roundedLon);
+                    
+                    // Cache to unified cache via route manager
+                    if (window.transJakartaApp?.modules?.routeManager) {
+                        window.transJakartaApp.modules.routeManager.cacheWeatherData(cacheKey, enhancedData);
+                    }
+                    
+                    // Apply popup-specific variation before display
+                    const variedData = this.applyPopupVariation(enhancedData, lat, lon, weatherId);
+                    this.updatePopupWeatherDisplay(weatherId, variedData);
+                    
+                } catch (error) {
+                    console.warn('Error loading popup weather:', error);
+                    this.updatePopupWeatherDisplay(weatherId, this.getFallbackWeatherData());
+                } finally {
+                    // Remove from unified loading set
+                    if (window.transJakartaApp?.modules?.routeManager?._weatherLoadingSet) {
+                        window.transJakartaApp.modules.routeManager._weatherLoadingSet.delete(cacheKey);
+                    }
+                }
+            }, Math.random() * 200); // Reduced delay 0-200ms
+            
+        } catch (error) {
+            console.warn('Error in loadPopupWeather:', error);
+            this.updatePopupWeatherDisplay(weatherId, null);
+        }
+    }
+
+    // Update weather display in popup
+    updatePopupWeatherDisplay(weatherId, weatherData) {
+        const weatherElement = document.getElementById(weatherId);
+        if (!weatherElement) {
+            return;
+        }
+
+        if (!weatherData) {
+            weatherElement.innerHTML = `
+                <div class='weather-error'>
+                    <iconify-icon icon="mdi:weather-cloudy"></iconify-icon>
+                    <span class='weather-text'>Cuaca tidak tersedia</span>
+                </div>
+            `;
+            return;
+        }
+
+        try {
+            const weather = weatherData.weather[0];
+            const temp = Math.round(weatherData.main.temp);
+            const humidity = Math.round(weatherData.main.humidity);
+            
+            const iconCode = weather.icon || '01d';
+            const iconUrl = `https://openweathermap.org/img/wn/${iconCode}.png`;
+            const description = this.capitalizeWords(weather.description || 'Cerah');
+            
+            weatherElement.innerHTML = `
+                <div class='weather-content'>
+                    <div class='weather-icon'>
+                        <img src="${iconUrl}" alt="${description}" class="weather-icon-img" style="width: 28px; height: 28px;" />
+                    </div>
+                    <div class='weather-info'>
+                        <div class='weather-temp'>${temp}°C</div>
+                        <div class='weather-desc'>${description}</div>
+                    </div>
+                    <div class='weather-humidity'>${humidity}%</div>
+                </div>
+            `;
+            
+        } catch (error) {
+            console.error('Error updating popup weather display:', error);
+            weatherElement.innerHTML = `
+                <div class='weather-error'>
+                    <iconify-icon icon="mdi:weather-cloudy"></iconify-icon>
+                    <span class='weather-text'>Error cuaca</span>
+                </div>
+            `;
+        }
+    }
+
+    // Enhance weather data (similar to route-manager)
+    enhancePopupWeatherData(data, lat, lon) {
+        try {
+            const enhanced = JSON.parse(JSON.stringify(data));
+            const latFloat = parseFloat(lat);
+            const lonFloat = parseFloat(lon);
+            const coordinateSeed = Math.abs(latFloat * 1000 + lonFloat * 1000) % 100;
+            
+            // Temperature variation
+            const tempVariation = (coordinateSeed % 6) - 2;
+            enhanced.main.temp = Math.round((enhanced.main.temp + tempVariation) * 10) / 10;
+            
+            // Humidity variation
+            const humidityVariation = (coordinateSeed % 31) - 15;
+            enhanced.main.humidity = Math.round(Math.max(30, Math.min(90, enhanced.main.humidity + humidityVariation)));
+            
+            // Weather variations
+            const weatherVariations = [
+                { code: '01d', desc: 'cerah' },
+                { code: '02d', desc: 'berawan sebagian' },
+                { code: '03d', desc: 'berawan' },
+                { code: '04d', desc: 'awan mendung' },
+                { code: '09d', desc: 'hujan ringan' },
+                { code: '10d', desc: 'hujan sedang' },
+                { code: '50d', desc: 'berkabut' }
+            ];
+            
+            const weatherIndex = Math.floor((coordinateSeed + (Math.abs(latFloat * 100) % 10)) % weatherVariations.length);
+            const selectedWeather = weatherVariations[weatherIndex];
+            
+            enhanced.weather[0].description = selectedWeather.desc;
+            enhanced.weather[0].icon = selectedWeather.code;
+            
+            return enhanced;
+        } catch (error) {
+            return data;
+        }
+    }
+
+    // Popup weather now uses unified cache from route manager - no separate cache needed
+
+    // Enhanced weather data optimized for popup (grid base data)
+    enhancePopupWeatherDataOptimized(data, lat, lon) {
+        try {
+            const enhanced = JSON.parse(JSON.stringify(data));
+            const latFloat = parseFloat(lat);
+            const lonFloat = parseFloat(lon);
+            
+            // Grid-based variation for popup
+            const gridSeed = Math.abs(Math.round(latFloat * 50) + Math.round(lonFloat * 50)) % 12;
+            
+            // Base temperature variation (-1°C to +1°C)
+            const tempVariation = (gridSeed % 3) - 1;
+            enhanced.main.temp = Math.round((enhanced.main.temp + tempVariation) * 10) / 10;
+            
+            // Base humidity variation (±5%)
+            const humidityVariation = (gridSeed % 11) - 5;
+            enhanced.main.humidity = Math.round(Math.max(45, Math.min(75, enhanced.main.humidity + humidityVariation)));
+            
+            return enhanced;
+        } catch (error) {
+            return data;
+        }
+    }
+
+    // Apply subtle variation for individual popup based on exact coordinates
+    applyPopupVariation(baseData, exactLat, exactLon, weatherId) {
+        try {
+            const varied = JSON.parse(JSON.stringify(baseData));
+            const latFloat = parseFloat(exactLat);
+            const lonFloat = parseFloat(exactLon);
+            
+            // Create popup-specific seed
+            const popupSeed = Math.abs(
+                Math.round(latFloat * 8000) + 
+                Math.round(lonFloat * 8000) + 
+                (weatherId ? weatherId.split('-').pop().length : 0)
+            ) % 50;
+            
+            // Very small temperature variation (±0.3°C)
+            const tempVariation = ((popupSeed % 7) - 3) * 0.1; // -0.3 to +0.3
+            varied.main.temp = Math.round((varied.main.temp + tempVariation) * 10) / 10;
+            
+            // Small humidity variation (±1%)
+            const humidityVariation = (popupSeed % 3) - 1; // -1 to +1
+            varied.main.humidity = Math.round(Math.max(40, Math.min(80, varied.main.humidity + humidityVariation)));
+            
+            return varied;
+            
+        } catch (error) {
+            console.warn('Error applying popup variation:', error);
+            return baseData;
+        }
+    }
+
+    // Fallback weather data for popup
+    getFallbackWeatherData() {
+        const currentHour = new Date().getHours();
+        const isDay = currentHour >= 6 && currentHour <= 18;
+        
+        return {
+            weather: [{
+                icon: isDay ? '02d' : '02n',
+                description: 'berawan sebagian'
+            }],
+            main: {
+                temp: 29,
+                humidity: 72
+            },
+            wind: {
+                speed: 2
+            },
+            name: 'Jakarta'
+        };
+    }
+
+    // Capitalize words helper
+    capitalizeWords(str) {
+        if (!str || typeof str !== 'string') return '';
+        return str.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
     }
 } 

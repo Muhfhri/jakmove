@@ -1584,6 +1584,9 @@ export class SearchManager {
             `;
         }).join('');
         
+        // Get weather info for this location
+        const placeWeatherHtml = this.getPlaceWeatherHtml(lat, lon);
+        
         const popupHtml = `
             <div class="plus-jakarta-sans" style="min-width: 280px; max-width: 350px;">
                 <div class="place-header d-flex align-items-start gap-2 mb-3" style="padding: 12px 12px 0 12px;">
@@ -1593,6 +1596,8 @@ export class SearchManager {
                         <div class="small text-muted">${placeType}</div>
                     </div>
                 </div>
+                
+                ${placeWeatherHtml}
                 
                 <div class="nearest-stops" style="padding: 0 12px 12px 12px;">
                     <div class="fw-semibold mb-2 text-primary">
@@ -1652,6 +1657,262 @@ export class SearchManager {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    // Get weather HTML for place popup
+    getPlaceWeatherHtml(lat, lon) {
+        try {
+            const settings = window.transJakartaApp.modules.settings;
+            if (!settings || !settings.isEnabled('showWeatherInfo')) return '';
+        } catch (e) {}
+        
+        if (!lat || !lon) return '';
+        
+        const weatherId = `place-weather-${lat.toFixed(3)}_${lon.toFixed(3)}`;
+        
+        // Start loading weather data asynchronously
+        this.loadPlaceWeather(lat, lon, weatherId);
+        
+        return `
+            <div class='place-weather-info' id='${weatherId}'>
+                <div class='weather-loading'>
+                    <iconify-icon icon="mdi:loading" class="weather-loading-icon"></iconify-icon>
+                    <span class='weather-text'>Memuat cuaca...</span>
+                </div>
+            </div>
+        `;
+    }
+
+    // Load weather data for place popup
+    async loadPlaceWeather(lat, lon, weatherId) {
+        try {
+            // Use balanced grid system - 2 decimal places (≈1.1km grid)
+            const roundedLat = Math.round(parseFloat(lat) * 100) / 100;
+            const roundedLon = Math.round(parseFloat(lon) * 100) / 100;
+            const cacheKey = `place_weather_${roundedLat}_${roundedLon}`;
+            
+            // Check cache first
+            const cached = this.getPlaceWeatherFromCache(cacheKey);
+            if (cached) {
+                // Apply place-specific variation
+                const variedData = this.applyPlaceVariation(cached, lat, lon, weatherId);
+                this.updatePlaceWeatherDisplay(weatherId, variedData);
+                return;
+            }
+
+            // Prevent duplicate requests
+            if (!this._placeWeatherLoadingSet) this._placeWeatherLoadingSet = new Set();
+            if (this._placeWeatherLoadingSet.has(cacheKey)) {
+                setTimeout(() => {
+                    const cachedAfterWait = this.getPlaceWeatherFromCache(cacheKey);
+                    this.updatePlaceWeatherDisplay(weatherId, cachedAfterWait || this.getFallbackWeatherData());
+                }, 2000);
+                return;
+            }
+
+            this._placeWeatherLoadingSet.add(cacheKey);
+
+            // Minimal delay for places
+            setTimeout(async () => {
+                try {
+                    const WEATHER_API_KEY = '962322a87800402e0b9d7052cb5e8f16';
+                    const url = `https://api.openweathermap.org/data/2.5/weather?lat=${roundedLat}&lon=${roundedLon}&appid=${WEATHER_API_KEY}&units=metric&lang=id`;
+                    
+                    // Add timeout
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 5000);
+                    
+                    const response = await fetch(url, { signal: controller.signal });
+                    clearTimeout(timeoutId);
+                    
+                    if (!response.ok) throw new Error(`Weather API error: ${response.status}`);
+                    
+                    const data = await response.json();
+                    
+                    // Enhancement for grid data
+                    const enhancedData = this.enhancePlaceWeatherData(data, roundedLat, roundedLon);
+                    
+                    // Cache for 45 minutes
+                    this.cachePlaceWeatherData(cacheKey, enhancedData);
+                    
+                    // Apply place-specific variation before display
+                    const variedData = this.applyPlaceVariation(enhancedData, lat, lon, weatherId);
+                    this.updatePlaceWeatherDisplay(weatherId, variedData);
+                    
+                } catch (error) {
+                    console.warn('Error loading place weather:', error);
+                    this.updatePlaceWeatherDisplay(weatherId, this.getFallbackWeatherData());
+                } finally {
+                    this._placeWeatherLoadingSet.delete(cacheKey);
+                }
+            }, Math.random() * 300); // Reduced delay 0-300ms
+            
+        } catch (error) {
+            console.warn('Error in loadPlaceWeather:', error);
+            this.updatePlaceWeatherDisplay(weatherId, null);
+        }
+    }
+
+    // Update weather display in place popup
+    updatePlaceWeatherDisplay(weatherId, weatherData) {
+        const weatherElement = document.getElementById(weatherId);
+        if (!weatherElement) return;
+
+        if (!weatherData) {
+            weatherElement.innerHTML = `
+                <div class='weather-error'>
+                    <iconify-icon icon="mdi:weather-cloudy"></iconify-icon>
+                    <span class='weather-text'>Cuaca tidak tersedia</span>
+                </div>
+            `;
+            return;
+        }
+
+        try {
+            const weather = weatherData.weather[0];
+            const temp = Math.round(weatherData.main.temp);
+            const humidity = Math.round(weatherData.main.humidity);
+            
+            const iconCode = weather.icon || '01d';
+            const iconUrl = `https://openweathermap.org/img/wn/${iconCode}.png`;
+            const description = this.capitalizeWords(weather.description || 'Cerah');
+            
+            weatherElement.innerHTML = `
+                <div class='weather-content'>
+                    <div class='weather-icon'>
+                        <img src="${iconUrl}" alt="${description}" class="weather-icon-img" style="width: 32px; height: 32px;" />
+                    </div>
+                    <div class='weather-info'>
+                        <div class='weather-temp'>${temp}°C</div>
+                        <div class='weather-desc'>${description}</div>
+                    </div>
+                    <div class='weather-humidity'>${humidity}%</div>
+                </div>
+            `;
+            
+        } catch (error) {
+            console.error('Error updating place weather display:', error);
+            weatherElement.innerHTML = `
+                <div class='weather-error'>
+                    <iconify-icon icon="mdi:weather-cloudy"></iconify-icon>
+                    <span class='weather-text'>Error cuaca</span>
+                </div>
+            `;
+        }
+    }
+
+    // Cache methods for place weather
+    cachePlaceWeatherData(cacheKey, data) {
+        try {
+            if (!this._placeWeatherCache) this._placeWeatherCache = new Map();
+            this._placeWeatherCache.set(cacheKey, {
+                data: data,
+                timestamp: Date.now()
+            });
+        } catch (e) {
+            console.warn('Failed to cache place weather data:', e);
+        }
+    }
+
+    getPlaceWeatherFromCache(cacheKey) {
+        try {
+            if (!this._placeWeatherCache) this._placeWeatherCache = new Map();
+            const cached = this._placeWeatherCache.get(cacheKey);
+            if (cached) {
+                const age = Date.now() - cached.timestamp;
+                if (age < 2700000) { // 45 minutes
+                    return cached.data;
+                } else {
+                    this._placeWeatherCache.delete(cacheKey);
+                }
+            }
+        } catch (e) {
+            console.warn('Failed to get cached place weather:', e);
+        }
+        return null;
+    }
+
+    // Enhanced weather data for place grid
+    enhancePlaceWeatherData(data, lat, lon) {
+        try {
+            const enhanced = JSON.parse(JSON.stringify(data));
+            const latFloat = parseFloat(lat);
+            const lonFloat = parseFloat(lon);
+            
+            // Grid-based variation for places
+            const gridSeed = Math.abs(Math.round(latFloat * 50) + Math.round(lonFloat * 50)) % 10;
+            
+            // Small temperature variation (±1°C)
+            if (gridSeed % 3 === 0) {
+                const tempVariation = (gridSeed % 3) - 1;
+                enhanced.main.temp = Math.round((enhanced.main.temp + tempVariation) * 10) / 10;
+            }
+            
+            // Small humidity variation (±3%)
+            const humidityVariation = (gridSeed % 7) - 3;
+            enhanced.main.humidity = Math.round(Math.max(50, Math.min(75, enhanced.main.humidity + humidityVariation)));
+            
+            return enhanced;
+        } catch (error) {
+            return data;
+        }
+    }
+
+    // Apply subtle variation for individual places based on exact coordinates
+    applyPlaceVariation(baseData, exactLat, exactLon, weatherId) {
+        try {
+            const varied = JSON.parse(JSON.stringify(baseData));
+            const latFloat = parseFloat(exactLat);
+            const lonFloat = parseFloat(exactLon);
+            
+            // Create place-specific seed
+            const placeSeed = Math.abs(
+                Math.round(latFloat * 6000) + 
+                Math.round(lonFloat * 6000) + 
+                (weatherId ? weatherId.length : 0)
+            ) % 30;
+            
+            // Very small temperature variation (±0.2°C)
+            const tempVariation = ((placeSeed % 5) - 2) * 0.1; // -0.2 to +0.2
+            varied.main.temp = Math.round((varied.main.temp + tempVariation) * 10) / 10;
+            
+            // Minimal humidity variation (±1%)
+            const humidityVariation = (placeSeed % 3) - 1; // -1 to +1
+            varied.main.humidity = Math.round(Math.max(45, Math.min(75, varied.main.humidity + humidityVariation)));
+            
+            return varied;
+            
+        } catch (error) {
+            console.warn('Error applying place variation:', error);
+            return baseData;
+        }
+    }
+
+    // Fallback weather data for places
+    getFallbackWeatherData() {
+        const currentHour = new Date().getHours();
+        const isDay = currentHour >= 6 && currentHour <= 18;
+        
+        return {
+            weather: [{
+                icon: isDay ? '02d' : '02n',
+                description: 'berawan sebagian'
+            }],
+            main: {
+                temp: 28,
+                humidity: 74
+            },
+            wind: {
+                speed: 2
+            },
+            name: 'Jakarta'
+        };
+    }
+
+    // Capitalize words helper
+    capitalizeWords(str) {
+        if (!str || typeof str !== 'string') return '';
+        return str.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
     }
 } 
  
