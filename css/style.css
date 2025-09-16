@@ -6920,3 +6920,166 @@ body.no-scroll { overflow: hidden; height: 100vh; }
     }
 }
 
+/* Weather Info di Halte */
+.stop-weather-info {
+    margin: 6px 0;
+    padding: 8px 12px;
+    background: linear-gradient(135deg, #e0f2fe 0%, #b3e5fc 100%);
+    border-radius: 8px;
+    border-left: 4px solid #03a9f4;
+    font-size: 0.85rem;
+}
+
+/* Weather Info di Popup */
+.popup-weather-info {
+    margin: 8px 0;
+    padding: 6px 8px;
+    background: linear-gradient(135deg, #e0f2fe 0%, #b3e5fc 100%);
+    border-radius: 6px;
+    border-left: 3px solid #03a9f4;
+    font-size: 0.8rem;
+}
+
+/* Weather Info di Place Popup */
+.place-weather-info {
+    margin: 0 12px 12px 12px;
+    padding: 8px 10px;
+    background: linear-gradient(135deg, #e0f2fe 0%, #b3e5fc 100%);
+    border-radius: 8px;
+    border-left: 3px solid #03a9f4;
+    font-size: 0.85rem;
+}
+
+.weather-loading, .weather-error {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #0277bd;
+}
+
+.weather-loading-icon {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.weather-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    justify-content: space-between;
+}
+
+.weather-icon {
+    min-width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.weather-icon-img {
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+}
+
+.weather-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.weather-temp {
+    font-weight: bold;
+    color: #01579b;
+    font-size: 0.9rem;
+}
+
+.weather-desc {
+    color: #0277bd;
+    font-size: 0.75rem;
+    text-transform: capitalize;
+}
+
+.weather-humidity {
+    display: flex;
+    align-items: center;
+    color: #0288d1;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    font-weight: 600;
+    background: rgba(2, 136, 209, 0.1);
+    padding: 4px 6px;
+    border-radius: 4px;
+}
+
+.weather-error {
+    color: #666;
+}
+
+.weather-text {
+    font-size: 0.75rem;
+}
+
+.weather-wind {
+    color: #0288d1;
+    font-size: 0.65rem;
+    opacity: 0.9;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+/* Dark Mode Support for Weather Components */
+[data-theme="dark"] .stop-weather-info,
+[data-theme="dark"] .popup-weather-info,
+[data-theme="dark"] .place-weather-info {
+    background: rgba(40, 49, 65, 0.9) !important;
+    border-left-color: #4FA8DE !important;
+}
+
+[data-theme="dark"] .weather-loading,
+[data-theme="dark"] .weather-error {
+    color: #4FA8DE !important;
+}
+
+[data-theme="dark"] .weather-temp {
+    color: #4FA8DE !important;
+}
+
+[data-theme="dark"] .weather-desc {
+    color: #adb5bd !important;
+}
+
+[data-theme="dark"] .weather-humidity {
+    background: rgba(79, 168, 222, 0.1) !important;
+    color: #4FA8DE !important;
+}
+
+[data-theme="dark"] .weather-wind {
+    color: #4FA8DE !important;
+}
+
+[data-theme="dark"] .weather-text {
+    color: #adb5bd !important;
+}
+
+[data-theme="dark"] .weather-content {
+    color: #eee !important;
+}
+
+/* Additional dark mode styles for weather icons */
+[data-theme="dark"] .weather-icon-img {
+    filter: brightness(0.9) contrast(1.1);
+}
+
+/* Ensure loading icon is visible in dark mode */
+[data-theme="dark"] .weather-loading-icon {
+    color: #4FA8DE !important;
+}
+
