@@ -863,11 +863,16 @@ export class LocationManager {
             }).join('');
 
             const distText = d < 1000 ? Math.round(d) + ' m' : (d/1000).toFixed(2) + ' km';
+            
+            // Get weather info for this stop
+            const weatherHtml = mapManager.getStopWeatherHtml ? mapManager.getStopWeatherHtml(stop) : '';
+            
             const html = `
                 <div class='stop-popup plus-jakarta-sans' style='min-width: 220px; max-width: 280px; padding: 10px 12px;'>
                     <div style='color:#333;padding:6px 0;border-bottom:1px solid #eee;margin-bottom:6px;'>
                         <div style='font-size:14px;font-weight:600;'>${stop.stop_name}</div>
                     </div>
+                    ${weatherHtml}
                     <div style='font-size:11px;color:#666;margin-bottom:6px;'>Jarak: ${distText}</div>
                     ${badges ? `<div><div style='font-size:11px;color:#666;margin-bottom:6px;'>Layanan:</div><div class='nearest-services' style='display:flex;flex-wrap:wrap;gap:4px;'>${badges}</div></div>` : ''}
                 </div>`;

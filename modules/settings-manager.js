@@ -7,6 +7,7 @@ export class SettingsManager {
 			filterAccessStops: true,
 			showAccessibilityIcon: true,
 			batterySaver: false,
+			showWeatherInfo: true,
 		};
 		this.keys = Object.keys(this.defaults);
 	}
