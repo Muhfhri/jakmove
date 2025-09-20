@@ -7,6 +7,12 @@ export class LocationManager {
         this._lastPopupDistance = null;
         this._lastEtaText = null;
         this._lastPositionUpdate = null;
+        // Movement detection for preventing updates during movement
+        this._isUserMoving = false;
+        this._lastUserPosition = null;
+        this._movementDetectionTimer = null;
+        // Clock update optimization
+        this._clockUpdateRequested = false;
         this.geoWatchId = null;
         this.userMarker = null;
         this.nearestStopMarker = null;
@@ -140,6 +146,19 @@ export class LocationManager {
         if (this._userAnimReqId) { try { cancelAnimationFrame(this._userAnimReqId); } catch(e){} this._userAnimReqId = null; }
         this._userAnimFrom = null; this._userAnimTo = null; this._renderedUserPos = null;
         this.lastArrivedStopId = null;
+        
+        // Clear movement detection and optimization caches
+        if (this._movementDetectionTimer) {
+            clearTimeout(this._movementDetectionTimer);
+            this._movementDetectionTimer = null;
+        }
+        this._isUserMoving = false;
+        this._lastUserPosition = null;
+        this._lastPopupContentKey = null;
+        this._lastPopupDistance = null;
+        this._lastEtaText = null;
+        this._lastPositionUpdate = null;
+        this._clockUpdateRequested = false;
         this.arrivalStop = null;
         this.userCentered = false;
         this.isActive = false;
@@ -188,7 +207,7 @@ export class LocationManager {
         }
     }
 
-    // Update live popup clock display
+    // Update live popup clock display (optimized to prevent any blinking)
     updateLivePopupClock() {
         try {
             // Check if popup is open and visible first
@@ -197,68 +216,122 @@ export class LocationManager {
                 return;
             }
             
-            const timeElement = document.getElementById('live-time');
-            const dateElement = document.getElementById('live-date');
-            const stopwatchElement = document.getElementById('live-stopwatch');
+            // Use requestAnimationFrame to ensure smooth updates without layout thrashing
+            if (this._clockUpdateRequested) return;
+            this._clockUpdateRequested = true;
             
-            if (!timeElement || !dateElement) return;
-            
-            const now = new Date();
-            
-            // Format time (HH:MM:SS)
-            const timeString = now.toLocaleTimeString('id-ID', {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: false
-            });
-            
-            // Format date (DD/MM/YYYY)
-            const dateString = now.toLocaleDateString('id-ID', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric'
-            });
-            
-            // Only update if content has changed to prevent unnecessary DOM updates
-            if (timeElement.textContent !== timeString) {
-                timeElement.textContent = timeString;
-            }
-            if (dateElement.textContent !== dateString) {
-                dateElement.textContent = dateString;
-            }
-            
-            // Update stopwatch
-            if (stopwatchElement && this._liveTrackingStartTime) {
-                const elapsedMs = Date.now() - this._liveTrackingStartTime;
-                const elapsedSeconds = Math.floor(elapsedMs / 1000);
-                const hours = Math.floor(elapsedSeconds / 3600);
-                const minutes = Math.floor((elapsedSeconds % 3600) / 60);
-                const seconds = elapsedSeconds % 60;
+            requestAnimationFrame(() => {
+                this._clockUpdateRequested = false;
                 
-                let stopwatchText = '';
-                if (hours > 0) {
-                    stopwatchText = `⏱️ ${hours}j ${minutes}m`;
-                } else if (minutes > 0) {
-                    stopwatchText = `⏱️ ${minutes}m ${seconds}d`;
-                } else {
-                    stopwatchText = `⏱️ ${seconds}d`;
+                try {
+                    const timeElement = document.getElementById('live-time');
+                    const dateElement = document.getElementById('live-date');
+                    const stopwatchElement = document.getElementById('live-stopwatch');
+                    
+                    if (!timeElement || !dateElement) return;
+                    
+                    const now = new Date();
+                    
+                    // Format time (HH:MM:SS)
+                    const timeString = now.toLocaleTimeString('id-ID', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        hour12: false
+                    });
+                    
+                    // Format date (DD/MM/YYYY)
+                    const dateString = now.toLocaleDateString('id-ID', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                    });
+                    
+                    // Batch DOM updates to minimize layout recalculation
+                    const updates = [];
+                    
+                    if (timeElement.textContent !== timeString) {
+                        updates.push(() => { timeElement.textContent = timeString; });
+                    }
+                    if (dateElement.textContent !== dateString) {
+                        updates.push(() => { dateElement.textContent = dateString; });
+                    }
+                    
+                    // Update stopwatch
+                    if (stopwatchElement && this._liveTrackingStartTime) {
+                        const elapsedMs = Date.now() - this._liveTrackingStartTime;
+                        const elapsedSeconds = Math.floor(elapsedMs / 1000);
+                        const hours = Math.floor(elapsedSeconds / 3600);
+                        const minutes = Math.floor((elapsedSeconds % 3600) / 60);
+                        const seconds = elapsedSeconds % 60;
+                        
+                        let stopwatchText = '';
+                        if (hours > 0) {
+                            stopwatchText = `⏱️ ${hours}j ${minutes}m`;
+                        } else if (minutes > 0) {
+                            stopwatchText = `⏱️ ${minutes}m ${seconds}d`;
+                        } else {
+                            stopwatchText = `⏱️ ${seconds}d`;
+                        }
+                        
+                        if (stopwatchElement.textContent !== stopwatchText) {
+                            updates.push(() => { stopwatchElement.textContent = stopwatchText; });
+                        }
+                    }
+                    
+                    // Execute all updates in a single batch
+                    if (updates.length > 0) {
+                        updates.forEach(update => update());
+                    }
+                    
+                } catch (error) {
+                    console.warn('Error in clock update RAF:', error);
                 }
-                
-                if (stopwatchElement.textContent !== stopwatchText) {
-                    stopwatchElement.textContent = stopwatchText;
-                }
-            }
+            });
             
         } catch (error) {
             console.warn('Error updating live popup clock:', error);
         }
     }
 
+    // Detect if user is moving based on position changes
+    _detectMovement(lat, lon) {
+        if (!this._lastUserPosition) {
+            this._lastUserPosition = { lat, lon, timestamp: Date.now() };
+            return;
+        }
+        
+        const distance = this.haversine(this._lastUserPosition.lat, this._lastUserPosition.lon, lat, lon);
+        const timeDiff = Date.now() - this._lastUserPosition.timestamp;
+        
+        // If moved more than 2 meters in last 2 seconds, consider as moving
+        if (distance > 2 && timeDiff < 2000) {
+            this._isUserMoving = true;
+            
+            // Clear existing timer
+            if (this._movementDetectionTimer) {
+                clearTimeout(this._movementDetectionTimer);
+            }
+            
+            // Set timer to mark as not moving after 3 seconds of no significant movement
+            this._movementDetectionTimer = setTimeout(() => {
+                this._isUserMoving = false;
+                console.debug('[Live] User stopped moving, content updates resumed');
+            }, 3000);
+            
+            console.debug('[Live] User is moving, content updates paused');
+        }
+        
+        this._lastUserPosition = { lat, lon, timestamp: Date.now() };
+    }
+
     // Handle position update
     handlePositionUpdate(pos) {
         const lat = pos.coords.latitude;
         const lon = pos.coords.longitude;
+        
+        // Detect movement
+        this._detectMovement(lat, lon);
         const now = Date.now();
         console.debug('[Location] position update:', { lat, lon });
 
@@ -590,10 +663,20 @@ export class LocationManager {
                 const etaSec = Math.max(1, Math.round(jarakNext / spd));
                 etaText = etaSec < 60 ? `${etaSec}s` : `${Math.floor(etaSec/60)}m ${etaSec%60}s`;
             }
-            // Visual stability: skip UI update if distance change small and too frequent (prevent blinking during movement)
+            // Enhanced visual stability: more aggressive filtering during movement
             const dt = nowTs - (this._lastUIUpdateTs || 0);
-            if (!arrivalTrigger && Math.abs((jarakNext || 0) - (this._prevDistForUi || 0)) < 5 && dt < 1000) {
-                return; // keep last UI for stability during movement
+            const distanceChange = Math.abs((jarakNext || 0) - (this._prevDistForUi || 0));
+            
+            // During movement, be much more conservative with updates
+            if (this._isUserMoving && !arrivalTrigger) {
+                if (distanceChange < 20 && dt < 3000) {
+                    return; // Skip UI updates during movement unless significant change
+                }
+            } else {
+                // When not moving, still apply some stability
+                if (distanceChange < 5 && dt < 1000) {
+                    return; // keep last UI for stability
+                }
             }
             this._lastUIUpdateTs = nowTs;
             this._prevDistForUi = jarakNext;
@@ -605,6 +688,14 @@ export class LocationManager {
         
         const mapManager = window.transJakartaApp.modules.map;
         if (mapManager && this.userMarker) {
+            // If user is moving, skip all content updates to prevent blinking
+            if (this._isUserMoving) {
+                console.debug('[Live] User is moving, skipping content updates to prevent blinking');
+                // Only update position, no content changes
+                this._updatePopupPositionOnly(userLat, userLon);
+                return;
+            }
+            
             // Check if we need to update the popup content or just position
             const needsContentUpdate = this._needsPopupContentUpdate(route, currentStop, nextStop, { etaText, trend, jarakNext });
             
@@ -627,8 +718,7 @@ export class LocationManager {
             } else {
                 // Only update position, content stays the same to prevent blinking
                 console.debug('[Live] Only updating popup position, content unchanged');
-                // Still update position but less frequently
-                this.animatePopupTo(userLat, userLon);
+                this._updatePopupPositionOnly(userLat, userLon);
             }
             
             // Render label halte berikutnya di peta
@@ -693,6 +783,34 @@ export class LocationManager {
         
         // Only update if difference is more than 0.5 minutes (30 seconds)
         return Math.abs(oldMinutes - newMinutes) > 0.5;
+    }
+
+    // Update popup position only, without touching content (prevents blinking during movement)
+    _updatePopupPositionOnly(userLat, userLon) {
+        const mapManager = window.transJakartaApp.modules.map;
+        if (!mapManager || !mapManager.userPopup || !this.userMarker) return;
+        
+        // Throttle position updates even more aggressively during movement
+        const now = Date.now();
+        if (this._lastPositionUpdate && (now - this._lastPositionUpdate) < 1000) {
+            return; // Update max every 1 second during movement
+        }
+        this._lastPositionUpdate = now;
+        
+        // Get current position for distance check
+        const currentPos = mapManager.userPopup.getLngLat();
+        if (currentPos) {
+            const distance = this.haversine(currentPos.lat, currentPos.lng, userLat, userLon);
+            
+            // Only update if moved more than 5 meters to avoid micro-movements
+            if (distance > 5) {
+                mapManager.userPopup.setLngLat([userLon, userLat]);
+                console.debug('[Live] Position-only update:', distance.toFixed(1), 'meters');
+            }
+        } else {
+            // First time, set position
+            mapManager.userPopup.setLngLat([userLon, userLat]);
+        }
     }
 
     // Handle arrival detection
