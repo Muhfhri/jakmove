@@ -655,7 +655,7 @@ export class GTFSLoader {
             routes: this.data.routes.map(r => ({
                 route_id: r.route_id, route_short_name: r.route_short_name,
                 route_long_name: r.route_long_name, route_color: r.route_color,
-                route_text_color: r.route_text_color
+                route_text_color: r.route_text_color, route_desc: r.route_desc
             })),
             trips: this.data.trips.map(t => ({
                 route_id: t.route_id, service_id: t.service_id, trip_id: t.trip_id,
