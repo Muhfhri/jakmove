@@ -147,7 +147,7 @@ Aplikasi dapat diakses langsung melalui browser tanpa instalasi:
 ### Local Development
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/jakmove.git
+git clone https://github.com/muhfhri/jakmove.git
 
 # Masuk ke direktori
 cd jakmove
