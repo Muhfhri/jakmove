@@ -2,17 +2,6 @@
 export class LocationManager {
     constructor() {
         this.isActive = false;
-        // Cache variables for popup content optimization
-        this._lastPopupContentKey = null;
-        this._lastPopupDistance = null;
-        this._lastEtaText = null;
-        this._lastPositionUpdate = null;
-        // Movement detection for preventing updates during movement
-        this._isUserMoving = false;
-        this._lastUserPosition = null;
-        this._movementDetectionTimer = null;
-        // Clock update optimization
-        this._clockUpdateRequested = false;
         this.geoWatchId = null;
         this.userMarker = null;
         this.nearestStopMarker = null;
@@ -48,8 +37,6 @@ export class LocationManager {
         this._userAnimStart = 0;
         this._userAnimDurationMs = 450;
         this._lastLiveStopForPopup = null;
-        this._liveClockTimer = null;
-        this._liveTrackingStartTime = null;
         // Popup smoothing properties
         this._popupAnimReqId = null;
         this._popupAnimFrom = null;
@@ -91,11 +78,6 @@ export class LocationManager {
 
         this.isActive = true;
         this._allowAutoStart = true;
-        
-        // Record start time for stopwatch when live tracking actually starts
-        if (!this._liveTrackingStartTime) {
-            this._liveTrackingStartTime = Date.now();
-        }
         this.updateLiveLocationButton(true);
         this.showNearestStopsButton();
         this.updateLockButtonVisibility();
@@ -130,8 +112,6 @@ export class LocationManager {
                 if (lockBtn) lockBtn.style.display = 'none';
                 mapManager.setCameraLock(false);
                 try { mapManager.clearNextStopLabel(); } catch (e) {}
-                // Reset route visual to normal state when live is disabled
-                try { mapManager.resetRouteVisualToNormal(); } catch (e) {}
             }
             this.userMarker = null;
         }
@@ -146,19 +126,6 @@ export class LocationManager {
         if (this._userAnimReqId) { try { cancelAnimationFrame(this._userAnimReqId); } catch(e){} this._userAnimReqId = null; }
         this._userAnimFrom = null; this._userAnimTo = null; this._renderedUserPos = null;
         this.lastArrivedStopId = null;
-        
-        // Clear movement detection and optimization caches
-        if (this._movementDetectionTimer) {
-            clearTimeout(this._movementDetectionTimer);
-            this._movementDetectionTimer = null;
-        }
-        this._isUserMoving = false;
-        this._lastUserPosition = null;
-        this._lastPopupContentKey = null;
-        this._lastPopupDistance = null;
-        this._lastEtaText = null;
-        this._lastPositionUpdate = null;
-        this._clockUpdateRequested = false;
         this.arrivalStop = null;
         this.userCentered = false;
         this.isActive = false;
@@ -170,10 +137,6 @@ export class LocationManager {
         this._prevUserPosSmoothed = null;
         this.lastUserTime = null;
         this.lastUserSpeed = null;
-        
-        // Stop live popup clock and reset stopwatch
-        this.stopLivePopupClock();
-        this._liveTrackingStartTime = null;
         this.updateLiveLocationButton(false);
         this.hideNearestStopsButton();
         this.updateLockButtonVisibility();
@@ -185,153 +148,10 @@ export class LocationManager {
     // Suspend/resume heavy UI updates (for fast route switch)
     suspendUpdates(on = true) { this._suspend = !!on; }
 
-    // Start live popup clock update
-    startLivePopupClock() {
-        // Clear any existing timer
-        this.stopLivePopupClock();
-        
-        // Update clock immediately
-        this.updateLivePopupClock();
-        
-        // Set interval to update every second with slight offset to avoid conflicts
-        this._liveClockTimer = setInterval(() => {
-            this.updateLivePopupClock();
-        }, 1000);
-    }
-
-    // Stop live popup clock update
-    stopLivePopupClock() {
-        if (this._liveClockTimer) {
-            clearInterval(this._liveClockTimer);
-            this._liveClockTimer = null;
-        }
-    }
-
-    // Update live popup clock display (optimized to prevent any blinking)
-    updateLivePopupClock() {
-        try {
-            // Check if popup is open and visible first
-            const mapManager = window.transJakartaApp.modules.map;
-            if (!mapManager || !mapManager.userPopup || !mapManager.userPopup.isOpen()) {
-                return;
-            }
-            
-            // Use requestAnimationFrame to ensure smooth updates without layout thrashing
-            if (this._clockUpdateRequested) return;
-            this._clockUpdateRequested = true;
-            
-            requestAnimationFrame(() => {
-                this._clockUpdateRequested = false;
-                
-                try {
-                    const timeElement = document.getElementById('live-time');
-                    const dateElement = document.getElementById('live-date');
-                    const stopwatchElement = document.getElementById('live-stopwatch');
-                    
-                    if (!timeElement || !dateElement) return;
-                    
-                    const now = new Date();
-                    
-                    // Format time (HH:MM:SS)
-                    const timeString = now.toLocaleTimeString('id-ID', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        second: '2-digit',
-                        hour12: false
-                    });
-                    
-                    // Format date (DD/MM/YYYY)
-                    const dateString = now.toLocaleDateString('id-ID', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric'
-                    });
-                    
-                    // Batch DOM updates to minimize layout recalculation
-                    const updates = [];
-                    
-                    if (timeElement.textContent !== timeString) {
-                        updates.push(() => { timeElement.textContent = timeString; });
-                    }
-                    if (dateElement.textContent !== dateString) {
-                        updates.push(() => { dateElement.textContent = dateString; });
-                    }
-                    
-                    // Update stopwatch
-                    if (stopwatchElement && this._liveTrackingStartTime) {
-                        const elapsedMs = Date.now() - this._liveTrackingStartTime;
-                        const elapsedSeconds = Math.floor(elapsedMs / 1000);
-                        const hours = Math.floor(elapsedSeconds / 3600);
-                        const minutes = Math.floor((elapsedSeconds % 3600) / 60);
-                        const seconds = elapsedSeconds % 60;
-                        
-                        let stopwatchText = '';
-                        if (hours > 0) {
-                            stopwatchText = `⏱️ ${hours}j ${minutes}m`;
-                        } else if (minutes > 0) {
-                            stopwatchText = `⏱️ ${minutes}m ${seconds}d`;
-                        } else {
-                            stopwatchText = `⏱️ ${seconds}d`;
-                        }
-                        
-                        if (stopwatchElement.textContent !== stopwatchText) {
-                            updates.push(() => { stopwatchElement.textContent = stopwatchText; });
-                        }
-                    }
-                    
-                    // Execute all updates in a single batch
-                    if (updates.length > 0) {
-                        updates.forEach(update => update());
-                    }
-                    
-                } catch (error) {
-                    console.warn('Error in clock update RAF:', error);
-                }
-            });
-            
-        } catch (error) {
-            console.warn('Error updating live popup clock:', error);
-        }
-    }
-
-    // Detect if user is moving based on position changes
-    _detectMovement(lat, lon) {
-        if (!this._lastUserPosition) {
-            this._lastUserPosition = { lat, lon, timestamp: Date.now() };
-            return;
-        }
-        
-        const distance = this.haversine(this._lastUserPosition.lat, this._lastUserPosition.lon, lat, lon);
-        const timeDiff = Date.now() - this._lastUserPosition.timestamp;
-        
-        // If moved more than 2 meters in last 2 seconds, consider as moving
-        if (distance > 2 && timeDiff < 2000) {
-            this._isUserMoving = true;
-            
-            // Clear existing timer
-            if (this._movementDetectionTimer) {
-                clearTimeout(this._movementDetectionTimer);
-            }
-            
-            // Set timer to mark as not moving after 3 seconds of no significant movement
-            this._movementDetectionTimer = setTimeout(() => {
-                this._isUserMoving = false;
-                console.debug('[Live] User stopped moving, content updates resumed');
-            }, 3000);
-            
-            console.debug('[Live] User is moving, content updates paused');
-        }
-        
-        this._lastUserPosition = { lat, lon, timestamp: Date.now() };
-    }
-
     // Handle position update
     handlePositionUpdate(pos) {
         const lat = pos.coords.latitude;
         const lon = pos.coords.longitude;
-        
-        // Detect movement
-        this._detectMovement(lat, lon);
         const now = Date.now();
         console.debug('[Location] position update:', { lat, lon });
 
@@ -663,20 +483,10 @@ export class LocationManager {
                 const etaSec = Math.max(1, Math.round(jarakNext / spd));
                 etaText = etaSec < 60 ? `${etaSec}s` : `${Math.floor(etaSec/60)}m ${etaSec%60}s`;
             }
-            // Enhanced visual stability: more aggressive filtering during movement
+            // Visual stability: skip UI update if distance change small and <500ms (reduced for better responsiveness)
             const dt = nowTs - (this._lastUIUpdateTs || 0);
-            const distanceChange = Math.abs((jarakNext || 0) - (this._prevDistForUi || 0));
-            
-            // During movement, be much more conservative with updates
-            if (this._isUserMoving && !arrivalTrigger) {
-                if (distanceChange < 20 && dt < 3000) {
-                    return; // Skip UI updates during movement unless significant change
-                }
-            } else {
-                // When not moving, still apply some stability
-                if (distanceChange < 5 && dt < 1000) {
-                    return; // keep last UI for stability
-                }
+            if (!arrivalTrigger && Math.abs((jarakNext || 0) - (this._prevDistForUi || 0)) < 2 && dt < 500) {
+                return; // keep last UI
             }
             this._lastUIUpdateTs = nowTs;
             this._prevDistForUi = jarakNext;
@@ -686,130 +496,20 @@ export class LocationManager {
         const route = window.transJakartaApp.modules.gtfs.getRoutes()
             .find(r => String(r.route_id) === String(routeId));
         
+        const popupContent = this.buildUserPopupContent(route, currentStop, nextStop, userLat, userLon, upcomingStops, { etaText, trend, jarakNext });
         const mapManager = window.transJakartaApp.modules.map;
         if (mapManager && this.userMarker) {
-            // If user is moving, skip all content updates to prevent blinking
-            if (this._isUserMoving) {
-                console.debug('[Live] User is moving, skipping content updates to prevent blinking');
-                // Only update position, no content changes
-                this._updatePopupPositionOnly(userLat, userLon);
-                return;
-            }
+            // Cache stop for interactions
+            this._lastLiveStopForPopup = (this.arrivalStop || nextStop) || currentStop;
             
-            // Check if we need to update the popup content or just position
-            const needsContentUpdate = this._needsPopupContentUpdate(route, currentStop, nextStop, { etaText, trend, jarakNext });
+            // Update both content AND position
+            mapManager.updateUserPopup(this.userMarker, popupContent);
+            this.animatePopupTo(userLat, userLon); // CRITICAL: Update popup position!
             
-            if (needsContentUpdate) {
-                // Full popup content update
-                const popupContent = this.buildUserPopupContent(route, currentStop, nextStop, userLat, userLon, upcomingStops, { etaText, trend, jarakNext });
-                
-                // Cache stop for interactions
-                this._lastLiveStopForPopup = (this.arrivalStop || nextStop) || currentStop;
-                
-                // Update both content AND position
-                mapManager.updateUserPopup(this.userMarker, popupContent);
-                
-                // Bind live popup interactions (route badges + platform badges)
-                setTimeout(() => { 
-                    this._bindLivePopupInteractions(); 
-                    // Start clock update for live popup
-                    this.startLivePopupClock();
-                }, 30);
-            } else {
-                // Only update position, content stays the same to prevent blinking
-                console.debug('[Live] Only updating popup position, content unchanged');
-                this._updatePopupPositionOnly(userLat, userLon);
-            }
-            
+            // Bind live popup interactions (route badges + platform badges)
+            setTimeout(() => { this._bindLivePopupInteractions(); }, 30);
             // Render label halte berikutnya di peta
             try { mapManager.updateNextStopLabel(nextStop); } catch (e) {}
-        }
-    }
-
-    // Check if popup content needs updating (prevent unnecessary re-renders)
-    _needsPopupContentUpdate(route, currentStop, nextStop, liveExtras) {
-        // Cache key components for comparison, excluding frequently changing values
-        const currentKey = `${route?.route_id}-${currentStop?.stop_id}-${nextStop?.stop_id}`;
-        
-        // If this is the first update or key has changed, update content
-        if (!this._lastPopupContentKey || this._lastPopupContentKey !== currentKey) {
-            this._lastPopupContentKey = currentKey;
-            return true;
-        }
-        
-        // Only update content for significant ETA changes (not every second)
-        if (this._lastEtaText !== liveExtras.etaText) {
-            // Check if it's a significant ETA change (not just second changes)
-            const etaChanged = this._isSignificantEtaChange(this._lastEtaText, liveExtras.etaText);
-            if (etaChanged) {
-                this._lastEtaText = liveExtras.etaText;
-                return true;
-            }
-        } else {
-            this._lastEtaText = liveExtras.etaText;
-        }
-        
-        // Only update for significant distance changes (more than 25 meters)
-        if (this._lastPopupDistance !== null) {
-            const distanceChange = Math.abs((liveExtras.jarakNext || 0) - this._lastPopupDistance);
-            if (distanceChange > 25) {
-                this._lastPopupDistance = liveExtras.jarakNext || 0;
-                return true;
-            }
-        } else {
-            this._lastPopupDistance = liveExtras.jarakNext || 0;
-            return true;
-        }
-        
-        return false;
-    }
-
-    // Check if ETA change is significant enough to warrant content update
-    _isSignificantEtaChange(oldEta, newEta) {
-        if (!oldEta || !newEta) return true;
-        
-        // Extract minutes from ETA strings like "~5 menit" or "2m 30s"
-        const extractMinutes = (eta) => {
-            if (eta === 'Berhenti') return -1;
-            const minuteMatch = eta.match(/(\d+)m/);
-            const secondMatch = eta.match(/(\d+)s/);
-            const minutes = minuteMatch ? parseInt(minuteMatch[1]) : 0;
-            const seconds = secondMatch ? parseInt(secondMatch[1]) : 0;
-            return minutes + (seconds / 60);
-        };
-        
-        const oldMinutes = extractMinutes(oldEta);
-        const newMinutes = extractMinutes(newEta);
-        
-        // Only update if difference is more than 0.5 minutes (30 seconds)
-        return Math.abs(oldMinutes - newMinutes) > 0.5;
-    }
-
-    // Update popup position only, without touching content (prevents blinking during movement)
-    _updatePopupPositionOnly(userLat, userLon) {
-        const mapManager = window.transJakartaApp.modules.map;
-        if (!mapManager || !mapManager.userPopup || !this.userMarker) return;
-        
-        // Throttle position updates even more aggressively during movement
-        const now = Date.now();
-        if (this._lastPositionUpdate && (now - this._lastPositionUpdate) < 1000) {
-            return; // Update max every 1 second during movement
-        }
-        this._lastPositionUpdate = now;
-        
-        // Get current position for distance check
-        const currentPos = mapManager.userPopup.getLngLat();
-        if (currentPos) {
-            const distance = this.haversine(currentPos.lat, currentPos.lng, userLat, userLon);
-            
-            // Only update if moved more than 5 meters to avoid micro-movements
-            if (distance > 5) {
-                mapManager.userPopup.setLngLat([userLon, userLat]);
-                console.debug('[Live] Position-only update:', distance.toFixed(1), 'meters');
-            }
-        } else {
-            // First time, set position
-            mapManager.userPopup.setLngLat([userLon, userLat]);
         }
     }
 
@@ -929,7 +629,7 @@ export class LocationManager {
             // Accessibility icon for next stop if accessible
             let accessIcon = '';
             if (displayStop && displayStop.wheelchair_boarding === '1') {
-                accessIcon = `<span title='Ramah kursi roda' style='margin-left:6px;'><i class="fa-solid fa-wheelchair" style="color: #059669;"></i></span>`;
+                accessIcon = `<span title='Ramah kursi roda' style='margin-left:6px;'><iconify-icon icon="fontisto:paralysis-disability" inline></iconify-icon></span>`;
             }
 
             // Breadcrumb 2 halte ke depan
@@ -955,26 +655,10 @@ export class LocationManager {
             const etaHtml = etaText ? `<span style='font-size:0.9em;color:#64748b;'>ETA ${etaText}</span>` : '';
             const trendHtml = `<span style='font-size:0.9em;'>${trend}</span>`;
              
-            // Get intermodal icons for the display stop
-            let intermodalHtml = '';
-            try {
-                const routesMgr = window.transJakartaApp.modules.routes;
-                if (routesMgr && routesMgr.buildIntermodalIconsForStop) {
-                    intermodalHtml = routesMgr.buildIntermodalIconsForStop(displayStop) || '';
-                }
-            } catch (e) {
-                console.warn('Error getting intermodal icons for live tracking:', e);
-            }
-
             nextStopInfo = `
                 <div style='margin-bottom:6px;'>
                     <div class='text-muted' style='font-size:0.95em;font-weight:600;margin-bottom:2px;'>${titleLabel}</div>
-                    <div style='font-size:1.1em;font-weight:bold;display:flex;align-items:center;gap:6px;'>
-                        ${buildHeaderIcon(displayStop.stop_id)} 
-                        <span>${displayStop.stop_name}</span> 
-                        ${intermodalHtml ? `<span class="intermodal-icons" style="display:flex;gap:2px;align-items:center;">${intermodalHtml}</span>` : ''}
-                        ${accessIcon}
-                    </div>
+                    <div style='font-size:1.1em;font-weight:bold;display:flex;align-items:center;gap:6px;'>${buildHeaderIcon(displayStop.stop_id)} <span>${displayStop.stop_name}</span> ${accessIcon}</div>
                     <div style='margin-bottom:2px;display:flex;align-items:center;gap:8px;'>
                         <span style='font-weight:600;color:${distColor};'>${jarakNext < 1000 ? Math.round(jarakNext) + ' m' : (jarakNext/1000).toFixed(2) + ' km'}</span>
                         <span style='font-size:0.9em;color:#64748b;'>arah ${bearingDeg}</span>
@@ -992,19 +676,12 @@ export class LocationManager {
 
         return `
             <div class='plus-jakarta-sans popup-card-friendly' style='min-width:220px;max-width:340px;line-height:1.45;background:rgba(248,250,252,0.95);border-radius:18px;box-shadow:none;padding:18px 18px 12px 18px;position:relative;'>
-                <div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;'>
-                    <div>
+                <div style='display:flex;align-items:center;gap:12px;margin-bottom:8px;'>
+                    <div style='flex:1;'>
                         <span class='badge badge-koridor-interaktif rounded-pill' 
                               style='background:${badgeColor};color:#fff;font-weight:bold;font-size:1.2em;padding:0.5em 1.1em;'>
                             ${badgeText}
                         </span>
-                    </div>
-                    <div style='display:flex;flex-direction:column;align-items:flex-end;gap:2px;'>
-                        <div id='live-time' style='font-size:1.1em;font-weight:bold;color:#374151;'></div>
-                        <div style='display:flex;gap:8px;align-items:center;'>
-                            <div id='live-stopwatch' style='font-size:0.75em;color:#059669;font-weight:600;'></div>
-                            <div id='live-date' style='font-size:0.75em;color:#6b7280;'></div>
-                        </div>
                     </div>
                 </div>
                 <div id='popup-dinamis-info'>
@@ -1413,13 +1090,6 @@ export class LocationManager {
         const mapManager = window.transJakartaApp.modules.map;
         if (!mapManager || !mapManager.userPopup || !this.userMarker) return;
         
-        // Throttle position updates to prevent blinking during movement
-        const now = Date.now();
-        if (this._lastPositionUpdate && (now - this._lastPositionUpdate) < 500) {
-            return; // Skip update if too frequent (update max every 500ms)
-        }
-        this._lastPositionUpdate = now;
-        
         // Get current popup position
         const currentPopupPos = mapManager.userPopup.getLngLat();
         if (!currentPopupPos) {
@@ -1443,14 +1113,14 @@ export class LocationManager {
             return;
         }
         
-        // If distance is very small (< 3 meters), don't update to prevent micro-movements
-        if (distance < 3) {
+        // If distance is very small (< 5 meters), snap directly for responsiveness
+        if (distance < 5) {
+            mapManager.userPopup.setLngLat([targetLon, targetLat]);
+            this._renderedPopupPos = { lat: targetLat, lon: targetLon };
             return;
         }
         
-        // For medium distances, update position directly without animation
-        mapManager.userPopup.setLngLat([targetLon, targetLat]);
-        this._renderedPopupPos = { lat: targetLat, lon: targetLon };
+        // Start/replace animation
         if (this._popupAnimReqId) { 
             try { cancelAnimationFrame(this._popupAnimReqId); } catch(e){} 
             this._popupAnimReqId = null; 
