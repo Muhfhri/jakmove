@@ -1,614 +1,704 @@
-// GTFS Data Loader Module
+// GTFS Data Loader Module - Restructured for Better Cache & Loading Flow
 export class GTFSLoader {
     constructor() {
+        // Core data structures
         this.data = {
-            stops: [],
-            routes: [],
-            trips: [],
-            stop_times: [],
-            shapes: [],
-            frequencies: [],
-            fare_rules: [],
-            fare_attributes: [],
-            transfers: [],
-            calendar: [],
-            agency: []
+            stops: [], routes: [], trips: [], stop_times: [], shapes: [],
+            frequencies: [], fare_rules: [], fare_attributes: [], transfers: [], calendar: [], agency: []
         };
         this.stopToRoutes = {};
-        this._worker = null;
+        
+        // Enhanced caches
+        this.nextStopCache = new Map();
+        this.tripSequenceCache = new Map();
+        this.platformLookup = new Map();
+        
+        // Configuration
         this.CACHE_KEY = 'jakmove_gtfs_data';
         this.CACHE_VERSION_KEY = 'jakmove_gtfs_version';
-        this.CURRENT_VERSION = '1.5'; // Increment when GTFS data changes
-        this.db = null;
+        this.CURRENT_VERSION = '2.0'; // Restructured version
+        this.CACHE_TIMEOUT = 1500; // Faster cache timeout for better UX
+        this._worker = null;
         
-        // Expose clear cache function globally for debugging
+        // Global debug function
         window.clearGTFSCache = () => this.clearCache();
     }
 
+    // ======================================
+    // MAIN LOADING ENTRY POINT
+    // ======================================
+
     async loadData() {
         try {
-            this.showLoadingProgress();
-            this.updateLoadingProgress(2, 'Menyiapkan aplikasi...');
+            console.log('🚀 Starting GTFS data loading (v2.0)...');
+            this.showSlideNotification();
+            this.updateSlideNotification(2, '<i class="fas fa-search" style="color: #8b5cf6;"></i> Memeriksa cache...');
 
-            // Try to load from cache first with timeout
-            const cachedData = await Promise.race([
-                this.loadFromCache(),
-                new Promise(resolve => setTimeout(() => resolve(null), 3000)) // 3 second timeout
-            ]);
+            // Try cache first
+            const cachedData = await this.attemptCacheLoad();
             
             if (cachedData) {
-                console.log('📦 Loading GTFS data from cache - instant load');
-                
-                // Extract stopToRoutes if it exists
-                if (cachedData.stopToRoutes) {
-                    this.stopToRoutes = cachedData.stopToRoutes;
-                    delete cachedData.stopToRoutes;
-                    delete cachedData.timestamp;
-                }
-                
-                Object.assign(this.data, cachedData);
-                
-                // Instant hide for cached data - no loading screen needed
-                this.hideLoadingProgress();
-                
-                // Update UI with last modified date
-                this.updateLastModifiedUI();
-                
-                // Optional: Background check for updates without blocking UI
-                this.checkForUpdatesInBackground();
-                
-                return this.data;
+                await this.processCachedData(cachedData);
+            } else {
+                await this.processNetworkData();
             }
 
-            console.log('🌐 Cache miss, loading GTFS data from network');
-            this.updateLoadingProgress(5, 'Memuat dari server...');
-
-            const files = [{
-                    url: 'gtfs/stops.txt',
-                    key: 'stopsTxt',
-                    label: 'Mengunduh stops.txt',
-                    range: [2, 10]
-                },
-                {
-                    url: 'gtfs/routes.txt',
-                    key: 'routesTxt',
-                    label: 'Mengunduh routes.txt',
-                    range: [10, 16]
-                },
-                {
-                    url: 'gtfs/trips.txt',
-                    key: 'tripsTxt',
-                    label: 'Mengunduh trips.txt',
-                    range: [16, 28]
-                },
-                {
-                    url: 'gtfs/stop_times.txt',
-                    key: 'stopTimesTxt',
-                    label: 'Mengunduh stop_times.txt',
-                    range: [28, 50]
-                },
-                {
-                    url: 'gtfs/shapes.txt',
-                    key: 'shapesTxt',
-                    label: 'Mengunduh shapes.txt',
-                    range: [50, 62]
-                },
-                {
-                    url: 'gtfs/frequencies.txt',
-                    key: 'frequenciesTxt',
-                    label: 'Mengunduh frequencies.txt',
-                    range: [62, 66]
-                },
-                {
-                    url: 'gtfs/fare_rules.txt',
-                    key: 'fareRulesTxt',
-                    label: 'Mengunduh fare_rules.txt',
-                    range: [66, 70]
-                },
-                {
-                    url: 'gtfs/fare_attributes.txt',
-                    key: 'fareAttributesTxt',
-                    label: 'Mengunduh fare_attributes.txt',
-                    range: [70, 74]
-                },
-                {
-                    url: 'gtfs/transfers.txt',
-                    key: 'transfersTxt',
-                    label: 'Mengunduh transfers.txt',
-                    range: [74, 78]
-                },
-                {
-                    url: 'gtfs/calendar.txt',
-                    key: 'calendarTxt',
-                    label: 'Mengunduh calendar.txt',
-                    range: [78, 82]
-                },
-                {
-                    url: 'gtfs/agency.txt',
-                    key: 'agencyTxt',
-                    label: 'Mengunduh agency.txt',
-                    range: [82, 86]
-                }
-            ];
-
-            // Sequential streaming fetch with per-file progress
-            const texts = {};
-            let latestModified = null;
-            let latestFile = null;
+            // Complete loading process
+            await this.finalizeLoading();
             
-            for (const f of files) {
-                const result = await this._streamFetchWithProgress(f.url, f.range[0], f.range[1], f.label);
-                texts[f.key] = result.text;
-                
-                // Track the latest modified file
-                if (result.lastModified) {
-                    const fileDate = new Date(result.lastModified);
-                    const fileName = f.url.split('/').pop(); // Get filename from URL
-                    
-                    if (!latestModified || fileDate > new Date(latestModified)) {
-                        latestModified = result.lastModified;
-                        latestFile = fileName;
-                    }
-                }
-            }
-            
-            // Store the latest modification info
-            if (latestModified && latestFile) {
-                localStorage.setItem('jakmove_gtfs_last_modified', latestModified);
-                localStorage.setItem('jakmove_gtfs_latest_file', latestFile);
-            }
-
-            this.updateLoadingProgress(87, 'Memproses data di latar (tidak membekukan UI)...');
-
-            // Extract text content for parsing
-            const textContents = {};
-            Object.keys(texts).forEach(key => {
-                // Handle both old string format and new object format
-                if (typeof texts[key] === 'string') {
-                    textContents[key] = texts[key];
-                } else if (texts[key] && texts[key].text) {
-                    textContents[key] = texts[key].text;
-                } else {
-                    textContents[key] = '';
-                }
-            });
-
-            // Offload parsing to Web Worker for responsiveness
-            const parsed = await this._parseInWorker(textContents, (p, s) => this.updateLoadingProgress(p, s));
-
-            // Assign parsed data
-            this.data.stops = parsed.stops;
-            this.data.routes = parsed.routes;
-            this.data.trips = parsed.trips;
-            this.data.stop_times = parsed.stop_times;
-            this.data.shapes = parsed.shapes;
-            this.data.frequencies = parsed.frequencies;
-            this.data.fare_rules = parsed.fare_rules;
-            this.data.fare_attributes = parsed.fare_attributes;
-            this.data.transfers = parsed.transfers;
-            this.data.calendar = parsed.calendar;
-            this.data.agency = parsed.agency;
-            this.stopToRoutes = parsed.stopToRoutes || {};
-
-            // Save to cache for future use with timeout
-            this.updateLoadingProgress(98, 'Menyimpan ke cache...');
-            try {
-                await Promise.race([
-                    this.saveToCache(),
-                    new Promise(resolve => setTimeout(() => resolve(), 5000)) // 5 second timeout for save
-                ]);
-                console.log('Cache save completed');
-            } catch (e) {
-                console.log('Cache save failed, continuing anyway:', e);
-            }
-            
-            this.updateLoadingProgress(100, 'Selesai!');
-            this.hideLoadingProgress();
-            
-            // Update UI with last modified date
-            this.updateLastModifiedUI();
-
+            console.log('✅ GTFS data loading completed');
             return this.data;
+            
         } catch (error) {
-            console.error('Error loading GTFS data:', error);
-            this.updateLoadingProgress(0, 'Error: Gagal memuat data');
-            setTimeout(() => this.hideLoadingProgress(), 3000);
+            console.error('❌ GTFS loading failed:', error);
+            this.showError('Gagal memuat data aplikasi');
             throw error;
         }
     }
 
-    async _streamFetchWithProgress(url, startPercent, endPercent, label) {
+    // ======================================
+    // CACHE LOADING FLOW
+    // ======================================
+    
+    async attemptCacheLoad() {
         try {
-            this.updateLoadingProgress(startPercent, `${label} (mulai)`);
-            const res = await fetch(url);
-            if (!res.ok) return { text: '', lastModified: null };
-            
-            const contentLength = parseInt(res.headers.get('Content-Length') || '0', 10);
-            const lastModified = res.headers.get('Last-Modified');
-            
-            if (!res.body || !window.ReadableStream) {
-                const text = await res.text();
-                this.updateLoadingProgress(endPercent, `${label} (100%)`);
-                return { text, lastModified };
-            }
-            const reader = res.body.getReader();
-            const decoder = new TextDecoder('utf-8');
-            let received = 0;
-            let chunks = '';
-            while (true) {
-                const {
-                    done,
-                    value
-                } = await reader.read();
-                if (done) break;
-                received += value.byteLength;
-                chunks += decoder.decode(value, {
-                    stream: true
-                });
-                const frac = contentLength > 0 ? (received / contentLength) : 0.5; // fallback
-                const pct = Math.min(endPercent, startPercent + Math.floor((endPercent - startPercent) * frac));
-                this.updateLoadingProgress(pct, `${label} (${contentLength ? Math.min(100, Math.floor(frac * 100)) : '...'}%)`);
-            }
-            // flush decoder
-            chunks += decoder.decode();
-            this.updateLoadingProgress(endPercent, `${label} (100%)`);
-            return { text: chunks, lastModified };
-        } catch (_) {
-            // Fallback simple fetch on error
-            try {
-                const res = await fetch(url);
-                const txt = res.ok ? await res.text() : '';
-                const lastModified = res.ok ? res.headers.get('Last-Modified') : null;
-                this.updateLoadingProgress(endPercent, `${label} (selesai)`);
-                return { text: txt, lastModified };
-            } catch (e) {
-                this.updateLoadingProgress(endPercent, `${label} (error)`);
-                return { text: '', lastModified: null };
-            }
+            return await Promise.race([
+                this.loadFromCache(),
+                new Promise(resolve => setTimeout(() => resolve(null), this.CACHE_TIMEOUT))
+            ]);
+        } catch (error) {
+            console.warn('Cache attempt failed:', error);
+            return null;
         }
     }
 
-    _ensureWorker() {
+    async processCachedData(cachedData) {
+        console.log('📦 Processing cached GTFS data (optimized)');
+        this.updateSlideNotification(15, '<i class="fas fa-bolt" style="color: #3b82f6;"></i> Memuat data dari cache...');
+        
+        // Assign data quickly
+        Object.assign(this.data, cachedData);
+        this.stopToRoutes = cachedData.stopToRoutes || {};
+        
+        this.updateSlideNotification(85, '<i class="fas fa-wrench" style="color: #10b981;"></i> Menyiapkan data cache...');
+        console.log(`📋 Cache loaded: ${Object.keys(this.stopToRoutes).length} stop mappings`);
+        
+        // Process with cache flag (much faster)
+        await this.unifiedDataProcessing('cache');
+    }
+
+    // ======================================
+    // NETWORK LOADING FLOW
+    // ======================================
+    
+    async processNetworkData() {
+        console.log('🌐 Processing network GTFS data');
+            this.updateSlideNotification(5, '<i class="fas fa-cloud-download-alt" style="color: #6366f1;"></i> Memuat dari server...');
+
+        // Load and parse files
+        const texts = await this.loadNetworkFiles();
+        const parsed = await this.parseDataFiles(texts);
+        
+        // Assign data
+        Object.assign(this.data, parsed);
+        this.stopToRoutes = parsed.stopToRoutes || {};
+        
+        console.log(`🔄 Network loaded: ${Object.keys(this.stopToRoutes).length} stop mappings`);
+        
+        // Save to cache
+        this.updateSlideNotification(92, '<i class="fas fa-save" style="color: #8b5cf6;"></i> Menyimpan ke cache...');
+        await this.saveToCache();
+        
+        // Process with network flag
+        await this.unifiedDataProcessing('network');
+    }
+
+    async loadNetworkFiles() {
+        // Prioritized file loading - essential files first
+        const coreFiles = [
+            { url: 'gtfs/stops.txt', key: 'stopsTxt', label: '🚏 stops' },
+            { url: 'gtfs/routes.txt', key: 'routesTxt', label: '🛣️ routes' },
+            { url: 'gtfs/trips.txt', key: 'tripsTxt', label: '🚌 trips' },
+            { url: 'gtfs/stop_times.txt', key: 'stopTimesTxt', label: '⏰ stop_times' }
+        ];
+        
+        const optionalFiles = [
+            { url: 'gtfs/shapes.txt', key: 'shapesTxt', label: '📐 shapes' },
+            { url: 'gtfs/frequencies.txt', key: 'frequenciesTxt', label: '🔄 frequencies' },
+            { url: 'gtfs/fare_rules.txt', key: 'fareRulesTxt', label: '💰 fare_rules' },
+            { url: 'gtfs/fare_attributes.txt', key: 'fareAttributesTxt', label: '💳 fare_attributes' },
+            { url: 'gtfs/transfers.txt', key: 'transfersTxt', label: '🔄 transfers' },
+            { url: 'gtfs/calendar.txt', key: 'calendarTxt', label: '📅 calendar' },
+            { url: 'gtfs/agency.txt', key: 'agencyTxt', label: '🏢 agency' }
+        ];
+
+        this.updateSlideNotification(8, '<i class="fas fa-rocket" style="color: #ec4899;"></i> Memulai pengunduhan paralel...');
+        
+            const texts = {};
+        const allFiles = [...coreFiles, ...optionalFiles];
+        let completed = 0;
+        
+        try {
+            // Phase 1: Load core files first (parallel)
+            this.updateSlideNotification(15, '<i class="fas fa-box" style="color: #3b82f6;"></i> Memuat file utama...');
+            const corePromises = coreFiles.map(async (file) => {
+                try {
+                    const response = await fetch(file.url);
+                    const text = await response.text();
+                    texts[file.key] = text;
+                    
+                    completed++;
+                    const progress = 15 + (completed / 4) * 40; // 15-55% for core files
+                    this.updateSlideNotification(progress, `${file.label} <i class="fas fa-check" style="color: #22c55e;"></i>`);
+                    
+                    return { key: file.key, success: true };
+                } catch (error) {
+                    console.warn(`Failed to load ${file.url}:`, error);
+                    texts[file.key] = '';
+                    completed++;
+                    return { key: file.key, success: false };
+                }
+            });
+            
+            await Promise.all(corePromises);
+            
+            // Phase 2: Load optional files (parallel)
+            this.updateSlideNotification(60, '📋 Memuat file tambahan...');
+            const optionalPromises = optionalFiles.map(async (file) => {
+                try {
+                    const response = await fetch(file.url);
+                    const text = await response.text();
+                    texts[file.key] = text;
+                    
+                    completed++;
+                    const progress = 60 + ((completed - 4) / 7) * 25; // 60-85% for optional files
+                    this.updateSlideNotification(progress, `${file.label} <i class="fas fa-check" style="color: #22c55e;"></i>`);
+                    
+                    return { key: file.key, success: true };
+                } catch (error) {
+                    console.warn(`Failed to load ${file.url}:`, error);
+                    texts[file.key] = '';
+                    completed++;
+                    return { key: file.key, success: false };
+                }
+            });
+            
+            await Promise.all(optionalPromises);
+            
+            this.updateSlideNotification(87, '<i class="fas fa-check-circle" style="color: #22c55e;"></i> Semua file berhasil dimuat!');
+            console.log('🚀 All files loaded with parallel optimization');
+            
+        } catch (error) {
+            console.warn('Optimized loading failed, some files may be missing:', error);
+        }
+
+        return texts;
+    }
+
+    async parseDataFiles(texts) {
+        this.updateSlideNotification(88, '⚙️ Memproses data GTFS...');
+        
+        const worker = this.ensureWorker();
+        if (worker) {
+            console.log('🔧 Using Web Worker for fast parsing');
+            return await this.parseWithWorker(texts);
+                } else {
+            console.log('⚠️ Web Worker not available, using main thread');
+            this.updateSlideNotification(89, '🔄 Parsing di main thread...');
+            return this.parseInMainThread(texts);
+        }
+    }
+
+    // ======================================
+    // UNIFIED DATA PROCESSING
+    // ======================================
+    
+    async unifiedDataProcessing(source) {
+        console.log(`🔄 Starting optimized processing for ${source} data`);
+        
+        if (source === 'cache') {
+            // Fast track for cached data - minimal processing
+            this.updateSlideNotification(90, '<i class="fas fa-shield-alt" style="color: #10b981;"></i> Memvalidasi data cache...');
+            this.validateData();
+            
+            this.updateSlideNotification(95, '<i class="fas fa-bullseye" style="color: #f59e0b;"></i> Menyelesaikan cache...');
+            // Skip heavy processing for cache - data should already be good
+            this.performCrossValidation();
+            
+        } else {
+            // Full processing for network data
+            this.updateSlideNotification(90, '<i class="fas fa-search" style="color: #3b82f6;"></i> Memvalidasi data...');
+            this.validateData();
+            
+            this.updateSlideNotification(93, '<i class="fas fa-hammer" style="color: #6366f1;"></i> Membangun struktur data...');
+            await this.buildEnhancedStructures();
+            
+            this.updateSlideNotification(96, '<i class="fas fa-gift" style="color: #f59e0b;"></i> Finalisasi data...');
+            await this.finalProcessing();
+        }
+        
+        console.log(`✅ Optimized processing completed for ${source}`);
+    }
+
+    validateData() {
+        const requiredData = ['stops', 'routes', 'trips', 'stop_times'];
+        const minCounts = { stops: 100, routes: 10, trips: 100, stop_times: 1000 };
+        
+        for (const dataType of requiredData) {
+            const count = this.data[dataType]?.length || 0;
+            const minCount = minCounts[dataType] || 0;
+            
+            if (count < minCount) {
+                throw new Error(`Insufficient ${dataType}: ${count} < ${minCount}`);
+            }
+        }
+        
+        // Validate stopToRoutes
+        if (Object.keys(this.stopToRoutes).length === 0) {
+            console.log('🔧 Building stopToRoutes mapping...');
+            this.buildStopToRoutesMapping();
+        }
+        
+        console.log(`✅ Data validated - ${Object.keys(this.stopToRoutes).length} stop mappings`);
+    }
+
+    async buildEnhancedStructures() {
+        console.log('🏗️ Building optimized structures...');
+        
+        // Only build essential structures for faster loading
+        this.buildTripSequenceCache();
+        this.buildPlatformLookup();
+        
+        // Skip heavy calculations that can be done on-demand
+        console.log('✅ Essential structures built (optimized)');
+    }
+
+    async finalProcessing() {
+        console.log('🎁 Optimized final processing...');
+        
+        // Cross-validate data relationships (fast validation only)
+        this.performCrossValidation();
+        
+        // Minimal delay for faster completion
+        await new Promise(resolve => setTimeout(resolve, 10));
+        
+        console.log('✅ Processing finalized (optimized)');
+    }
+
+    async finalizeLoading() {
+        this.updateSlideNotification(100, '<i class="fas fa-check-circle" style="color: #22c55e;"></i> Data berhasil dimuat!');
+        this.updateLastModifiedUI();
+        
+        // Hide loading progress now that data is ready
+        setTimeout(() => {
+            this.hideSlideNotification();
+            console.log('📊 GTFS data loading completed, progress hidden');
+        }, 800);
+        
+        // Background update check
+        this.checkForUpdatesInBackground();
+        
+        // Signal that GTFS is ready
+        window.gtfsDataReady = true;
+    }
+
+    // ======================================
+    // DATA STRUCTURE BUILDERS
+    // ======================================
+    
+    buildStopToRoutesMapping() {
+        if (!this.data.stop_times || !this.data.trips) return;
+        
+        this.stopToRoutes = {};
+        const tripToRoute = new Map();
+        
+        // Map trip to route
+        this.data.trips.forEach(trip => {
+            tripToRoute.set(String(trip.trip_id), String(trip.route_id));
+        });
+        
+        // Map stop to routes
+        this.data.stop_times.forEach(st => {
+            const stopId = String(st.stop_id);
+            const routeId = tripToRoute.get(String(st.trip_id));
+            
+            if (routeId) {
+                if (!this.stopToRoutes[stopId]) {
+                    this.stopToRoutes[stopId] = new Set();
+                }
+                this.stopToRoutes[stopId].add(routeId);
+            }
+        });
+        
+        // Convert Sets to Arrays
+        Object.keys(this.stopToRoutes).forEach(stopId => {
+            this.stopToRoutes[stopId] = Array.from(this.stopToRoutes[stopId]);
+        });
+    }
+
+    buildTripSequenceCache() {
+        this.tripSequenceCache = new Map();
+        
+        // Group stop_times by trip
+        const tripGroups = new Map();
+        this.data.stop_times.forEach(st => {
+            const tripId = String(st.trip_id);
+            if (!tripGroups.has(tripId)) {
+                tripGroups.set(tripId, []);
+            }
+            tripGroups.get(tripId).push(st);
+        });
+        
+        // Sort and cache
+        tripGroups.forEach((stopTimes, tripId) => {
+            const sorted = stopTimes.sort((a, b) => parseInt(a.stop_sequence) - parseInt(b.stop_sequence));
+            this.tripSequenceCache.set(tripId, sorted);
+        });
+        
+        console.log(`📋 Built ${this.tripSequenceCache.size} trip sequences`);
+    }
+
+    async preCalculateNextStops() {
+        this.nextStopCache = new Map();
+        
+        // Focus on major stops (2+ routes)
+        const majorStops = this.data.stops.filter(stop => {
+            const routes = this.stopToRoutes[String(stop.stop_id)] || [];
+            return routes.length >= 2;
+        }).slice(0, 100);
+        
+        for (const stop of majorStops) {
+            const stopId = String(stop.stop_id);
+            const routes = this.stopToRoutes[stopId] || [];
+            
+            for (const routeId of routes) {
+                const nextStopName = this.calculateNextStopForRoute(stopId, routeId);
+                if (nextStopName) {
+                    this.nextStopCache.set(`${stopId}-${routeId}`, nextStopName);
+                }
+            }
+            
+            // Small delay to prevent blocking
+            if (majorStops.indexOf(stop) % 10 === 0) {
+                await new Promise(resolve => setTimeout(resolve, 5));
+            }
+        }
+        
+        console.log(`🎯 Pre-calculated ${this.nextStopCache.size} next stops`);
+    }
+
+    buildPlatformLookup() {
+        this.platformLookup = new Map();
+        
+        const stopsWithPlatforms = this.data.stops.filter(stop => 
+            stop.platform_code && String(stop.platform_code).trim()
+        );
+        
+        stopsWithPlatforms.forEach(stop => {
+            const code = String(stop.platform_code).trim();
+            if (!this.platformLookup.has(code)) {
+                this.platformLookup.set(code, []);
+            }
+            this.platformLookup.get(code).push(stop);
+        });
+        
+        console.log(`🚏 Built ${this.platformLookup.size} platform lookups`);
+    }
+
+    async preGeneratePlatformMappings() {
+        try {
+            const mapManager = window.transJakartaApp?.modules?.map;
+            if (!mapManager || !mapManager._platformMapCache) return;
+            
+            const interchangeStops = this.data.stops.filter(stop => {
+                const hasPlatform = stop.platform_code && String(stop.platform_code).trim();
+                const routes = this.stopToRoutes[String(stop.stop_id)] || [];
+                return hasPlatform && routes.length >= 2;
+            }).slice(0, 50);
+            
+            for (const stop of interchangeStops) {
+                const stopId = String(stop.stop_id);
+                const routes = this.stopToRoutes[stopId] || [];
+                const platformCode = String(stop.platform_code).trim();
+                
+                if (platformCode) {
+                    const cacheKey = `platforms-${stopId}-all`;
+                    const platformMap = [{
+                        code: platformCode,
+                        routeIds: routes,
+                        nextByRoute: routes.map(rid => ({
+                            rid: String(rid),
+                            nextName: this.nextStopCache.get(`${stopId}-${rid}`) || ''
+                        })),
+                        headsign: '', nextName: '', bearingDeg: null, directionArrow: '',
+                        lat: parseFloat(stop.stop_lat || 0),
+                        lng: parseFloat(stop.stop_lon || 0)
+                    }];
+                    
+                    mapManager._platformMapCache.set(cacheKey, {
+                        platformMap: platformMap,
+                        ts: Date.now()
+                    });
+                }
+            }
+            
+            console.log(`🗂️ Pre-generated ${interchangeStops.length} platform mappings`);
+        } catch (error) {
+            console.warn('Platform mapping generation failed:', error);
+        }
+    }
+
+    // ======================================
+    // WORKER & PARSING
+    // ======================================
+    
+    ensureWorker() {
         if (this._worker) return this._worker;
         try {
             this._worker = new Worker('workers/gtfs-worker.js');
-        } catch (_) {
+        } catch (error) {
+            console.warn('Worker creation failed:', error);
             this._worker = null;
         }
         return this._worker;
     }
 
-    _parseInWorker(texts, onProgress) {
+    async parseWithWorker(texts) {
         return new Promise((resolve, reject) => {
-            const w = this._ensureWorker();
-            if (!w) {
-                // Fallback: parse in main thread using existing methods
-                try {
-                    const result = {};
-                    onProgress && onProgress(90, 'Memproses data (fallback)...');
-                    
-                    // Extract text from texts object properly
-                    const extractText = (key) => {
-                        const val = texts[key];
-                        return typeof val === 'string' ? val : (val && val.text ? val.text : '');
-                    };
-                    
-                    result.stops = this.parseCSV(extractText('stopsTxt'));
-                    result.routes = this.parseCSV(extractText('routesTxt'));
-                    result.trips = this.parseCSV(extractText('tripsTxt'));
-                    result.stop_times = this.parseCSV(extractText('stopTimesTxt'));
-                    result.shapes = this.parseCSV(extractText('shapesTxt'));
-                    result.frequencies = this.parseCSV(extractText('frequenciesTxt'));
-                    result.fare_rules = this.parseCSV(extractText('fareRulesTxt'));
-                    result.fare_attributes = this.parseCSV(extractText('fareAttributesTxt'));
-                    result.transfers = this.parseCSV(extractText('transfersTxt'));
-                    result.calendar = this.parseCSV(extractText('calendarTxt'));
-                    result.agency = this.parseCSV(extractText('agencyTxt'));
-                    // Build mapping
-                    const stopToRoutes = {};
-                    result.stop_times.forEach(st => {
-                        const trip = result.trips.find(t => t.trip_id === st.trip_id);
-                        if (trip) {
-                            if (!stopToRoutes[st.stop_id]) stopToRoutes[st.stop_id] = new Set();
-                            stopToRoutes[st.stop_id].add(trip.route_id);
-                        }
-                    });
-                    Object.keys(stopToRoutes).forEach(k => stopToRoutes[k] = Array.from(stopToRoutes[k]));
-                    result.stopToRoutes = stopToRoutes;
-                    onProgress && onProgress(96, 'Finalisasi data...');
-                    resolve(result);
-                } catch (e) {
-                    reject(e);
-                }
-                return;
-            }
-            const onMsg = (ev) => {
-                const msg = ev.data || {};
-                if (msg.type === 'progress') {
-                    onProgress && onProgress(msg.percent, msg.status || '');
-                } else if (msg.type === 'result') {
-                    w.removeEventListener('message', onMsg);
-                    resolve(msg.data);
-                } else if (msg.type === 'error') {
-                    w.removeEventListener('message', onMsg);
-                    reject(new Error(msg.error || 'Worker error'));
+            const worker = this._worker;
+            
+            const handleMessage = (msg) => {
+                if (msg.data.type === 'progress') {
+                    this.updateSlideNotification(msg.data.percent, msg.data.status);
+                } else if (msg.data.type === 'result') {
+                    worker.removeEventListener('message', handleMessage);
+                    resolve(msg.data.data);
+                } else if (msg.data.type === 'error') {
+                    worker.removeEventListener('message', handleMessage);
+                    reject(new Error(msg.data.error));
                 }
             };
-            w.addEventListener('message', onMsg);
-            try {
-                w.postMessage({
-                    cmd: 'parseAll',
-                    payload: texts
-                });
-            } catch (e) {
-                w.removeEventListener('message', onMsg);
-                reject(e);
+            
+            worker.addEventListener('message', handleMessage);
+            worker.postMessage({ cmd: 'parseAll', payload: texts });
+        });
+    }
+
+    parseInMainThread(texts) {
+        console.log('📝 Parsing in main thread (fallback)');
+        
+        const parseCSV = (text) => {
+            if (!text || !text.trim()) return [];
+            const lines = text.split('\n').filter(l => l.trim());
+            if (lines.length === 0) return [];
+            const headers = lines[0].split(',').map(h => h.trim());
+            return lines.slice(1).map(line => {
+                const values = line.split(',').map(v => v.trim());
+                const obj = {};
+                headers.forEach((h, i) => obj[h] = values[i] || '');
+                return obj;
+            });
+        };
+        
+        const result = {
+            stops: parseCSV(texts.stopsTxt || ''),
+            routes: parseCSV(texts.routesTxt || ''),
+            trips: parseCSV(texts.tripsTxt || ''),
+            stop_times: parseCSV(texts.stopTimesTxt || ''),
+            shapes: parseCSV(texts.shapesTxt || ''),
+            frequencies: parseCSV(texts.frequenciesTxt || ''),
+            fare_rules: parseCSV(texts.fareRulesTxt || ''),
+            fare_attributes: parseCSV(texts.fareAttributesTxt || ''),
+            transfers: parseCSV(texts.transfersTxt || ''),
+            calendar: parseCSV(texts.calendarTxt || ''),
+            agency: parseCSV(texts.agencyTxt || '')
+        };
+        
+        // Build stopToRoutes in main thread
+        const stopToRoutes = {};
+        const tripToRoute = new Map(result.trips.map(t => [t.trip_id, t.route_id]));
+        
+        result.stop_times.forEach(st => {
+            const routeId = tripToRoute.get(st.trip_id);
+            if (routeId) {
+                if (!stopToRoutes[st.stop_id]) stopToRoutes[st.stop_id] = new Set();
+                stopToRoutes[st.stop_id].add(routeId);
             }
         });
-    }
-
-    // Utility functions
-    getStops() {
-        return this.data.stops;
-    }
-    getRoutes() {
-        return this.data.routes;
-    }
-    getTrips() {
-        return this.data.trips;
-    }
-    getStopTimes() {
-        return this.data.stop_times;
-    }
-    getShapes() {
-        return this.data.shapes;
-    }
-    getFrequencies() {
-        return this.data.frequencies;
-    }
-    getFareRules() {
-        return this.data.fare_rules;
-    }
-    getFareAttributes() {
-        return this.data.fare_attributes;
-    }
-    getStopToRoutes() {
-        return this.stopToRoutes;
-    }
-    getCalendar() {
-        return this.data.calendar;
-    }
-    getAgency() {
-        return this.data.agency;
-    }
-
-    // Natural sort function for human-friendly sorting of route names
-    naturalSort(a, b) {
-        let ax = (typeof a === 'object' && a.route_short_name) ? a.route_short_name : a;
-        let bx = (typeof b === 'object' && b.route_short_name) ? b.route_short_name : b;
         
-        if (!ax && typeof a === 'object') ax = a.route_id;
-        if (!bx && typeof b === 'object') bx = b.route_id;
-        
-        return ax.localeCompare(bx, undefined, {
-            numeric: true,
-            sensitivity: 'base'
+        Object.keys(stopToRoutes).forEach(k => {
+            stopToRoutes[k] = Array.from(stopToRoutes[k]);
         });
-    }
-
-    // Loading progress functions
-    showLoadingProgress() {
-        const loadingModal = document.getElementById('loadingProgress');
-        if (loadingModal) {
-            loadingModal.style.display = 'flex';
-            setTimeout(() => loadingModal.classList.add('show'), 10);
-        }
-        try {
-            document.body.classList.add('no-scroll');
-        } catch (_) {}
-    }
-
-    hideLoadingProgress() {
-        const loadingModal = document.getElementById('loadingProgress');
-        if (loadingModal) {
-            loadingModal.classList.remove('show');
-            setTimeout(() => loadingModal.style.display = 'none', 300);
-        }
-        try {
-            document.body.classList.remove('no-scroll');
-        } catch (_) {}
-    }
-
-    updateLoadingProgress(percent, status) {
-        const progressBar = document.getElementById('progressBar');
-        const progressPercent = document.getElementById('progressPercent');
-        const progressStatus = document.getElementById('progressStatus');
         
-        if (progressBar) {
-            progressBar.style.width = percent + '%';
-            progressBar.setAttribute('aria-valuenow', percent);
-        }
-        if (progressPercent) {
-            progressPercent.textContent = Math.round(percent) + '%';
-        }
-        if (progressStatus && status) {
-            progressStatus.textContent = status;
+        result.stopToRoutes = stopToRoutes;
+        return result;
+    }
+
+    // ======================================
+    // HELPER METHODS
+    // ======================================
+    
+    calculateNextStopForRoute(currentStopId, routeId) {
+        try {
+            const routeTrips = this.data.trips.filter(t => String(t.route_id) === String(routeId));
+            if (!routeTrips.length) return '';
+            
+            for (const trip of routeTrips.slice(0, 3)) {
+                const tripId = String(trip.trip_id);
+                const sortedStopTimes = this.tripSequenceCache.get(tripId);
+                if (!sortedStopTimes) continue;
+                
+                const currentIndex = sortedStopTimes.findIndex(st => 
+                    String(st.stop_id) === String(currentStopId)
+                );
+                
+                if (currentIndex >= 0 && currentIndex < sortedStopTimes.length - 1) {
+                    const nextStopId = sortedStopTimes[currentIndex + 1].stop_id;
+                    const nextStop = this.data.stops.find(s => String(s.stop_id) === String(nextStopId));
+                    if (nextStop) return nextStop.stop_name || '';
+                }
+            }
+            return '';
+        } catch (error) {
+            return '';
         }
     }
 
-    // Caching functions
+    performCrossValidation() {
+        try {
+            const invalidTrips = this.data.trips.filter(trip => {
+                return !this.data.routes.some(route => route.route_id === trip.route_id);
+            }).length;
+            
+            const invalidStopTimes = this.data.stop_times.filter(st => {
+                const tripExists = this.data.trips.some(trip => trip.trip_id === st.trip_id);
+                const stopExists = this.data.stops.some(stop => stop.stop_id === st.stop_id);
+                return !tripExists || !stopExists;
+            }).length;
+            
+            if (invalidTrips > 0) {
+                console.warn(`⚠️ ${invalidTrips} invalid trip references found`);
+            }
+            if (invalidStopTimes > 0) {
+                console.warn(`⚠️ ${invalidStopTimes} invalid stop_time references found`);
+            }
+            
+            console.log('✅ Cross-validation completed');
+        } catch (error) {
+            console.warn('Cross-validation failed:', error);
+        }
+    }
+
+    // ======================================
+    // CACHE MANAGEMENT
+    // ======================================
+    
     async loadFromCache() {
-        try {
-            // Check if browser supports IndexedDB and localStorage
-            if (!window.indexedDB || !localStorage) {
-                console.log('Cache not supported');
-                return null;
-            }
-
-            // Check version first
+        // Check version
             const cachedVersion = localStorage.getItem(this.CACHE_VERSION_KEY);
             if (cachedVersion !== this.CURRENT_VERSION) {
-                console.log('Cache version mismatch, clearing old cache');
+            console.log('Cache version mismatch, clearing');
                 await this.clearCache();
                 return null;
             }
 
-            // Try localStorage first for faster access
+        // Try localStorage first
+        try {
             const localData = localStorage.getItem(this.CACHE_KEY);
             if (localData) {
-                try {
-                    const parsed = JSON.parse(localData);
-                    console.log('✅ Loaded from localStorage cache');
-                    return parsed;
-                } catch (e) {
-                    console.log('localStorage cache corrupted, trying IndexedDB');
-                }
+                return JSON.parse(localData);
             }
+        } catch (error) {
+            console.warn('localStorage failed:', error);
+        }
 
-            // Fallback to IndexedDB
+        // Try IndexedDB fallback
+        try {
             return await this.loadFromIndexedDB();
         } catch (error) {
-            console.error('Error loading from cache:', error);
-            return null;
+            console.warn('IndexedDB failed:', error);
         }
+
+            return null;
     }
 
     async saveToCache() {
         try {
-            if (!window.indexedDB || !localStorage) return;
-
-            // Compress data by removing unnecessary fields and optimizing structure
             const cacheData = this.compressDataForCache();
-
-            // Save version
             localStorage.setItem(this.CACHE_VERSION_KEY, this.CURRENT_VERSION);
 
-            // Try localStorage first (faster access)
+            // Try localStorage first
             try {
                 const dataStr = JSON.stringify(cacheData);
-                console.log(`Cache data size: ${(dataStr.length / 1024 / 1024).toFixed(2)}MB`);
-                
-                // Check if data is too large for localStorage (5MB limit)
-                if (dataStr.length < 4.5 * 1024 * 1024) { // 4.5MB safety margin
+                if (dataStr.length < 5 * 1024 * 1024) { // 5MB limit
                     localStorage.setItem(this.CACHE_KEY, dataStr);
-                    console.log('✅ Saved to localStorage cache');
-                    return;
+                    console.log('💾 Cached to localStorage');
                 } else {
-                    console.log('Data too large for localStorage, using IndexedDB');
+                    throw new Error('Too large for localStorage');
                 }
-            } catch (e) {
-                console.log('localStorage full, using IndexedDB fallback');
-            }
-
-            // Fallback to IndexedDB
+            } catch (error) {
+                console.warn('localStorage save failed, using IndexedDB:', error);
             await this.saveToIndexedDB(cacheData);
+            }
         } catch (error) {
-            console.error('Error saving to cache:', error);
+            console.warn('Cache save failed:', error);
         }
     }
 
     compressDataForCache() {
-        // Create a more compact version of the data
         return {
-            stops: this.data.stops.map(stop => ({
-                stop_id: stop.stop_id,
-                stop_name: stop.stop_name,
-                stop_lat: parseFloat(stop.stop_lat),
-                stop_lon: parseFloat(stop.stop_lon),
-                location_type: stop.location_type
+            stops: this.data.stops.map(s => ({
+                stop_id: s.stop_id, stop_name: s.stop_name,
+                stop_lat: parseFloat(s.stop_lat), stop_lon: parseFloat(s.stop_lon),
+                location_type: s.location_type, platform_code: s.platform_code
             })),
-            routes: this.data.routes.map(route => ({
-                route_id: route.route_id,
-                route_short_name: route.route_short_name,
-                route_long_name: route.route_long_name,
-                route_color: route.route_color,
-                route_text_color: route.route_text_color
+            routes: this.data.routes.map(r => ({
+                route_id: r.route_id, route_short_name: r.route_short_name,
+                route_long_name: r.route_long_name, route_color: r.route_color,
+                route_text_color: r.route_text_color
             })),
-            trips: this.data.trips.map(trip => ({
-                route_id: trip.route_id,
-                service_id: trip.service_id,
-                trip_id: trip.trip_id,
-                trip_headsign: trip.trip_headsign,
-                shape_id: trip.shape_id
+            trips: this.data.trips.map(t => ({
+                route_id: t.route_id, service_id: t.service_id, trip_id: t.trip_id,
+                trip_headsign: t.trip_headsign, shape_id: t.shape_id
             })),
             stop_times: this.data.stop_times.map(st => ({
-                trip_id: st.trip_id,
-                arrival_time: st.arrival_time,
-                departure_time: st.departure_time,
-                stop_id: st.stop_id,
-                stop_sequence: parseInt(st.stop_sequence)
+                trip_id: st.trip_id, arrival_time: st.arrival_time, departure_time: st.departure_time,
+                stop_id: st.stop_id, stop_sequence: parseInt(st.stop_sequence)
             })),
-            shapes: this.data.shapes.map(shape => ({
-                shape_id: shape.shape_id,
-                shape_pt_lat: parseFloat(shape.shape_pt_lat),
-                shape_pt_lon: parseFloat(shape.shape_pt_lon),
-                shape_pt_sequence: parseInt(shape.shape_pt_sequence)
+            shapes: this.data.shapes.map(sh => ({
+                shape_id: sh.shape_id, shape_pt_lat: parseFloat(sh.shape_pt_lat),
+                shape_pt_lon: parseFloat(sh.shape_pt_lon), shape_pt_sequence: parseInt(sh.shape_pt_sequence)
             })),
-            frequencies: this.data.frequencies,
-            fare_rules: this.data.fare_rules,
-            fare_attributes: this.data.fare_attributes,
-            transfers: this.data.transfers,
-            calendar: this.data.calendar,
-            agency: this.data.agency,
-            stopToRoutes: this.stopToRoutes,
-            timestamp: Date.now()
+            frequencies: this.data.frequencies, fare_rules: this.data.fare_rules,
+            fare_attributes: this.data.fare_attributes, transfers: this.data.transfers,
+            calendar: this.data.calendar, agency: this.data.agency,
+            stopToRoutes: this.stopToRoutes, timestamp: Date.now()
         };
     }
 
     async loadFromIndexedDB() {
         return new Promise((resolve) => {
             try {
-                const request = indexedDB.open('JakMoveGTFS', 1);
-                request.onupgradeneeded = (e) => {
-                    const db = e.target.result;
-                    if (!db.objectStoreNames.contains('gtfs')) {
-                        db.createObjectStore('gtfs');
-                    }
-                };
-                request.onsuccess = (e) => {
-                    const db = e.target.result;
-                    try {
-                        if (!db.objectStoreNames.contains('gtfs')) {
-                            console.log('Object store not found, no cache available');
-                            db.close();
-                            resolve(null);
-                            return;
-                        }
-                        const transaction = db.transaction('gtfs', 'readonly');
-                        const store = transaction.objectStore('gtfs');
+                const request = indexedDB.open('jakmove_cache', 1);
+                
+                request.onerror = () => resolve(null);
+                request.onsuccess = (event) => {
+                    const db = event.target.result;
+                    const transaction = db.transaction(['gtfs_data'], 'readonly');
+                    const store = transaction.objectStore('gtfs_data');
                         const getRequest = store.get('data');
-                        getRequest.onsuccess = () => {
-                            if (getRequest.result) {
-                                console.log('✅ Loaded from IndexedDB cache');
-                                db.close();
-                                resolve(getRequest.result);
-                            } else {
-                                db.close();
-                                resolve(null);
-                            }
-                        };
-                        getRequest.onerror = (e) => {
-                            console.log('IndexedDB get failed:', e);
-                            db.close();
-                            resolve(null);
-                        };
-                        transaction.onerror = (e) => {
-                            console.log('IndexedDB transaction failed:', e);
-                            db.close();
-                            resolve(null);
-                        };
-                    } catch (e) {
-                        console.log('IndexedDB operation failed:', e);
-                        db.close();
-                        resolve(null);
+                    
+                    getRequest.onsuccess = () => resolve(getRequest.result?.data || null);
+                    getRequest.onerror = () => resolve(null);
+                };
+                
+                request.onupgradeneeded = (event) => {
+                    const db = event.target.result;
+                    if (!db.objectStoreNames.contains('gtfs_data')) {
+                        db.createObjectStore('gtfs_data');
                     }
                 };
-                request.onerror = (e) => {
-                    console.log('IndexedDB open failed:', e);
-                    resolve(null);
-                };
-            } catch (e) {
-                console.log('IndexedDB error:', e);
+            } catch (error) {
                 resolve(null);
             }
         });
@@ -617,234 +707,292 @@ export class GTFSLoader {
     async saveToIndexedDB(data) {
         return new Promise((resolve) => {
             try {
-                const request = indexedDB.open('JakMoveGTFS', 1);
-                request.onupgradeneeded = (e) => {
-                    const db = e.target.result;
-                    if (!db.objectStoreNames.contains('gtfs')) {
-                        db.createObjectStore('gtfs');
+                const request = indexedDB.open('jakmove_cache', 1);
+                
+                request.onsuccess = (event) => {
+                    const db = event.target.result;
+                    const transaction = db.transaction(['gtfs_data'], 'readwrite');
+                    const store = transaction.objectStore('gtfs_data');
+                    
+                    store.put({ data }, 'data');
+                    transaction.oncomplete = () => {
+                        console.log('💾 Cached to IndexedDB');
+                            resolve();
+                        };
+                    transaction.onerror = () => resolve();
+                };
+                
+                request.onerror = () => resolve();
+                request.onupgradeneeded = (event) => {
+                    const db = event.target.result;
+                    if (!db.objectStoreNames.contains('gtfs_data')) {
+                        db.createObjectStore('gtfs_data');
                     }
                 };
-                request.onsuccess = (e) => {
-                    const db = e.target.result;
-                    try {
-                        if (!db.objectStoreNames.contains('gtfs')) {
-                            console.log('Object store not found, skipping save');
-                            db.close();
-                            resolve();
-                            return;
-                        }
-                        const transaction = db.transaction('gtfs', 'readwrite');
-                        const store = transaction.objectStore('gtfs');
-                        const putRequest = store.put(data, 'data');
-                        putRequest.onsuccess = () => {
-                            console.log('✅ Saved to IndexedDB cache');
-                            db.close();
-                            resolve();
-                        };
-                        putRequest.onerror = (e) => {
-                            console.log('IndexedDB put failed:', e);
-                            db.close();
-                            resolve();
-                        };
-                        transaction.onerror = (e) => {
-                            console.log('IndexedDB transaction failed:', e);
-                            db.close();
-                            resolve();
-                        };
-                    } catch (e) {
-                        console.log('IndexedDB operation failed:', e);
-                        db.close();
-                        resolve();
-                    }
-                };
-                request.onerror = (e) => {
-                    console.log('IndexedDB open failed:', e);
-                    resolve();
-                };
-            } catch (e) {
-                console.log('IndexedDB error:', e);
+            } catch (error) {
                 resolve();
             }
         });
     }
 
     async clearCache() {
-        // Clear localStorage
         localStorage.removeItem(this.CACHE_KEY);
         localStorage.removeItem(this.CACHE_VERSION_KEY);
         localStorage.removeItem('jakmove_gtfs_last_modified');
         localStorage.removeItem('jakmove_gtfs_latest_file');
         localStorage.removeItem('jakmove_gtfs_etag');
         
-        // Clear IndexedDB
-        return new Promise((resolve) => {
-            try {
-                const request = indexedDB.open('JakMoveGTFS', 1);
-                request.onupgradeneeded = (e) => {
-                    const db = e.target.result;
-                    if (!db.objectStoreNames.contains('gtfs')) {
-                        db.createObjectStore('gtfs');
-                    }
-                };
-                request.onsuccess = (e) => {
-                    const db = e.target.result;
-                    if (db.objectStoreNames.contains('gtfs')) {
-                        const transaction = db.transaction('gtfs', 'readwrite');
-                        const store = transaction.objectStore('gtfs');
-                        store.clear();
-                        transaction.oncomplete = () => resolve();
-                        transaction.onerror = () => resolve();
-                    } else {
-                        resolve();
-                    }
-                    db.close();
-                };
-                request.onerror = () => resolve();
-            } catch (e) {
-                console.log('IndexedDB clear failed:', e);
-                resolve();
-            }
-        });
-    }
-
-    // Get GTFS last modified date for display (check all files and get the latest)
-    async getGTFSLastModified() {
         try {
-            // First try to get from stored cache
-            const storedLastModified = localStorage.getItem('jakmove_gtfs_last_modified');
-            const storedLatestFile = localStorage.getItem('jakmove_gtfs_latest_file');
-            if (storedLastModified) {
-                const formattedDate = this.formatIndonesianDate(new Date(storedLastModified));
-                return storedLatestFile ? `${formattedDate} (${storedLatestFile})` : formattedDate;
-            }
-
-            // If not in cache, check all GTFS files
-            const latestInfo = await this.checkAllGTFSFiles();
-            
-            if (latestInfo.date) {
-                // Store for future use
-                localStorage.setItem('jakmove_gtfs_last_modified', latestInfo.date);
-                localStorage.setItem('jakmove_gtfs_latest_file', latestInfo.file);
-                const formattedDate = this.formatIndonesianDate(new Date(latestInfo.date));
-                return `${formattedDate} (${latestInfo.file})`;
-            }
-            
-            return 'Tidak diketahui';
-        } catch (error) {
-            console.error('Error getting GTFS last modified date:', error);
-            return 'Tidak diketahui';
-        }
-    }
-
-    // Check all GTFS files and return the latest modification date
-    async checkAllGTFSFiles() {
-        const gtfsFiles = [
-            'agency.txt', 'calendar.txt', 'calendar_dates.txt', 'fare_attributes.txt',
-            'fare_rules.txt', 'frequencies.txt', 'routes.txt', 'shapes.txt',
-            'stop_times.txt', 'stops.txt', 'transfers.txt', 'trips.txt'
-        ];
-
-        let latestDate = null;
-        let latestFile = null;
-
-        for (const file of gtfsFiles) {
-            try {
-                const response = await fetch(`gtfs/${file}`, { method: 'HEAD' });
-                const lastModified = response.headers.get('Last-Modified');
-                
-                if (lastModified) {
-                    const fileDate = new Date(lastModified);
-                    if (!latestDate || fileDate > latestDate) {
-                        latestDate = fileDate;
-                        latestFile = file;
-                    }
-                }
-            } catch (error) {
-                console.warn(`Failed to check modification date for ${file}:`, error);
-            }
-        }
-
-        return {
-            date: latestDate ? latestDate.toUTCString() : null,
-            file: latestFile
-        };
-    }
-
-    // Format date in Indonesian format
-    formatIndonesianDate(date) {
-        const options = {
-            weekday: 'long',
-            year: 'numeric', 
-            month: 'long',
-            day: 'numeric',
-            timeZone: 'Asia/Jakarta'
-        };
-        
-        return new Intl.DateTimeFormat('id-ID', options).format(date);
-    }
-
-    // Update UI with last modified date
-    updateLastModifiedUI() {
-        // Use the global GTFSUtils if available, otherwise fallback to local method
-        if (window.GTFSUtils) {
-            window.GTFSUtils.updateLastModifiedElement('.status-text');
-        } else {
-            this.getGTFSLastModified().then(dateStr => {
-                const statusElement = document.querySelector('.status-text');
-                if (statusElement) {
-                    statusElement.textContent = `Diperbarui ${dateStr}`;
-                    statusElement.title = `Data GTFS terakhir diperbarui pada ${dateStr}`;
-                }
+            const request = indexedDB.deleteDatabase('jakmove_cache');
+            await new Promise(resolve => {
+                request.onsuccess = () => resolve();
+                request.onerror = () => resolve();
+                request.onblocked = () => resolve();
             });
+        } catch (error) {
+            console.warn('IndexedDB clear failed:', error);
+        }
+
+        console.log('🗑️ Cache cleared');
+    }
+
+    // ======================================
+    // PUBLIC API
+    // ======================================
+    
+    getStops() { return this.data.stops || []; }
+    getRoutes() { return this.data.routes || []; }
+    getTrips() { return this.data.trips || []; }
+    getStopTimes() { return this.data.stop_times || []; }
+    getShapes() { return this.data.shapes || []; }
+    getStopToRoutes() { return this.stopToRoutes || {}; }
+    getFrequencies() { return this.data.frequencies || []; }
+    getFareRules() { return this.data.fare_rules || []; }
+    getFareAttributes() { return this.data.fare_attributes || []; }
+    getTransfers() { return this.data.transfers || []; }
+    getCalendar() { return this.data.calendar || []; }
+    getAgency() { return this.data.agency || []; }
+
+    // Enhanced natural sort function for route sorting - NUMBERS FIRST, then LETTERS
+    naturalSort(a, b) {
+        // Get route short names for comparison
+        const aName = a.route_short_name || a.route_id || '';
+        const bName = b.route_short_name || b.route_id || '';
+        
+        // Enhanced regex to properly categorize routes
+        const aMatch = aName.match(/^([A-Za-z]*)(\d*)([A-Za-z]?)(.*)$/);
+        const bMatch = bName.match(/^([A-Za-z]*)(\d*)([A-Za-z]?)(.*)$/);
+        
+        if (aMatch && bMatch) {
+            const aPrefix = aMatch[1] || '';  // Letter prefix (B, K, etc.)
+            const aNum = parseInt(aMatch[2]) || 0;  // Main number
+            const aSuffix = aMatch[3] || '';  // Letter suffix (A, B, etc.)
+            const aRest = aMatch[4] || '';   // Remaining text
+            
+            const bPrefix = bMatch[1] || '';
+            const bNum = parseInt(bMatch[2]) || 0;
+            const bSuffix = bMatch[3] || '';
+            const bRest = bMatch[4] || '';
+            
+            // RULE 1: Pure numbers (1, 2, 3) come FIRST
+            const aIsNumeric = aPrefix === '' && aNum > 0;
+            const bIsNumeric = bPrefix === '' && bNum > 0;
+            
+            if (aIsNumeric && !bIsNumeric) return -1; // a comes first
+            if (!aIsNumeric && bIsNumeric) return 1;  // b comes first
+            
+            // RULE 2: Both are numeric routes - sort by number
+            if (aIsNumeric && bIsNumeric) {
+                if (aNum !== bNum) return aNum - bNum;
+                // If same number, compare suffix (1A vs 1B)
+                return aSuffix.localeCompare(bSuffix);
+            }
+            
+            // RULE 3: Both are non-numeric routes - sort by prefix first
+            if (!aIsNumeric && !bIsNumeric) {
+                // Compare prefixes (B vs K)
+                if (aPrefix !== bPrefix) {
+                    return aPrefix.localeCompare(bPrefix);
+                }
+                
+                // Same prefix, compare numbers (B1 vs B11)
+                if (aNum !== bNum) {
+                    return aNum - bNum;
+                }
+                
+                // Same prefix and number, compare suffix
+                if (aSuffix !== bSuffix) {
+                    return aSuffix.localeCompare(bSuffix);
+                }
+                
+                // Same everything, compare rest
+                return aRest.localeCompare(bRest);
+            }
+        }
+        
+        // Fallback to regular string comparison
+        return aName.localeCompare(bName);
+    }
+
+    // ======================================
+    // UI METHODS
+    // ======================================
+    
+    showSlideNotification() {
+        const notification = document.getElementById('slideNotification');
+        if (notification) {
+            notification.style.display = 'block';
+            setTimeout(() => {
+                notification.classList.add('show');
+            }, 100);
+            console.log('📱 Slide notification shown');
+        } else {
+            console.warn('⚠️ Slide notification element not found!');
         }
     }
 
-    // Background update check (non-blocking)
-    checkForUpdatesInBackground() {
-        // Run in background without blocking UI
-        setTimeout(async () => {
-            try {
-                console.log('🔄 Checking for GTFS updates in background...');
-                
-                // Check all GTFS files for updates
-                const latestInfo = await this.checkAllGTFSFiles();
-                
+
+    hideSlideNotification() {
+        const notification = document.getElementById('slideNotification');
+        if (notification) {
+            notification.classList.remove('show');
+            setTimeout(() => {
+                notification.style.display = 'none';
+                console.log('📱 Slide notification hidden');
+            }, 500);
+        }
+    }
+
+    updateSlideNotification(percent, status) {
+        const notification = document.getElementById('slideNotification');
+        if (!notification) return;
+        
+        const progressBar = notification.querySelector('.slide-progress-bar');
+        const title = notification.querySelector('.slide-title');
+        const subtitle = notification.querySelector('.slide-subtitle');
+        const percentEl = notification.querySelector('.slide-percent');
+        const icon = notification.querySelector('.slide-icon');
+        
+        // Update progress bar
+        if (progressBar) {
+            progressBar.style.width = `${percent}%`;
+        }
+        
+        // Update percentage
+        if (percentEl) {
+            percentEl.textContent = `${Math.round(percent)}%`;
+        }
+        
+        // Update status text (support HTML icons)
+        if (subtitle) {
+            if (status.includes('<i class=')) {
+                subtitle.innerHTML = status;
+            } else {
+                subtitle.textContent = status;
+            }
+        }
+        
+        // Update icon and title based on progress
+        if (icon && title) {
+            if (percent >= 100) {
+                icon.innerHTML = '<i class="fas fa-check-circle" style="color: #22c55e;"></i>';
+                title.textContent = 'Selesai!';
+            } else if (percent >= 95) {
+                icon.innerHTML = '<i class="fas fa-gift" style="color: #f59e0b;"></i>';
+                title.textContent = 'Finalisasi...';
+            } else if (percent >= 85) {
+                icon.innerHTML = '<i class="fas fa-cogs" style="color: #3b82f6;"></i>';
+                title.textContent = 'Memproses...';
+            } else if (percent >= 50) {
+                icon.innerHTML = '<i class="fas fa-box" style="color: #6366f1;"></i>';
+                title.textContent = 'Memuat Data...';
+            } else if (percent >= 10) {
+                icon.innerHTML = '<i class="fas fa-folder-open" style="color: #8b5cf6;"></i>';
+                title.textContent = 'Mengunduh...';
+            } else {
+                icon.innerHTML = '<i class="fas fa-rocket" style="color: #ec4899;"></i>';
+                title.textContent = 'Memuat JakMove';
+            }
+        }
+        
+        // Enhanced console logging
+        const timestamp = new Date().toLocaleTimeString();
+        console.log(`📱 [${timestamp}] ${percent}% - ${status}`);
+        
+        // Update page title
+        if (percent < 100) {
+            document.title = `${Math.round(percent)}% Loading - JakMove`;
+        } else {
+            document.title = 'JakMove - Transportasi Jakarta';
+        }
+    }
+
+    showError(message) {
+        // Hide loading first
+        this.hideSlideNotification();
+        
+        const errorEl = document.getElementById('loading-error');
+        if (errorEl) {
+            errorEl.textContent = message;
+            errorEl.style.display = 'block';
+        }
+        
+        // Also show in console
+        console.error('GTFS Error:', message);
+        
+        // Create fallback error display if no error element
+        if (!errorEl) {
+            const fallbackError = document.createElement('div');
+            fallbackError.style.cssText = `
+                position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+                background: #fee2e2; border: 1px solid #fecaca; color: #dc2626;
+                padding: 20px; border-radius: 8px; z-index: 10000; text-align: center;
+            `;
+            fallbackError.innerHTML = `
+                <div style="font-weight: bold; margin-bottom: 10px;">❌ Error Loading</div>
+                <div>${message}</div>
+                <button onclick="this.parentElement.remove()" style="margin-top: 10px; padding: 5px 10px; background: #dc2626; color: white; border: none; border-radius: 4px; cursor: pointer;">OK</button>
+            `;
+            document.body.appendChild(fallbackError);
+        }
+    }
+
+    updateLastModifiedUI() {
+        try {
+            const lastModified = localStorage.getItem('jakmove_gtfs_last_modified');
+            const el = document.getElementById('gtfs-last-modified');
+            if (el && lastModified) {
+                const date = new Date(lastModified);
+                el.textContent = date.toLocaleDateString('id-ID');
+            }
+        } catch (error) {
+            console.warn('Failed to update last modified UI:', error);
+        }
+    }
+
+    async checkForUpdatesInBackground() {
+        try {
+            const response = await fetch('gtfs/latest.json');
+            if (!response.ok) {
+                // File doesn't exist, skip background check silently
+                return;
+            }
+            
+            const latestInfo = await response.json();
                 const storedLastModified = localStorage.getItem('jakmove_gtfs_last_modified');
-                const storedLatestFile = localStorage.getItem('jakmove_gtfs_latest_file');
                 
-                if (latestInfo.date !== storedLastModified || latestInfo.file !== storedLatestFile) {
+            if (latestInfo.date !== storedLastModified) {
                     console.log('📥 GTFS update available, will refresh on next visit');
-                    // Clear cache so next visit will fetch fresh data
                     await this.clearCache();
                     
-                    // Update the stored modification info
                     if (latestInfo.date) {
                         localStorage.setItem('jakmove_gtfs_last_modified', latestInfo.date);
                         localStorage.setItem('jakmove_gtfs_latest_file', latestInfo.file);
                     }
-                    
-                    // Update UI with new date
-                    this.updateLastModifiedUI();
-                } else {
-                    console.log('✅ GTFS data is up to date');
                 }
             } catch (error) {
-                console.log('Background update check failed:', error);
-            }
-        }, 5000); // Check after 5 seconds when app has fully loaded
-    }
-
-    // Legacy parsers kept for fallback
-    parseCSV(text) {
-        if (!text || text.trim() === '') return [];
-        const lines = text.split('\n').filter(line => line.trim() !== '');
-        if (lines.length === 0) return [];
-        const headers = lines[0].split(',').map(h => h.trim());
-        return lines.slice(1).map(line => {
-            const values = line.split(',').map(v => v.trim());
-            const obj = {};
-            headers.forEach((h, i) => obj[h] = values[i]);
-            return obj;
-        });
+            // Silent fail for background check - this is optional functionality
+            console.debug('Background update check failed (expected in development):', error.message);
+        }
     }
 }

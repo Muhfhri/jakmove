@@ -915,13 +915,20 @@ export class MapManager {
                         });
                         return { ...pm, headsign: codeToHeadsign.get(pm.code) || '', nextName: (codeToNextName.get(pm.code) || codeToHeadsign.get(pm.code) || ''), nextByRoute, bearingDeg: deg, directionArrow: arrow, lat, lng };
                     });
-                } catch (e) {}
+                } catch (e) {
+                    console.warn('Error processing platform data for stop', stopId, ':', e);
+                }
             }
         }
         // Fallback to feature properties if cluster lookup failed
         if (!unionRouteIds.length) unionRouteIds = Array.isArray(stop.properties.routeIds) ? stop.properties.routeIds : [];
         if (!platformCodes.length) platformCodes = Array.isArray(stop.properties.platformCodes) ? stop.properties.platformCodes : [];
-        if (!platformMap.length) platformMap = Array.isArray(stop.properties.platformMap) ? stop.properties.platformMap : [];
+        if (!platformMap.length) {
+            platformMap = Array.isArray(stop.properties.platformMap) ? stop.properties.platformMap : [];
+            console.log('Using fallback platformMap for stop', stopId, '- platforms:', platformMap.length);
+        } else {
+            console.log('Built platformMap for stop', stopId, '- platforms:', platformMap.length);
+        }
         // Intersect with feature-specific routeIds when present to avoid showing routes not at this exact stop
         try {
             let given = [];
@@ -976,19 +983,91 @@ export class MapManager {
 
         // Layanan per platform (jika ada detail kode platform)
         let platformDetailHtml = '';
+        console.log('Platform check for popup:', { 
+            stopId, 
+            isFeeder, 
+            platformMapLength: platformMap.length, 
+            platformCodes: platformCodes.length,
+            willShowPlatforms: !isFeeder && platformMap.length > 0 
+        });
+        
+        // Enhanced platform detection - try multiple sources
+        if (!isFeeder && (!platformMap.length || platformMap.every(p => !p.code))) {
+            console.log('Attempting enhanced platform detection for stop', stopId);
+            
+            // First, try to regenerate platform cache if it's missing
+            const cacheKey = `platforms-${stopId}-${currentRouteId || 'all'}`;
+            if (this._platformMapCache && !this._platformMapCache.has(cacheKey)) {
+                console.log('Platform cache miss, regenerating for', stopId);
+                // Force regeneration of platform data
+                this.generatePlatformMapping(stop, routes, currentRouteId, unionRouteIds, platformCodes);
+                
+                // Try to get from cache again
+                const cached = this._platformMapCache.get(cacheKey);
+                if (cached && cached.platformMap) {
+                    platformMap = cached.platformMap;
+                    console.log('Platform data regenerated from cache:', platformMap.length);
+                }
+            }
+            
+            // If still no platform data, try alternative approach using platformCodes
+            if (!platformMap.length && platformCodes.length > 0) {
+                platformMap = platformCodes.map(code => ({
+                    code: code,
+                    routeIds: unionRouteIds, // Use all routes as fallback
+                    nextByRoute: unionRouteIds.map(rid => ({ rid: String(rid), nextName: '' })),
+                    headsign: '',
+                    nextName: '',
+                    bearingDeg: null,
+                    directionArrow: '',
+                    lat: parseFloat(stop.geometry?.coordinates?.[1] || 0),
+                    lng: parseFloat(stop.geometry?.coordinates?.[0] || 0)
+                }));
+                console.log('Created fallback platformMap from platformCodes:', platformMap.length);
+                
+                // Cache the fallback data
+                if (this._platformMapCache) {
+                    this._platformMapCache.set(cacheKey, {
+                        platformMap: platformMap,
+                        ts: Date.now()
+                    });
+                }
+            }
+        }
+        
         if (!isFeeder && platformMap.length) {
 			const pfId = 'pf-' + Date.now();
 			const rows = platformMap.map((p, idx) => {
-				const perRoute = (p.nextByRoute || []).map(({ rid, nextName }) => {
+				// Ensure platform has valid data
+				if (!p || !p.code) {
+					console.warn('Invalid platform data at index', idx, ':', p);
+					return '';
+				}
+				
+				// Build route list for this platform
+				let perRoute = '';
+				if (p.nextByRoute && Array.isArray(p.nextByRoute)) {
+					perRoute = p.nextByRoute.map(({ rid, nextName }) => {
 					const r = routes.find(rt => String(rt.route_id) === String(rid));
 					if (!r) return '';
 					const color = r.route_color ? `#${r.route_color}` : '#6c757d';
 					const shortName = r.route_short_name || rid;
 					return `<div class=\"pf-next-item\" data-routeid=\"${r.route_id}\" style=\"display:flex;align-items:center;gap:8px;margin:2px 0;cursor:pointer;\"><span class=\"badge\" data-routeid=\"${r.route_id}\" style=\"background:${color};color:#fff;font-weight:700;font-size:0.72em;padding:3px 7px;border-radius:9999px;\">${shortName}</span><span class=\"next-name\" style=\"color:#111827;\">${nextName || '-'}<\/span><\/div>`;
 				}).join('');
-				return `
-				<div class=\"pf-block\" data-pf=\"${idx}\" data-code=\"${p.code}\" data-lat=\"${p.lat}\" data-lng=\"${p.lng}\" style=\"margin:8px 0;\">\n\t\t\t\t\t<div class=\"pf-row\" style=\"font-weight:600;color:#475569;\">Platform ${p.code}<\/div>\n\t\t\t\t\t<div class=\"pf-next\">${perRoute}<\/div>\n\t\t\t\t\t<div class=\"pf-actions\" style=\"margin-top:6px;\"><button class=\"pf-open btn btn-sm btn-outline-secondary\" data-code=\"${p.code}\" data-lat=\"${p.lat}\" data-lng=\"${p.lng}\" data-rids=\"${encodeURIComponent(JSON.stringify(p.routeIds||[]))}\" style=\"padding:3px 8px;font-size:11px;\">Lihat<\/button><\/div>\n\t\t\t\t<\/div>`;
+				} else if (p.routeIds && Array.isArray(p.routeIds)) {
+					// Fallback: use routeIds if nextByRoute is not available
+					perRoute = p.routeIds.map(rid => {
+						const r = routes.find(rt => String(rt.route_id) === String(rid));
+						if (!r) return '';
+						const color = r.route_color ? `#${r.route_color}` : '#6c757d';
+						const shortName = r.route_short_name || rid;
+						return `<div class=\"pf-next-item\" data-routeid=\"${r.route_id}\" style=\"display:flex;align-items:center;gap:8px;margin:2px 0;cursor:pointer;\"><span class=\"badge\" data-routeid=\"${r.route_id}\" style=\"background:${color};color:#fff;font-weight:700;font-size:0.72em;padding:3px 7px;border-radius:9999px;\">${shortName}</span><span class=\"next-name\" style=\"color:#111827;\">-<\/span><\/div>`;
 			}).join('');
+				}
+				
+				return `
+				<div class=\"pf-block\" data-pf=\"${idx}\" data-code=\"${p.code}\" data-lat=\"${p.lat || 0}\" data-lng=\"${p.lng || 0}\" style=\"margin:8px 0;\">\n\t\t\t\t\t<div class=\"pf-row\" style=\"font-weight:600;color:#475569;\">Platform ${p.code}<\/div>\n\t\t\t\t\t<div class=\"pf-next\">${perRoute}<\/div>\n\t\t\t\t\t<div class=\"pf-actions\" style=\"margin-top:6px;\"><button class=\"pf-open btn btn-sm btn-outline-secondary\" data-code=\"${p.code}\" data-lat=\"${p.lat || 0}\" data-lng=\"${p.lng || 0}\" data-rids=\"${encodeURIComponent(JSON.stringify(p.routeIds||[]))}\" style=\"padding:3px 8px;font-size:11px;\">Lihat<\/button><\/div>\n\t\t\t\t<\/div>`;
+			}).filter(row => row !== '').join('');
 			// Collapse logic: show first 2 rows, toggle to show all
 			const total = platformMap.length;
 			const visible = Math.min(2, total);
@@ -1100,7 +1179,7 @@ export class MapManager {
 			}, 60);
 		}
 
-        const wheelchairIconHtml = wheelchair ? `<iconify-icon icon=\"fontisto:paralysis-disability\" inline></iconify-icon>` : '';
+        const wheelchairIconHtml = wheelchair ? `<i class="fa-solid fa-wheelchair" style="color: #059669;"></i>` : '';
 
         // Get weather info for this stop
         const weatherHtml = this.getStopWeatherHtml(thisStop);
@@ -1240,7 +1319,8 @@ export class MapManager {
                                 routeIds,
                                 wheelchairBoarding: s.wheelchair_boarding || '0',
                                 stopCode: s.stop_code || '',
-                                stopDesc: s.stop_desc || ''
+                                stopDesc: s.stop_desc || '',
+                                platform_code: s.platform_code || '' // Add platform_code for proper popup display
                             },
                             geometry: { type: 'Point', coordinates: [lon, lat] }
                         },
@@ -1249,18 +1329,40 @@ export class MapManager {
                     };
                 }).filter(o => o.d <= radius).sort((a,b) => a.d - b.d);
                 const limited = computed.slice(0, 30);
-                // Exclude platform (G) from base radius markers to avoid duplication with platform dots
-                selected = limited.filter(o => !o.isPlatform).map(o => ({ type: 'Feature', properties: { ...o.f.properties, dist: o.d }, geometry: o.f.geometry }));
-                platformSelected = limited.filter(o => o.isPlatform).map(o => ({
-                    type: 'Feature',
-                    properties: {
-                        stopId: o.f.properties.stopId,
-                        platform: true,
-                        platformCode: (window.transJakartaApp.modules.gtfs.getStops().find(s => s.stop_id === o.f.properties.stopId)?.platform_code || '').toString(),
-                        routeIds: o.f.properties.routeIds || []
-                    },
-                    geometry: o.f.geometry
+                // Separate base stops and platforms for proper handling
+                selected = limited.filter(o => !o.isPlatform).map(o => ({ 
+                    type: 'Feature', 
+                    properties: { ...o.f.properties, dist: o.d }, 
+                    geometry: o.f.geometry 
                 }));
+                
+                // Enhanced platform mapping with more robust data
+                platformSelected = limited.filter(o => o.isPlatform).map(o => {
+                    const stopData = stops.find(s => s.stop_id === o.f.properties.stopId);
+                    const platformCode = stopData?.platform_code || '';
+                    const routeIds = o.f.properties.routeIds || [];
+                    
+                    console.log('🔧 Platform mapping:', {
+                        stopId: o.f.properties.stopId,
+                        platformCode,
+                        routeCount: routeIds.length,
+                        stopExists: !!stopData
+                    });
+                    
+                    return {
+                        type: 'Feature',
+                        properties: {
+                            stopId: o.f.properties.stopId,
+                            stopName: o.f.properties.stopName,
+                            platform: true,
+                            platformCode: platformCode.toString(),
+                            routeIds: routeIds,
+                            stopType: o.f.properties.stopType || 'Platform',
+                            wheelchairBoarding: stopData?.wheelchair_boarding || '0'
+                        },
+                        geometry: o.f.geometry
+                    };
+                });
             } catch (e) { selected = []; platformSelected = []; }
 
             const data = { type: 'FeatureCollection', features: selected };
@@ -1318,18 +1420,112 @@ export class MapManager {
                 this.map.addLayer({ id: pfLyId, type: 'circle', source: pfSrcId, paint: { 'circle-radius': 4.0, 'circle-color': '#64748b', 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 1.2 } });
             }
 
-            // Click handler for platform dots
+            // Enhanced click handler for platform dots with forced consistency
             if (this._onRadiusPlatformClick) { try { this.map.off('click', pfLyId, this._onRadiusPlatformClick); } catch (e) {} }
             this._onRadiusPlatformClick = (e) => {
                 const f = e.features && e.features[0];
                 if (!f) return;
+                
                 const props = f.properties || {};
-                const code = props.platformCode || '';
-                let rids = [];
-                try { rids = Array.isArray(props.routeIds) ? props.routeIds : (typeof props.routeIds === 'string' ? JSON.parse(props.routeIds) : []); } catch (err) { rids = []; }
-                const lng = f.geometry && f.geometry.coordinates ? f.geometry.coordinates[0] : e.lngLat.lng;
-                const lat = f.geometry && f.geometry.coordinates ? f.geometry.coordinates[1] : e.lngLat.lat;
-                this.navigateToPlatformAndShow(code, lat, lng, rids);
+                const stopId = props.stopId || '';
+                const stopName = props.stopName || '';
+                const platformCode = props.platformCode || '';
+                const routeIds = props.routeIds || [];
+                
+                console.log('🚏 Platform click debug:', {
+                    stopId,
+                    stopName,
+                    platformCode,
+                    routeCount: Array.isArray(routeIds) ? routeIds.length : 0,
+                    allProps: props
+                });
+                
+                // Force consistent data retrieval from GTFS
+                const gtfs = window.transJakartaApp.modules.gtfs;
+                const actualStop = gtfs.getStops().find(s => String(s.stop_id) === String(stopId));
+                const coordinates = f.geometry?.coordinates || [e.lngLat.lng, e.lngLat.lat];
+                
+                if (String(stopId).startsWith('G')) {
+                    // Individual platform (G) - force platform view with enhanced data
+                    console.log('📍 Forcing individual platform view for:', stopId);
+                    
+                    const enhancedCode = actualStop?.platform_code || platformCode || stopId.replace('G', 'P');
+                    let enhancedRouteIds = [];
+                    
+                    // Force route IDs extraction
+                    if (Array.isArray(routeIds)) {
+                        enhancedRouteIds = routeIds;
+                    } else if (typeof routeIds === 'string') {
+                        try { enhancedRouteIds = JSON.parse(routeIds); } catch (e) { enhancedRouteIds = []; }
+                    }
+                    
+                    // Fallback: get routes from stopToRoutes if empty
+                    if (enhancedRouteIds.length === 0 && actualStop) {
+                        const stopToRoutes = gtfs.getStopToRoutes();
+                        enhancedRouteIds = stopToRoutes[stopId] || [];
+                        console.log('🔄 Fallback route lookup:', enhancedRouteIds.length, 'routes found');
+                    }
+                    
+                    console.log('💪 Forcing platform display with:', {
+                        code: enhancedCode,
+                        routes: enhancedRouteIds.length,
+                        coordinates: coordinates
+                    });
+                    
+                    this.navigateToPlatformAndShow(enhancedCode, coordinates[1], coordinates[0], enhancedRouteIds);
+                    
+                } else if (String(stopId).startsWith('H')) {
+                    // Halte stop (H) - force full popup
+                    console.log('🏢 Forcing halte popup for:', stopId);
+                    
+                    if (actualStop) {
+                        const stopType = this.getStopType(String(actualStop.stop_id));
+                        const enhancedFeature = {
+                            type: 'Feature',
+                            properties: {
+                                stopId: actualStop.stop_id,
+                                stopName: actualStop.stop_name || stopName,
+                                stopType,
+                                wheelchairBoarding: actualStop.wheelchair_boarding || '0',
+                                stopCode: actualStop.stop_code || '',
+                                stopDesc: actualStop.stop_desc || '',
+                                platform_code: actualStop.platform_code || platformCode
+                            },
+                            geometry: {
+                                type: 'Point',
+                                coordinates: [parseFloat(actualStop.stop_lon), parseFloat(actualStop.stop_lat)]
+                            }
+                        };
+                        
+                        console.log('💪 Forcing halte popup display');
+                        this.showStopPopup(enhancedFeature, e.lngLat, { origin: 'radius-halte-forced' });
+                        
+                    } else {
+                        console.warn('❌ Halte stop not found, falling back to platform view');
+                        // Force fallback to platform view
+                        const fallbackCode = platformCode || 'Platform';
+                        let fallbackRoutes = [];
+                        try { fallbackRoutes = Array.isArray(routeIds) ? routeIds : []; } catch (e) { fallbackRoutes = []; }
+                        this.navigateToPlatformAndShow(fallbackCode, coordinates[1], coordinates[0], fallbackRoutes);
+                    }
+                    
+                } else {
+                    // Force fallback with enhanced error handling
+                    console.log('❓ Forcing fallback view for unknown type:', stopId);
+                    const fallbackCode = platformCode || actualStop?.platform_code || 'Platform';
+                    let fallbackRoutes = [];
+                    
+                    // Enhanced route extraction
+                    if (Array.isArray(routeIds)) {
+                        fallbackRoutes = routeIds;
+                    } else if (actualStop) {
+                        const stopToRoutes = gtfs.getStopToRoutes();
+                        fallbackRoutes = stopToRoutes[stopId] || [];
+                    }
+                    
+                    console.log('💪 Forcing fallback display');
+                    this.navigateToPlatformAndShow(fallbackCode, coordinates[1], coordinates[0], fallbackRoutes);
+                }
             };
             this.map.on('click', pfLyId, this._onRadiusPlatformClick);
             this.map.on('mouseenter', pfLyId, () => { this.map.getCanvas().style.cursor = 'pointer'; });
@@ -1667,6 +1863,368 @@ export class MapManager {
     
     clearNextStopLabel() { this.updateNextStopLabel(null); }
 
+    // Update visual differentiation for passed vs upcoming route segments
+    updatePassedStopsVisual(userMeasure, stopMeasureMap) {
+        if (!this.map || !this._activeRouteData || !stopMeasureMap) return;
+        
+        console.log('Updating passed stops visual - userMeasure:', userMeasure);
+        
+        try {
+            const routeId = this._activeRouteData.routeId;
+            const shapes = this._activeRouteData.shapes;
+            const color = this._activeRouteData.color;
+            
+            if (!shapes || !routeId) return;
+            
+            // Create segments: passed (different style) and upcoming (normal style)
+            const passedSegments = [];
+            const upcomingSegments = [];
+            
+            // Get linear referencing data from route manager
+            const routeManager = window.transJakartaApp.modules.routes;
+            const linearRef = routeManager?.getLinearRef ? routeManager.getLinearRef() : null;
+            
+            if (linearRef && linearRef.polyline && linearRef.polyline.length > 0) {
+                // Use linear referencing to split route
+                const polyline = linearRef.polyline;
+                let passedCoords = [];
+                let upcomingCoords = [];
+                let foundSplit = false;
+                
+                for (let i = 0; i < polyline.length; i++) {
+                    const point = polyline[i];
+                    const pointMeasure = point.cumulativeDist || 0;
+                    
+                    if (pointMeasure <= userMeasure) {
+                        passedCoords.push([point.lng, point.lat]);
+                    } else {
+                        if (!foundSplit && passedCoords.length > 0) {
+                            // Add transition point to both segments for continuity
+                            upcomingCoords.push([point.lng, point.lat]);
+                            foundSplit = true;
+                        }
+                        upcomingCoords.push([point.lng, point.lat]);
+                    }
+                }
+                
+                // Create passed segment feature
+                if (passedCoords.length > 1) {
+                    passedSegments.push({
+                        type: 'Feature',
+                        properties: { routeId, segmentType: 'passed' },
+                        geometry: { type: 'LineString', coordinates: passedCoords }
+                    });
+                }
+                
+                // Create upcoming segment feature
+                if (upcomingCoords.length > 1) {
+                    upcomingSegments.push({
+                        type: 'Feature',
+                        properties: { routeId, segmentType: 'upcoming' },
+                        geometry: { type: 'LineString', coordinates: upcomingCoords }
+                    });
+                }
+            } else {
+                // Fallback: use shapes with approximate splitting
+                shapes.forEach((shape, shapeIndex) => {
+                    if (!shape || shape.length < 2) return;
+                    
+                    const coordinates = shape.map(p => [p.lng, p.lat]);
+                    
+                    // For now, treat all as upcoming if no linear ref
+                    upcomingSegments.push({
+                        type: 'Feature',
+                        properties: { routeId, segmentType: 'upcoming' },
+                        geometry: { type: 'LineString', coordinates }
+                    });
+                });
+            }
+            
+            // Remove old route layers
+            this._removeRouteLayers();
+            
+            // Add passed segments (dimmed/different color)
+            if (passedSegments.length > 0) {
+                const passedSourceId = `route-passed-${routeId}`;
+                const passedLayerId = `route-passed-${routeId}`;
+                
+                const passedSource = {
+                    type: 'geojson',
+                    data: { type: 'FeatureCollection', features: passedSegments }
+                };
+                
+                if (this.map.getSource(passedSourceId)) this.map.removeSource(passedSourceId);
+                this.map.addSource(passedSourceId, passedSource);
+                
+                if (this.map.getLayer(passedLayerId)) this.map.removeLayer(passedLayerId);
+                this.map.addLayer({
+                    id: passedLayerId,
+                    type: 'line',
+                    source: passedSourceId,
+                    layout: { 'line-join': 'round', 'line-cap': 'round' },
+                    paint: {
+                        'line-color': '#6b7280', // Darker gray color for passed segments
+                        'line-width': 3, // Thinner than upcoming
+                        'line-opacity': 0.8, // More visible but still dimmed
+                        'line-dasharray': [2, 2] // Dashed line for passed segments
+                    }
+                });
+                
+                this.layers.set(passedLayerId, { sourceId: passedSourceId, layerId: passedLayerId });
+            }
+            
+            // Add upcoming segments (normal/bright color)
+            if (upcomingSegments.length > 0) {
+                const upcomingSourceId = `route-upcoming-${routeId}`;
+                const upcomingLayerId = `route-upcoming-${routeId}`;
+                
+                const upcomingSource = {
+                    type: 'geojson',
+                    data: { type: 'FeatureCollection', features: upcomingSegments }
+                };
+                
+                if (this.map.getSource(upcomingSourceId)) this.map.removeSource(upcomingSourceId);
+                this.map.addSource(upcomingSourceId, upcomingSource);
+                
+                if (this.map.getLayer(upcomingLayerId)) this.map.removeLayer(upcomingLayerId);
+                this.map.addLayer({
+                    id: upcomingLayerId,
+                    type: 'line',
+                    source: upcomingSourceId,
+                    layout: { 'line-join': 'round', 'line-cap': 'round' },
+                    paint: {
+                        'line-color': color, // Original route color for upcoming segments
+                        'line-width': 5, // Slightly thicker to emphasize
+                        'line-opacity': 1.0 // Full opacity for upcoming segments
+                    }
+                });
+                
+                this.layers.set(upcomingLayerId, { sourceId: upcomingSourceId, layerId: upcomingLayerId });
+            }
+            
+            // Update stop markers visual state
+            this.updateStopsVisualState(userMeasure, stopMeasureMap);
+            
+            // Add user progress indicator line if we have a current position
+            this.addUserProgressIndicator(userMeasure, linearRef);
+            
+            // Ensure overlays stay on top
+            this._ensureOverlaysOnTop();
+            
+            console.log('Route visual update completed - passed segments:', passedSegments.length, 'upcoming segments:', upcomingSegments.length);
+            
+        } catch (error) {
+            console.warn('Error updating passed stops visual:', error);
+        }
+    }
+
+    // Update visual state of stop markers based on user progress
+    updateStopsVisualState(userMeasure, stopMeasureMap) {
+        if (!this.map || !stopMeasureMap) return;
+        
+        try {
+            const sourceId = 'stops-source';
+            if (!this.map.getSource(sourceId)) return;
+            
+            // Get current stop features
+            const source = this.map.getSource(sourceId);
+            const currentData = source._data;
+            if (!currentData || !currentData.features) return;
+            
+            // Update stop features with passed/upcoming state
+            const updatedFeatures = currentData.features.map(feature => {
+                const stopId = feature.properties.stopId;
+                const stopMeasure = stopMeasureMap.get(stopId);
+                
+                if (typeof stopMeasure === 'number') {
+                    const isPassed = stopMeasure <= userMeasure;
+                    return {
+                        ...feature,
+                        properties: {
+                            ...feature.properties,
+                            isPassed: isPassed
+                        }
+                    };
+                }
+                
+                return feature;
+            });
+            
+            // Update the source data
+            source.setData({
+                type: 'FeatureCollection',
+                features: updatedFeatures
+            });
+            
+            // Update layer styling to show passed vs upcoming stops
+            const layerId = 'stops-markers';
+            if (this.map.getLayer(layerId)) {
+                this.map.setPaintProperty(layerId, 'icon-opacity', [
+                    'case',
+                    ['get', 'isPassed'], 0.5, // Dimmed for passed stops
+                    1.0 // Normal for upcoming stops
+                ]);
+            }
+            
+        } catch (error) {
+            console.warn('Error updating stops visual state:', error);
+        }
+    }
+
+    // Reset route visual to normal state (no passed/upcoming differentiation)
+    resetRouteVisualToNormal() {
+        if (!this._activeRouteData) return;
+        
+        try {
+            const { routeId, shapes, color } = this._activeRouteData;
+            
+            // Remove any existing passed/upcoming layers
+            this._removeRouteLayers();
+            
+            // Remove progress indicator
+            this.removeUserProgressIndicator();
+            
+            // Re-add normal route visualization
+            this.addRoutePolyline(routeId, shapes, color);
+            
+            // Reset stops visual state
+            this.resetStopsVisualState();
+            
+            console.log('Route visual reset to normal state');
+            
+        } catch (error) {
+            console.warn('Error resetting route visual to normal:', error);
+        }
+    }
+
+    // Reset stops visual state to normal (no passed/upcoming differentiation)
+    resetStopsVisualState() {
+        if (!this.map) return;
+        
+        try {
+            const layerId = 'stops-markers';
+            if (this.map.getLayer(layerId)) {
+                // Reset icon opacity to normal
+                this.map.setPaintProperty(layerId, 'icon-opacity', 1.0);
+            }
+            
+            const sourceId = 'stops-source';
+            if (this.map.getSource(sourceId)) {
+                const source = this.map.getSource(sourceId);
+                const currentData = source._data;
+                if (currentData && currentData.features) {
+                    // Remove isPassed property from all features
+                    const resetFeatures = currentData.features.map(feature => ({
+                        ...feature,
+                        properties: {
+                            ...feature.properties,
+                            isPassed: undefined
+                        }
+                    }));
+                    
+                    source.setData({
+                        type: 'FeatureCollection',
+                        features: resetFeatures
+                    });
+                }
+            }
+            
+        } catch (error) {
+            console.warn('Error resetting stops visual state:', error);
+        }
+    }
+
+    // Add user progress indicator on the route
+    addUserProgressIndicator(userMeasure, linearRef) {
+        if (!this.map || !linearRef || !linearRef.polyline) return;
+        
+        try {
+            // Find the point on route closest to user's progress
+            const polyline = linearRef.polyline;
+            let userPoint = null;
+            
+            for (let i = 0; i < polyline.length - 1; i++) {
+                const point = polyline[i];
+                const nextPoint = polyline[i + 1];
+                
+                if (point.cumulativeDist <= userMeasure && nextPoint.cumulativeDist >= userMeasure) {
+                    // Interpolate between the two points
+                    const ratio = (userMeasure - point.cumulativeDist) / (nextPoint.cumulativeDist - point.cumulativeDist);
+                    userPoint = {
+                        lng: point.lng + (nextPoint.lng - point.lng) * ratio,
+                        lat: point.lat + (nextPoint.lat - point.lat) * ratio
+                    };
+                    break;
+                }
+            }
+            
+            if (userPoint) {
+                const indicatorSourceId = 'user-progress-indicator';
+                const indicatorLayerId = 'user-progress-indicator';
+                
+                const indicatorData = {
+                    type: 'FeatureCollection',
+                    features: [{
+                        type: 'Feature',
+                        properties: {},
+                        geometry: {
+                            type: 'Point',
+                            coordinates: [userPoint.lng, userPoint.lat]
+                        }
+                    }]
+                };
+                
+                // Remove existing indicator
+                if (this.map.getLayer(indicatorLayerId)) this.map.removeLayer(indicatorLayerId);
+                if (this.map.getSource(indicatorSourceId)) this.map.removeSource(indicatorSourceId);
+                
+                // Add new indicator
+                this.map.addSource(indicatorSourceId, {
+                    type: 'geojson',
+                    data: indicatorData
+                });
+                
+                this.map.addLayer({
+                    id: indicatorLayerId,
+                    type: 'circle',
+                    source: indicatorSourceId,
+                    paint: {
+                        'circle-radius': 8,
+                        'circle-color': '#ef4444', // Red color for progress indicator
+                        'circle-stroke-width': 2,
+                        'circle-stroke-color': '#ffffff'
+                    }
+                });
+                
+                this.layers.set(indicatorLayerId, { sourceId: indicatorSourceId, layerId: indicatorLayerId });
+            }
+        } catch (error) {
+            console.warn('Error adding user progress indicator:', error);
+        }
+    }
+
+    // Remove user progress indicator
+    removeUserProgressIndicator() {
+        if (!this.map) return;
+        
+        try {
+            const indicatorLayerId = 'user-progress-indicator';
+            const indicatorSourceId = 'user-progress-indicator';
+            
+            if (this.map.getLayer(indicatorLayerId)) {
+                this.map.removeLayer(indicatorLayerId);
+            }
+            if (this.map.getSource(indicatorSourceId)) {
+                this.map.removeSource(indicatorSourceId);
+            }
+            
+            this.layers.delete(indicatorLayerId);
+            
+        } catch (error) {
+            console.warn('Error removing user progress indicator:', error);
+        }
+    }
+
     setCameraLock(enabled) {
         this._cameraLock = !!enabled;
         if (!this.map) return;
@@ -1927,7 +2485,7 @@ export class MapManager {
             if (routeManager) {
                 if (!routeManager._weatherLoadingSet) routeManager._weatherLoadingSet = new Set();
                 if (routeManager._weatherLoadingSet.has(cacheKey)) {
-                    setTimeout(() => {
+                setTimeout(() => {
                         const cachedAfterWait = routeManager.getWeatherFromCache(cacheKey);
                         if (cachedAfterWait) {
                             console.log(`Using cached weather after wait for ${cacheKey}: ${cachedAfterWait.main.temp}°C`);
@@ -1937,7 +2495,7 @@ export class MapManager {
                             this.updatePopupWeatherDisplay(weatherId, this.getFallbackWeatherData());
                         }
                     }, 500); // Shorter timeout for popup
-                    return;
+                return;
                 }
                 routeManager._weatherLoadingSet.add(cacheKey);
             }
@@ -2158,5 +2716,164 @@ export class MapManager {
     capitalizeWords(str) {
         if (!str || typeof str !== 'string') return '';
         return str.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    }
+
+    // Generate platform mapping when cache is missing
+    generatePlatformMapping(stop, routes, currentRouteId, unionRouteIds, platformCodes) {
+        try {
+            console.log('🔧 Generating platform mapping for', stop.properties?.stopId);
+            
+            const gtfs = window.transJakartaApp.modules.gtfs;
+            if (!gtfs) return;
+            
+            const stopId = stop.properties.stopId;
+            const cacheKey = `platforms-${stopId}-${currentRouteId || 'all'}`;
+            
+            // Basic platform data structure
+            let generatedPlatformMap = [];
+            
+            // If we have platform codes, use them as base
+            if (platformCodes && platformCodes.length > 0) {
+                generatedPlatformMap = platformCodes.map(code => {
+                    // Get routes that serve this platform code
+                    const platformRoutes = unionRouteIds.filter(rid => {
+                        // This is a simplified approach - in real implementation
+                        // you might want to check actual platform assignments
+                        return true; // For now, assume all routes serve all platforms
+                    });
+                    
+                    return {
+                        code: code,
+                        routeIds: platformRoutes,
+                        nextByRoute: platformRoutes.map(rid => ({
+                            rid: String(rid),
+                            nextName: this.getNextStopForRoute(stopId, rid) || ''
+                        })),
+                        headsign: '',
+                        nextName: '',
+                        bearingDeg: null,
+                        directionArrow: '',
+                        lat: parseFloat(stop.geometry?.coordinates?.[1] || 0),
+                        lng: parseFloat(stop.geometry?.coordinates?.[0] || 0)
+                    };
+                });
+            } else if (unionRouteIds && unionRouteIds.length > 0) {
+                // If no platform codes but we have routes, create generic platforms
+                // This is a fallback for stops that should have platforms but data is missing
+                const routesPerPlatform = Math.max(1, Math.ceil(unionRouteIds.length / 2));
+                const platformCount = Math.ceil(unionRouteIds.length / routesPerPlatform);
+                
+                for (let i = 0; i < platformCount; i++) {
+                    const startIdx = i * routesPerPlatform;
+                    const endIdx = Math.min(startIdx + routesPerPlatform, unionRouteIds.length);
+                    const platformRoutes = unionRouteIds.slice(startIdx, endIdx);
+                    
+                    generatedPlatformMap.push({
+                        code: String.fromCharCode(65 + i), // A, B, C, etc.
+                        routeIds: platformRoutes,
+                        nextByRoute: platformRoutes.map(rid => ({
+                            rid: String(rid),
+                            nextName: this.getNextStopForRoute(stopId, rid) || ''
+                        })),
+                        headsign: '',
+                        nextName: '',
+                        bearingDeg: null,
+                        directionArrow: '',
+                        lat: parseFloat(stop.geometry?.coordinates?.[1] || 0),
+                        lng: parseFloat(stop.geometry?.coordinates?.[0] || 0)
+                    });
+                }
+            }
+            
+            // Cache the generated data
+            if (this._platformMapCache && generatedPlatformMap.length > 0) {
+                this._platformMapCache.set(cacheKey, {
+                    platformMap: generatedPlatformMap,
+                    ts: Date.now()
+                });
+                console.log(`✅ Generated and cached ${generatedPlatformMap.length} platforms for stop ${stopId}`);
+            }
+            
+            return generatedPlatformMap;
+            
+        } catch (error) {
+            console.warn('❌ Platform mapping generation failed:', error);
+            return [];
+        }
+    }
+
+    // Get next stop name for a route (uses cache when available)
+    getNextStopForRoute(currentStopId, routeId) {
+        try {
+            const gtfs = window.transJakartaApp.modules.gtfs;
+            if (!gtfs) return '';
+            
+            // First, try to get from pre-calculated cache
+            const cacheKey = `${currentStopId}-${routeId}`;
+            if (gtfs.nextStopCache && gtfs.nextStopCache.has(cacheKey)) {
+                const cachedNextStop = gtfs.nextStopCache.get(cacheKey);
+                console.debug(`🎯 Using cached next stop for ${cacheKey}: ${cachedNextStop}`);
+                return cachedNextStop;
+            }
+            
+            // If not in cache, try to use trip sequence cache for faster calculation
+            if (gtfs.tripSequenceCache) {
+                const routeTrips = gtfs.getTrips().filter(t => String(t.route_id) === String(routeId));
+                
+                for (const trip of routeTrips.slice(0, 3)) { // Check max 3 trips for performance
+                    const tripId = String(trip.trip_id);
+                    const sortedStopTimes = gtfs.tripSequenceCache.get(tripId);
+                    
+                    if (!sortedStopTimes) continue;
+                    
+                    const currentIndex = sortedStopTimes.findIndex(st => 
+                        String(st.stop_id) === String(currentStopId)
+                    );
+                    
+                    if (currentIndex >= 0 && currentIndex < sortedStopTimes.length - 1) {
+                        const nextStopId = sortedStopTimes[currentIndex + 1].stop_id;
+                        const nextStop = gtfs.getStops().find(s => String(s.stop_id) === String(nextStopId));
+                        if (nextStop) {
+                            const nextStopName = nextStop.stop_name || '';
+                            
+                            // Cache the result for future use
+                            if (gtfs.nextStopCache && nextStopName) {
+                                gtfs.nextStopCache.set(cacheKey, nextStopName);
+                                console.debug(`💾 Cached next stop for ${cacheKey}: ${nextStopName}`);
+                            }
+                            
+                            return nextStopName;
+                        }
+                    }
+                }
+            } else {
+                // Fallback to original method if no trip sequence cache
+                const stopTimes = gtfs.getStopTimes();
+                const trips = gtfs.getTrips().filter(t => String(t.route_id) === String(routeId));
+                
+                if (!trips.length || !stopTimes.length) return '';
+                
+                // Find a trip that includes current stop
+                for (const trip of trips.slice(0, 3)) { // Check max 3 trips for performance
+                    const tripStopTimes = stopTimes
+                        .filter(st => String(st.trip_id) === String(trip.trip_id))
+                        .sort((a, b) => parseInt(a.stop_sequence) - parseInt(b.stop_sequence));
+                    
+                    const currentIndex = tripStopTimes.findIndex(st => String(st.stop_id) === String(currentStopId));
+                    if (currentIndex >= 0 && currentIndex < tripStopTimes.length - 1) {
+                        const nextStopId = tripStopTimes[currentIndex + 1].stop_id;
+                        const nextStop = gtfs.getStops().find(s => String(s.stop_id) === String(nextStopId));
+                        if (nextStop) {
+                            return nextStop.stop_name || '';
+                        }
+                    }
+                }
+            }
+            
+            return '';
+        } catch (error) {
+            console.warn('Error getting next stop:', error);
+            return '';
+        }
     }
 } 

@@ -44,9 +44,18 @@ function capitalizeWords(str) {
 }
 
 // Function to get real weather data from OpenWeather API
-async function getWeatherData() {
+async function getWeatherData(forceRefresh = false) {
     try {
-        const response = await fetch(WEATHER_API_URL, { cache: 'no-store' });
+        // Show loading state if refresh button exists
+        const refreshBtn = document.getElementById('refreshWeatherBtn');
+        if (refreshBtn && forceRefresh) {
+            refreshBtn.classList.add('refreshing');
+            refreshBtn.disabled = true;
+        }
+        
+        const response = await fetch(WEATHER_API_URL, { 
+            cache: forceRefresh ? 'no-store' : 'default' 
+        });
         if (!response.ok) {
             throw new Error(`Weather API request failed: ${response.status}`);
         }
@@ -56,7 +65,7 @@ async function getWeatherData() {
     } catch (error) {
         console.error('Error fetching weather data:', error);
         const cachedData = localStorage.getItem('weatherData');
-        if (cachedData) {
+        if (cachedData && !forceRefresh) {
             const cached = JSON.parse(cachedData);
             const cacheAge = Date.now() - cached.timestamp;
             if (cacheAge < 30 * 60 * 1000) { // < 30 minutes
@@ -70,6 +79,13 @@ async function getWeatherData() {
             main: { temp: 28, humidity: 75 },
             wind: { speed: 5 }
         });
+    } finally {
+        // Remove loading state
+        const refreshBtn = document.getElementById('refreshWeatherBtn');
+        if (refreshBtn) {
+            refreshBtn.classList.remove('refreshing');
+            refreshBtn.disabled = false;
+        }
     }
 }
 
@@ -103,14 +119,32 @@ function updateWeatherDisplay(weatherData) {
     }
 }
 
+// Function to manually refresh weather
+function refreshWeather() {
+    console.log('🔄 Manual weather refresh triggered');
+    getWeatherData(true); // Force refresh
+}
+
+// Initialize weather refresh button
+function initWeatherRefreshButton() {
+    const refreshBtn = document.getElementById('refreshWeatherBtn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', refreshWeather);
+        console.log('✅ Weather refresh button initialized');
+    }
+}
+
 // Initialize weather
 function initWeather() {
     try {
         getWeatherData();
+        // Initialize refresh button
+        initWeatherRefreshButton();
         // Update every 30 minutes
         setInterval(() => {
             getWeatherData();
         }, 30 * 60 * 1000);
+        console.log('🌤️ Weather system initialized');
     } catch (e) {
         console.warn('initWeather failed:', e);
     }
@@ -124,4 +158,4 @@ if (document.readyState === 'loading') {
 }
 
 // Export functions for potential use in other scripts
-window.WeatherAPI = { getWeatherData, updateWeatherDisplay, initWeather }; 
+window.WeatherAPI = { getWeatherData, updateWeatherDisplay, initWeather, refreshWeather }; 

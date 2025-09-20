@@ -222,6 +222,9 @@
                         <div class="weather-container d-flex align-items-center gap-2">
                             <span id="weather-label" class="weather-icon">🌤️</span>
                             <span id="weather-info" class="weather-info">Memuat cuaca...</span>
+                            <button id="refreshWeatherBtn" class="weather-refresh-btn" title="Perbarui cuaca">
+                                <iconify-icon icon="mdi:refresh"></iconify-icon>
+                            </button>
                         </div>
                         <div class="status-indicator d-flex align-items-center gap-2">
                             <div class="status-dot"></div>
@@ -255,27 +258,178 @@
 
 
 
-    <!-- Progress Bar untuk Initial Loading -->
-    <div id="loadingProgress" class="loading-modal" style="display: none;">
-        <div class="loading-content modern">
-            <div class="loading-spinner">
-                <div class="spinner"></div>
+    <!-- Enhanced Slide Notification System -->
+    <div id="slideNotification" class="slide-notification" style="display: none;">
+        <div class="slide-content">
+            <div class="slide-icon"><i class="fas fa-rocket" style="color: #ec4899;"></i></div>
+            <div class="slide-text">
+                <div class="slide-title">Memuat JakMove</div>
+                <div class="slide-subtitle">Menyiapkan aplikasi...</div>
             </div>
-            <div class="loading-header text-center">
-                <h4 class="mb-1">Memuat JakMove</h4>
-                <p class="mb-0">Mohon tunggu sebentar...</p>
+            <div class="slide-progress">
+                <div class="slide-progress-bar"></div>
             </div>
-            <div class="progress-container mt-3">
-                <div class="progress modern">
-                    <div id="progressBar" class="progress-bar" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
-                </div>
-                <div class="progress-info d-flex align-items-center justify-content-between mt-2">
-                    <span id="progressStatus" class="small text-muted" aria-live="polite">Menyiapkan aplikasi...</span>
-                    <span id="progressPercent" class="fw-bold">0%</span>
-                </div>
-            </div>
+            <div class="slide-percent">0%</div>
         </div>
     </div>
+
+    <!-- CSS for Enhanced Slide Notification -->
+    <style>
+        .slide-notification {
+            position: fixed;
+            top: 20px;
+            right: -450px;
+            z-index: 9999;
+            transition: right 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+        
+        .slide-notification.show {
+            right: 20px;
+        }
+        
+        .slide-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 18px 22px;
+            border-radius: 14px;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            min-width: 380px;
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .slide-icon {
+            font-size: 22px;
+            animation: pulse 2s infinite;
+            min-width: 26px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .slide-icon i {
+            font-size: 20px;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+        }
+        
+        .slide-text {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .slide-title {
+            font-size: 15px;
+            font-weight: 700;
+            margin-bottom: 3px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .slide-subtitle {
+            font-size: 12px;
+            opacity: 0.9;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .slide-subtitle i {
+            font-size: 10px;
+            flex-shrink: 0;
+        }
+        
+        .slide-progress {
+            width: 80px;
+            height: 5px;
+            background: rgba(255,255,255,0.3);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        
+        .slide-progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #ffffff, #f0f9ff);
+            border-radius: 3px;
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+        
+        .slide-percent {
+            font-size: 13px;
+            font-weight: 700;
+            min-width: 35px;
+            text-align: right;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { 
+                transform: scale(1);
+                filter: brightness(1);
+            }
+            50% { 
+                transform: scale(1.1);
+                filter: brightness(1.2);
+            }
+        }
+        
+        /* Responsive for mobile */
+        @media (max-width: 480px) {
+            .slide-content {
+                min-width: 320px;
+                padding: 16px 18px;
+            }
+            
+            .slide-notification {
+                right: -380px;
+            }
+            
+            .slide-notification.show {
+                right: 10px;
+            }
+        }
+        
+        /* Weather Refresh Button */
+        .weather-refresh-btn {
+            background: none;
+            border: none;
+            color: #6b7280;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+        
+        .weather-refresh-btn:hover {
+            background: rgba(59, 130, 246, 0.1);
+            color: #3b82f6;
+            transform: rotate(180deg);
+        }
+        
+        .weather-refresh-btn:active {
+            transform: scale(0.95) rotate(180deg);
+        }
+        
+        .weather-refresh-btn.refreshing {
+            animation: spin 1s linear infinite;
+            color: #3b82f6;
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+    </style>
 
     <!-- Main Content Area -->
     <div class="main-content container">

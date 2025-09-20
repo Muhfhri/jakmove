@@ -10,32 +10,37 @@ self.onmessage = (ev) => {
     try {
         post('progress', {
             percent: 88,
-            status: 'Mem-parse CSV: stops...'
+            status: '🚏 Parsing stops...'
         });
         const stops = parseCSV(texts.stopsTxt || '');
+        
         post('progress', {
             percent: 89,
-            status: 'Mem-parse CSV: routes...'
+            status: '🛣️ Parsing routes...'
         });
         const routes = parseCSV(texts.routesTxt || '');
+        
         post('progress', {
             percent: 90,
-            status: 'Mem-parse CSV: trips...'
+            status: '🚌 Parsing trips...'
         });
         const trips = parseCSV(texts.tripsTxt || '');
+        
         post('progress', {
             percent: 91,
-            status: 'Mem-parse CSV: stop_times...'
+            status: '⏰ Parsing stop_times...'
         });
         const stop_times = parseCSV(texts.stopTimesTxt || '');
+        
         post('progress', {
             percent: 92,
-            status: 'Mem-parse CSV: shapes...'
+            status: '📐 Parsing shapes...'
         });
         const shapes = parseCSV(texts.shapesTxt || '');
+        
         post('progress', {
             percent: 93,
-            status: 'Mem-parse CSV: lainnya...'
+            status: '📋 Parsing data tambahan...'
         });
         const frequencies = parseCSV(texts.frequenciesTxt || '');
         const fare_rules = parseCSV(texts.fareRulesTxt || '');
@@ -46,13 +51,14 @@ self.onmessage = (ev) => {
 
         post('progress', {
             percent: 94,
-            status: 'Membangun indeks halte→rute...'
+            status: '🔗 Membangun indeks halte→rute...'
         });
         const stopToRoutes = buildStopToRoutes(stop_times, trips);
+        console.log('[Worker] Built stopToRoutes mapping:', Object.keys(stopToRoutes).length, 'stops');
 
         post('progress', {
             percent: 96,
-            status: 'Finalisasi data...'
+            status: '<i class="fas fa-check"></i> Finalisasi parsing...'
         });
         post('result', {
             data: {

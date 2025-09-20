@@ -231,35 +231,52 @@ export class RouteManager {
         `;
     }
 
-    // Build service type HTML
+    // Build service type HTML dengan deteksi yang lebih komprehensif
     buildServiceTypeHTML(route) {
-        if (!route.route_desc) return '';
+        if (!route) return '';
 
-        let serviceType = route.route_desc;
-        if (route.route_id && route.route_id.startsWith('JAK.') && 
-            serviceType.trim() === 'Angkutan Umum Integrasi') {
-            serviceType = 'MikroTrans';
-        }
+        let serviceType = this.determineServiceType(route);
+        if (!serviceType) return '';
 
         const serviceTypeMap = {
-            'BRT': { name: 'Bus Rapid Transit', icon: 'mdi:bus-multiple', color: '#2563eb' },
-            'TransJakarta': { name: 'Bus Rapid Transit', icon: 'mdi:bus-multiple', color: '#2563eb' },
-            'Angkutan Umum Integrasi': { name: 'Angkutan Umum Integrasi', icon: 'mdi:bus', color: '#f59e0b' },
-            'MikroTrans': { name: 'MikroTrans', icon: 'mdi:bus-side', color: '#06b6d4' },
-            'Royal Trans': { name: 'Royal Trans', icon: 'mdi:bus-clock', color: '#10b981' },
-            'Bus Wisata': { name: 'Bus Wisata', icon: 'mdi:bus-marker', color: '#ef4444' }
+            // Jenis layanan berdasarkan route_desc di GTFS
+            'BRT': { name: 'Bus Rapid Transit', icon: 'fa-solid fa-bus', color: '#2563eb' },
+            'Rusun': { name: 'Layanan Rusun', icon: 'fa-solid fa-building', color: '#4fa8de' },
+            'Angkutan Umum Integrasi': { name: 'Angkutan Umum Integrasi', icon: 'fa-solid fa-bus-simple', color: '#f59e0b' },
+            'Royaltrans': { name: 'Royaltrans', icon: 'fa-solid fa-crown', color: '#10b981' },
+            'Transjabodetabek': { name: 'Transjabodetabek', icon: 'fa-solid fa-map', color: '#84cc16' },
+            'Bus Wisata': { name: 'Bus Wisata', icon: 'fa-solid fa-camera', color: '#ef4444' }
         };
 
-        const serviceInfo = serviceTypeMap[serviceType] || { name: serviceType, icon: 'mdi:bus', color: '#6b7280' };
+        const serviceInfo = serviceTypeMap[serviceType] || { 
+            name: serviceType, 
+            icon: 'fa-solid fa-bus', 
+            color: '#6b7280' 
+        };
 
         return `
             <div class='modern-service-type'>
-                <div class='service-badge' style='background: ${serviceInfo.color}15; color: ${serviceInfo.color}; border: 1px solid ${serviceInfo.color}30;'>
-                    <iconify-icon icon="${serviceInfo.icon}"></iconify-icon>
+                <div class='service-badge' style='background: ${serviceInfo.color}15; color: ${serviceInfo.color}; border: 1px solid ${serviceInfo.color}30; padding: 8px 12px; border-radius: 20px; display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 600; margin-top: 6px;'>
+                    <i class="${serviceInfo.icon}" style="font-size: 0.9rem;"></i>
                     <span>${serviceInfo.name}</span>
                 </div>
             </div>
         `;
+    }
+
+    // Menentukan jenis layanan berdasarkan route_desc dari GTFS
+    determineServiceType(route) {
+        if (!route) return null;
+
+        const routeDesc = route.route_desc || '';
+        
+        // Langsung gunakan route_desc dari GTFS - sangat sederhana!
+        if (routeDesc) {
+            return routeDesc.trim();
+        }
+
+        // Fallback jika tidak ada route_desc (seharusnya tidak pernah terjadi)
+        return 'BRT';
     }
 
     infoIconLink(url, title) {
@@ -1512,7 +1529,7 @@ Github: github.com/muhfhri/jakmove
                 wcIcon.className = 'wc-icon';
                 wcIcon.title = 'Ramah kursi roda';
                 wcIcon.style.marginLeft = '6px';
-                wcIcon.innerHTML = '<iconify-icon icon="fontisto:paralysis-disability" inline></iconify-icon>';
+                wcIcon.innerHTML = '<i class="fa-solid fa-wheelchair" style="color: #059669;"></i>';
             }
         }
         
@@ -1649,83 +1666,17 @@ Github: github.com/muhfhri/jakmove
         
         const weatherId = `weather-${stop.stop_id}`;
         
-        // Check cache first before starting loading
-        const roundedLat = Math.round(parseFloat(stop.stop_lat) * 100) / 100;
-        const roundedLon = Math.round(parseFloat(stop.stop_lon) * 100) / 100;
-        const cacheKey = `weather_${roundedLat}_${roundedLon}`;
-        const cached = this.getWeatherFromCache(cacheKey);
+        // Start loading weather data asynchronously
+        this.loadStopWeather(stop.stop_lat, stop.stop_lon, weatherId);
         
-        if (cached) {
-            // If cached data exists, generate weather HTML directly
-            const variedData = this.applyStopVariation(cached, stop.stop_lat, stop.stop_lon, weatherId);
-            return this.generateWeatherHtml(weatherId, variedData);
-        } else {
-            // Only load if no cache exists
-            this.loadStopWeather(stop.stop_lat, stop.stop_lon, weatherId);
-            return `
-                <div class='stop-weather-info' id='${weatherId}'>
-                    <div class='weather-loading'>
-                        <iconify-icon icon="mdi:loading" class="weather-loading-icon"></iconify-icon>
-                        <span class='weather-text'>Memuat cuaca...</span>
-                    </div>
+        return `
+            <div class='stop-weather-info' id='${weatherId}'>
+                <div class='weather-loading'>
+                    <iconify-icon icon="mdi:loading" class="weather-loading-icon"></iconify-icon>
+                    <span class='weather-text'>Memuat cuaca...</span>
                 </div>
-            `;
-        }
-    }
-
-    // Generate weather HTML for cached data
-    generateWeatherHtml(weatherId, weatherData) {
-        if (!weatherData) {
-            return `
-                <div class='stop-weather-info' id='${weatherId}'>
-                    <div class='weather-error'>
-                        <iconify-icon icon="mdi:weather-cloudy"></iconify-icon>
-                        <span class='weather-text'>Cuaca tidak tersedia</span>
-                    </div>
-                </div>
-            `;
-        }
-
-        try {
-            const weather = weatherData.weather[0];
-            const temp = Math.round(weatherData.main.temp);
-            const humidity = Math.round(weatherData.main.humidity);
-            
-            // Use OpenWeatherMap icons directly
-            const iconCode = weather.icon || '01d';
-            const iconUrl = `https://openweathermap.org/img/wn/${iconCode}@2x.png`;
-            const description = this.capitalizeWords(weather.description || 'Cerah');
-            
-            // Add wind speed if available
-            const windSpeed = weatherData.wind?.speed ? Math.round(weatherData.wind.speed) : null;
-            
-            return `
-                <div class='stop-weather-info' id='${weatherId}'>
-                    <div class='weather-content'>
-                        <div class='weather-icon'>
-                            <img src="${iconUrl}" alt="${description}" class="weather-icon-img" />
-                        </div>
-                        <div class='weather-info'>
-                            <div class='weather-temp'>${temp}°C</div>
-                            <div class='weather-desc'>${description}</div>
-                            ${windSpeed ? `<div class='weather-wind'>🌬️ ${windSpeed} m/s</div>` : ''}
-                        </div>
-                        <div class='weather-humidity'>${humidity}%</div>
-                    </div>
-                </div>
-            `;
-            
-        } catch (error) {
-            console.error('Error generating weather HTML:', error);
-            return `
-                <div class='stop-weather-info' id='${weatherId}'>
-                    <div class='weather-error'>
-                        <iconify-icon icon="mdi:weather-cloudy"></iconify-icon>
-                        <span class='weather-text'>Error cuaca</span>
-                    </div>
-                </div>
-            `;
-        }
+            </div>
+        `;
     }
 
     // Load weather data for specific stop coordinates
@@ -1740,7 +1691,6 @@ Github: github.com/muhfhri/jakmove
             // Check cache first
             const cached = this.getWeatherFromCache(cacheKey);
             if (cached) {
-                console.log(`Using cached weather for ${cacheKey}: ${cached.main.temp}°C`);
                 // Apply stop-specific variation to cached data for diversity
                 const variedData = this.applyStopVariation(cached, lat, lon, weatherId);
                 this.updateWeatherDisplay(weatherId, variedData);
@@ -1754,13 +1704,11 @@ Github: github.com/muhfhri/jakmove
                 setTimeout(() => {
                     const cachedAfterWait = this.getWeatherFromCache(cacheKey);
                     if (cachedAfterWait) {
-                        console.log(`Using cached weather after wait for ${cacheKey}: ${cachedAfterWait.main.temp}°C`);
-                        const variedData = this.applyStopVariation(cachedAfterWait, lat, lon, weatherId);
-                        this.updateWeatherDisplay(weatherId, variedData);
+                        this.updateWeatherDisplay(weatherId, cachedAfterWait);
                     } else {
                         this.updateWeatherDisplay(weatherId, null);
                     }
-                }, 1000);
+                }, 2000);
                 return;
             }
 
@@ -1823,9 +1771,7 @@ Github: github.com/muhfhri/jakmove
     // Update weather display for specific stop
     updateWeatherDisplay(weatherId, weatherData) {
         const weatherElement = document.getElementById(weatherId);
-        if (!weatherElement) {
-            return;
-        }
+        if (!weatherElement) return;
 
         if (!weatherData) {
             weatherElement.innerHTML = `
@@ -1906,19 +1852,6 @@ Github: github.com/muhfhri/jakmove
             console.warn('Failed to get cached weather:', e);
         }
         return null;
-    }
-
-    // Clear stale loading sets to prevent memory leaks
-    clearStaleLoadingSets() {
-        try {
-            if (this._weatherLoadingSet && this._weatherLoadingSet.size > 0) {
-                // Clear loading sets to prevent stuck states
-                this._weatherLoadingSet.clear();
-                console.log('Weather loading sets cleared');
-            }
-        } catch (e) {
-            console.warn('Error clearing stale loading sets:', e);
-        }
     }
 
     // Enhanced weather data with optimized variation (for grid base data)

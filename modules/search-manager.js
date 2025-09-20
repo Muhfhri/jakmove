@@ -881,7 +881,7 @@ export class SearchManager {
         try {
             const settings = window.transJakartaApp.modules.settings;
             if (stop.wheelchair_boarding === '1' && (!settings || settings.isEnabled('showAccessibilityIcon'))) {
-                right.innerHTML = '<iconify-icon icon="fontisto:paralysis-disability" inline></iconify-icon>';
+                right.innerHTML = '<i class="fa-solid fa-wheelchair" style="color: #059669;"></i>';
                 right.title = 'Ramah kursi roda';
             }
         } catch (e) {}

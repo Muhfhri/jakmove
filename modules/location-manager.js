@@ -37,6 +37,8 @@ export class LocationManager {
         this._userAnimStart = 0;
         this._userAnimDurationMs = 450;
         this._lastLiveStopForPopup = null;
+        this._liveClockTimer = null;
+        this._liveTrackingStartTime = null;
         // Popup smoothing properties
         this._popupAnimReqId = null;
         this._popupAnimFrom = null;
@@ -78,6 +80,11 @@ export class LocationManager {
 
         this.isActive = true;
         this._allowAutoStart = true;
+        
+        // Record start time for stopwatch when live tracking actually starts
+        if (!this._liveTrackingStartTime) {
+            this._liveTrackingStartTime = Date.now();
+        }
         this.updateLiveLocationButton(true);
         this.showNearestStopsButton();
         this.updateLockButtonVisibility();
@@ -112,6 +119,8 @@ export class LocationManager {
                 if (lockBtn) lockBtn.style.display = 'none';
                 mapManager.setCameraLock(false);
                 try { mapManager.clearNextStopLabel(); } catch (e) {}
+                // Reset route visual to normal state when live is disabled
+                try { mapManager.resetRouteVisualToNormal(); } catch (e) {}
             }
             this.userMarker = null;
         }
@@ -137,6 +146,10 @@ export class LocationManager {
         this._prevUserPosSmoothed = null;
         this.lastUserTime = null;
         this.lastUserSpeed = null;
+        
+        // Stop live popup clock and reset stopwatch
+        this.stopLivePopupClock();
+        this._liveTrackingStartTime = null;
         this.updateLiveLocationButton(false);
         this.hideNearestStopsButton();
         this.updateLockButtonVisibility();
@@ -147,6 +160,82 @@ export class LocationManager {
 
     // Suspend/resume heavy UI updates (for fast route switch)
     suspendUpdates(on = true) { this._suspend = !!on; }
+
+    // Start live popup clock update
+    startLivePopupClock() {
+        // Clear any existing timer
+        this.stopLivePopupClock();
+        
+        // Update clock immediately
+        this.updateLivePopupClock();
+        
+        // Set interval to update every second
+        this._liveClockTimer = setInterval(() => {
+            this.updateLivePopupClock();
+        }, 1000);
+    }
+
+    // Stop live popup clock update
+    stopLivePopupClock() {
+        if (this._liveClockTimer) {
+            clearInterval(this._liveClockTimer);
+            this._liveClockTimer = null;
+        }
+    }
+
+    // Update live popup clock display
+    updateLivePopupClock() {
+        try {
+            const timeElement = document.getElementById('live-time');
+            const dateElement = document.getElementById('live-date');
+            const stopwatchElement = document.getElementById('live-stopwatch');
+            
+            if (!timeElement || !dateElement) return;
+            
+            const now = new Date();
+            
+            // Format time (HH:MM:SS)
+            const timeString = now.toLocaleTimeString('id-ID', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            });
+            
+            // Format date (DD/MM/YYYY)
+            const dateString = now.toLocaleDateString('id-ID', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+            
+            timeElement.textContent = timeString;
+            dateElement.textContent = dateString;
+            
+            // Update stopwatch
+            if (stopwatchElement && this._liveTrackingStartTime) {
+                const elapsedMs = Date.now() - this._liveTrackingStartTime;
+                const elapsedSeconds = Math.floor(elapsedMs / 1000);
+                const hours = Math.floor(elapsedSeconds / 3600);
+                const minutes = Math.floor((elapsedSeconds % 3600) / 60);
+                const seconds = elapsedSeconds % 60;
+                
+                let stopwatchText = '';
+                if (hours > 0) {
+                    stopwatchText = `⏱️ ${hours}j ${minutes}m`;
+                } else if (minutes > 0) {
+                    stopwatchText = `⏱️ ${minutes}m ${seconds}d`;
+                } else {
+                    stopwatchText = `⏱️ ${seconds}d`;
+                }
+                
+                stopwatchElement.textContent = stopwatchText;
+            }
+            
+        } catch (error) {
+            console.warn('Error updating live popup clock:', error);
+        }
+    }
 
     // Handle position update
     handlePositionUpdate(pos) {
@@ -507,7 +596,11 @@ export class LocationManager {
             this.animatePopupTo(userLat, userLon); // CRITICAL: Update popup position!
             
             // Bind live popup interactions (route badges + platform badges)
-            setTimeout(() => { this._bindLivePopupInteractions(); }, 30);
+            setTimeout(() => { 
+                this._bindLivePopupInteractions(); 
+                // Start clock update for live popup
+                this.startLivePopupClock();
+            }, 30);
             // Render label halte berikutnya di peta
             try { mapManager.updateNextStopLabel(nextStop); } catch (e) {}
         }
@@ -629,7 +722,7 @@ export class LocationManager {
             // Accessibility icon for next stop if accessible
             let accessIcon = '';
             if (displayStop && displayStop.wheelchair_boarding === '1') {
-                accessIcon = `<span title='Ramah kursi roda' style='margin-left:6px;'><iconify-icon icon="fontisto:paralysis-disability" inline></iconify-icon></span>`;
+                accessIcon = `<span title='Ramah kursi roda' style='margin-left:6px;'><i class="fa-solid fa-wheelchair" style="color: #059669;"></i></span>`;
             }
 
             // Breadcrumb 2 halte ke depan
@@ -655,10 +748,26 @@ export class LocationManager {
             const etaHtml = etaText ? `<span style='font-size:0.9em;color:#64748b;'>ETA ${etaText}</span>` : '';
             const trendHtml = `<span style='font-size:0.9em;'>${trend}</span>`;
              
+            // Get intermodal icons for the display stop
+            let intermodalHtml = '';
+            try {
+                const routesMgr = window.transJakartaApp.modules.routes;
+                if (routesMgr && routesMgr.buildIntermodalIconsForStop) {
+                    intermodalHtml = routesMgr.buildIntermodalIconsForStop(displayStop) || '';
+                }
+            } catch (e) {
+                console.warn('Error getting intermodal icons for live tracking:', e);
+            }
+
             nextStopInfo = `
                 <div style='margin-bottom:6px;'>
                     <div class='text-muted' style='font-size:0.95em;font-weight:600;margin-bottom:2px;'>${titleLabel}</div>
-                    <div style='font-size:1.1em;font-weight:bold;display:flex;align-items:center;gap:6px;'>${buildHeaderIcon(displayStop.stop_id)} <span>${displayStop.stop_name}</span> ${accessIcon}</div>
+                    <div style='font-size:1.1em;font-weight:bold;display:flex;align-items:center;gap:6px;'>
+                        ${buildHeaderIcon(displayStop.stop_id)} 
+                        <span>${displayStop.stop_name}</span> 
+                        ${intermodalHtml ? `<span class="intermodal-icons" style="display:flex;gap:2px;align-items:center;">${intermodalHtml}</span>` : ''}
+                        ${accessIcon}
+                    </div>
                     <div style='margin-bottom:2px;display:flex;align-items:center;gap:8px;'>
                         <span style='font-weight:600;color:${distColor};'>${jarakNext < 1000 ? Math.round(jarakNext) + ' m' : (jarakNext/1000).toFixed(2) + ' km'}</span>
                         <span style='font-size:0.9em;color:#64748b;'>arah ${bearingDeg}</span>
@@ -676,12 +785,19 @@ export class LocationManager {
 
         return `
             <div class='plus-jakarta-sans popup-card-friendly' style='min-width:220px;max-width:340px;line-height:1.45;background:rgba(248,250,252,0.95);border-radius:18px;box-shadow:none;padding:18px 18px 12px 18px;position:relative;'>
-                <div style='display:flex;align-items:center;gap:12px;margin-bottom:8px;'>
-                    <div style='flex:1;'>
+                <div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;'>
+                    <div>
                         <span class='badge badge-koridor-interaktif rounded-pill' 
                               style='background:${badgeColor};color:#fff;font-weight:bold;font-size:1.2em;padding:0.5em 1.1em;'>
                             ${badgeText}
                         </span>
+                    </div>
+                    <div style='display:flex;flex-direction:column;align-items:flex-end;gap:2px;'>
+                        <div id='live-time' style='font-size:1.1em;font-weight:bold;color:#374151;'></div>
+                        <div style='display:flex;gap:8px;align-items:center;'>
+                            <div id='live-stopwatch' style='font-size:0.75em;color:#059669;font-weight:600;'></div>
+                            <div id='live-date' style='font-size:0.75em;color:#6b7280;'></div>
+                        </div>
                     </div>
                 </div>
                 <div id='popup-dinamis-info'>
