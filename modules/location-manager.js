@@ -5,6 +5,8 @@ export class LocationManager {
         // Cache variables for popup content optimization
         this._lastPopupContentKey = null;
         this._lastPopupDistance = null;
+        this._lastEtaText = null;
+        this._lastPositionUpdate = null;
         this.geoWatchId = null;
         this.userMarker = null;
         this.nearestStopMarker = null;
@@ -588,10 +590,10 @@ export class LocationManager {
                 const etaSec = Math.max(1, Math.round(jarakNext / spd));
                 etaText = etaSec < 60 ? `${etaSec}s` : `${Math.floor(etaSec/60)}m ${etaSec%60}s`;
             }
-            // Visual stability: skip UI update if distance change small and <500ms (reduced for better responsiveness)
+            // Visual stability: skip UI update if distance change small and too frequent (prevent blinking during movement)
             const dt = nowTs - (this._lastUIUpdateTs || 0);
-            if (!arrivalTrigger && Math.abs((jarakNext || 0) - (this._prevDistForUi || 0)) < 2 && dt < 500) {
-                return; // keep last UI
+            if (!arrivalTrigger && Math.abs((jarakNext || 0) - (this._prevDistForUi || 0)) < 5 && dt < 1000) {
+                return; // keep last UI for stability during movement
             }
             this._lastUIUpdateTs = nowTs;
             this._prevDistForUi = jarakNext;
@@ -625,10 +627,9 @@ export class LocationManager {
             } else {
                 // Only update position, content stays the same to prevent blinking
                 console.debug('[Live] Only updating popup position, content unchanged');
+                // Still update position but less frequently
+                this.animatePopupTo(userLat, userLon);
             }
-            
-            // Always update popup position
-            this.animatePopupTo(userLat, userLon);
             
             // Render label halte berikutnya di peta
             try { mapManager.updateNextStopLabel(nextStop); } catch (e) {}
@@ -637,8 +638,8 @@ export class LocationManager {
 
     // Check if popup content needs updating (prevent unnecessary re-renders)
     _needsPopupContentUpdate(route, currentStop, nextStop, liveExtras) {
-        // Cache key components for comparison
-        const currentKey = `${route?.route_id}-${currentStop?.stop_id}-${nextStop?.stop_id}-${liveExtras.etaText}-${liveExtras.trend}`;
+        // Cache key components for comparison, excluding frequently changing values
+        const currentKey = `${route?.route_id}-${currentStop?.stop_id}-${nextStop?.stop_id}`;
         
         // If this is the first update or key has changed, update content
         if (!this._lastPopupContentKey || this._lastPopupContentKey !== currentKey) {
@@ -646,10 +647,22 @@ export class LocationManager {
             return true;
         }
         
-        // If significant distance change (more than 10 meters), update content
+        // Only update content for significant ETA changes (not every second)
+        if (this._lastEtaText !== liveExtras.etaText) {
+            // Check if it's a significant ETA change (not just second changes)
+            const etaChanged = this._isSignificantEtaChange(this._lastEtaText, liveExtras.etaText);
+            if (etaChanged) {
+                this._lastEtaText = liveExtras.etaText;
+                return true;
+            }
+        } else {
+            this._lastEtaText = liveExtras.etaText;
+        }
+        
+        // Only update for significant distance changes (more than 25 meters)
         if (this._lastPopupDistance !== null) {
             const distanceChange = Math.abs((liveExtras.jarakNext || 0) - this._lastPopupDistance);
-            if (distanceChange > 10) {
+            if (distanceChange > 25) {
                 this._lastPopupDistance = liveExtras.jarakNext || 0;
                 return true;
             }
@@ -659,6 +672,27 @@ export class LocationManager {
         }
         
         return false;
+    }
+
+    // Check if ETA change is significant enough to warrant content update
+    _isSignificantEtaChange(oldEta, newEta) {
+        if (!oldEta || !newEta) return true;
+        
+        // Extract minutes from ETA strings like "~5 menit" or "2m 30s"
+        const extractMinutes = (eta) => {
+            if (eta === 'Berhenti') return -1;
+            const minuteMatch = eta.match(/(\d+)m/);
+            const secondMatch = eta.match(/(\d+)s/);
+            const minutes = minuteMatch ? parseInt(minuteMatch[1]) : 0;
+            const seconds = secondMatch ? parseInt(secondMatch[1]) : 0;
+            return minutes + (seconds / 60);
+        };
+        
+        const oldMinutes = extractMinutes(oldEta);
+        const newMinutes = extractMinutes(newEta);
+        
+        // Only update if difference is more than 0.5 minutes (30 seconds)
+        return Math.abs(oldMinutes - newMinutes) > 0.5;
     }
 
     // Handle arrival detection
@@ -1261,6 +1295,13 @@ export class LocationManager {
         const mapManager = window.transJakartaApp.modules.map;
         if (!mapManager || !mapManager.userPopup || !this.userMarker) return;
         
+        // Throttle position updates to prevent blinking during movement
+        const now = Date.now();
+        if (this._lastPositionUpdate && (now - this._lastPositionUpdate) < 500) {
+            return; // Skip update if too frequent (update max every 500ms)
+        }
+        this._lastPositionUpdate = now;
+        
         // Get current popup position
         const currentPopupPos = mapManager.userPopup.getLngLat();
         if (!currentPopupPos) {
@@ -1284,14 +1325,14 @@ export class LocationManager {
             return;
         }
         
-        // If distance is very small (< 5 meters), snap directly for responsiveness
-        if (distance < 5) {
-            mapManager.userPopup.setLngLat([targetLon, targetLat]);
-            this._renderedPopupPos = { lat: targetLat, lon: targetLon };
+        // If distance is very small (< 3 meters), don't update to prevent micro-movements
+        if (distance < 3) {
             return;
         }
         
-        // Start/replace animation
+        // For medium distances, update position directly without animation
+        mapManager.userPopup.setLngLat([targetLon, targetLat]);
+        this._renderedPopupPos = { lat: targetLat, lon: targetLon };
         if (this._popupAnimReqId) { 
             try { cancelAnimationFrame(this._popupAnimReqId); } catch(e){} 
             this._popupAnimReqId = null; 
