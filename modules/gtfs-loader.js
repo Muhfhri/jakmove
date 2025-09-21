@@ -650,7 +650,9 @@ export class GTFSLoader {
             stops: this.data.stops.map(s => ({
                 stop_id: s.stop_id, stop_name: s.stop_name,
                 stop_lat: parseFloat(s.stop_lat), stop_lon: parseFloat(s.stop_lon),
-                location_type: s.location_type, platform_code: s.platform_code
+                location_type: s.location_type, platform_code: s.platform_code,
+                parent_station: s.parent_station, wheelchair_boarding: s.wheelchair_boarding,
+                stop_desc: s.stop_desc, stop_code: s.stop_code
             })),
             routes: this.data.routes.map(r => ({
                 route_id: r.route_id, route_short_name: r.route_short_name,

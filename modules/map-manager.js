@@ -1677,7 +1677,22 @@ export class MapManager {
             this.map.on('click', hitLayerId, (e) => {
                 const p = e.lngLat;
                 const s = stop; // closure
-                const pseudoFeature = { properties: { stopId: s.stop_id, stopName: s.stop_name, wheelchairBoarding: (s.wheelchair_boarding || '0') } };
+                // Create enhanced feature data similar to regular stops to support platform display
+                const pseudoFeature = { 
+                    properties: { 
+                        stopId: s.stop_id, 
+                        stopName: s.stop_name, 
+                        wheelchairBoarding: (s.wheelchair_boarding || '0'),
+                        // Add additional properties needed for platform detection
+                        platform_code: s.platform_code || '',
+                        parent_station: s.parent_station || '',
+                        location_type: s.location_type || '0'
+                    },
+                    geometry: {
+                        type: 'Point',
+                        coordinates: [lng, lat]
+                    }
+                };
                 this.showStopPopup(pseudoFeature, p, { origin: 'nearest' });
             });
             this.map.on('mouseenter', hitLayerId, () => { this.map.getCanvas().style.cursor = 'pointer'; });
