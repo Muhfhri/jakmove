@@ -88,7 +88,6 @@ export class JourneyPlanner {
         this.origin = null;
         this.destination = null;
         this._clearMapArtifacts();
-        try { this.app.modules.map.clearJourneyMarkers(); } catch (e) {}
         this._setStatus('');
         this._setSteps([]);
         this._lastPlan = null;
