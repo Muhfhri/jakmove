@@ -2685,13 +2685,24 @@ Github: github.com/muhfhri/jakmove
             modes = this._intermodalByStopKeyNormalized[normalizedName];
         }
         if (!modes) return '';
-        const arr = Array.isArray(modes) ? modes : [modes];
+        
         const iconUrlMap = {
             'MRT': 'https://transportforjakarta.or.id/wp-content/uploads/2024/10/roundel-mrt-icon-w-mePn2LwZXQCglMGN-768x768.png',
             'LRT': 'https://transportforjakarta.or.id/wp-content/uploads/2024/10/roundel-lrt-icon-w-AQEpaJBkWOcwoNrr-768x768.png',
             'KRL': 'https://transportforjakarta.or.id/wp-content/uploads/2024/10/roundel-krl-icon-w-YBg4WpGk8phW4kOL-768x768.png'
         };
-        return arr.map(m => {
+        
+        // Always show just icons for cleaner look
+        let modeArray = [];
+        if (Array.isArray(modes)) {
+            modeArray = modes;
+        } else if (typeof modes === 'object' && modes !== null) {
+            modeArray = Object.keys(modes);
+        } else {
+            modeArray = [modes];
+        }
+        
+        return modeArray.map(m => {
             const key = String(m).toUpperCase();
             const url = iconUrlMap[key];
             if (!url) return '';
@@ -2699,6 +2710,73 @@ Github: github.com/muhfhri/jakmove
             const cls = key.toLowerCase();
             return `<img class="intermodal-icon-img ${cls}" src="${url}" alt="${alt}" title="${alt}"/>`;
         }).join('');
+    }
+
+    // Build intermodal station info with automatic formatting
+    buildIntermodalStationInfo(stop) {
+        try {
+            const settings = window.transJakartaApp.modules.settings;
+            if (settings && !settings.isEnabled('showIntermodalIcons')) return '';
+        } catch (e) {}
+        if (!this._intermodalByStopKey) return '';
+        
+        // Try by stop_id first (exact), then by exact name, then normalized name
+        let modes = this._intermodalByStopKey[stop.stop_id] || this._intermodalByStopKey[stop.stop_name];
+        if (!modes && this._intermodalByStopKeyNormalized) {
+            const normalizedName = this.normalizeStopKey(stop.stop_name || '');
+            modes = this._intermodalByStopKeyNormalized[normalizedName];
+        }
+        if (!modes) return '';
+        
+        // Only process if it's the new object format with station names
+        if (typeof modes === 'object' && modes !== null && !Array.isArray(modes)) {
+            const stationInfos = Object.keys(modes).map(service => {
+                const key = String(service).toUpperCase();
+                const stationName = modes[service];
+                
+                // Auto-format with proper prefix
+                let formattedName = '';
+                switch(key) {
+                    case 'MRT':
+                        formattedName = `Stasiun MRT ${stationName}`;
+                        break;
+                    case 'LRT':
+                        formattedName = `Stasiun LRT ${stationName}`;
+                        break;
+                    case 'KRL':
+                        formattedName = `Stasiun KRL ${stationName}`;
+                        break;
+                    default:
+                        formattedName = `Stasiun ${key} ${stationName}`;
+                }
+                
+                return `<span style="color: #374151; font-weight: 500; display: block; margin-bottom: 2px;">${formattedName}</span>`;
+            }).join('');
+            
+            if (stationInfos) {
+                return `
+                    <div style="
+                        background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+                        border: 1px solid #0ea5e9;
+                        border-radius: 8px;
+                        padding: 6px 10px;
+                        margin-top: 8px;
+                        font-size: 0.75em;
+                        line-height: 1.3;
+                        max-height: 100px;
+                        overflow-y: auto;
+                    " class="intermodal-station-info">
+                        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+                            <i class="fa-solid fa-train" style="color: #0284c7; font-size: 0.8em;"></i>
+                            <span style="font-weight: 600; color: #0284c7; font-size: 0.9em;">Stasiun Terintegrasi</span>
+                        </div>
+                        <div style="max-height: 60px; overflow-y: auto; scrollbar-width: thin;">${stationInfos}</div>
+                    </div>
+                `;
+            }
+        }
+        
+        return '';
     }
 
     // Normalize stop key for name-based mapping: trim, collapse spaces, lowercase

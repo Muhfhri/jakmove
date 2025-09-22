@@ -137,6 +137,331 @@ label {
 [data-theme="dark"] table {
   color: #fff;
 }
+
+/* Platform popup dark mode styles */
+[data-theme="dark"] .pf-block {
+  background: #334155 !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  box-shadow: 0 1px 3px rgba(255,255,255,0.05) !important;
+}
+
+[data-theme="dark"] .pf-row {
+  color: #f1f5f9 !important;
+}
+
+[data-theme="dark"] .pf-row .fa-location-dot {
+  color: #a78bfa !important;
+}
+
+[data-theme="dark"] .pf-next-item .next-name {
+  color: #f1f5f9 !important;
+}
+
+[data-theme="dark"] .pf-header {
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .pf-header-icon {
+  color: #a78bfa !important;
+}
+
+[data-theme="dark"] .pf-container {
+  background: #1e293b !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+}
+
+[data-theme="dark"] .pf-toggle-btn {
+  background: #374151 !important;
+  color: #e5e7eb !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+}
+
+/* Nearest stop popup dark mode styles */
+[data-theme="dark"] .nearest-stop-popup {
+  background: #1e293b !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3), 0 2px 8px rgba(0,0,0,0.15) !important;
+}
+
+[data-theme="dark"] .nearest-stop-name {
+  color: #f1f5f9 !important;
+}
+
+[data-theme="dark"] .nearest-header-icon {
+  color: #60a5fa !important;
+}
+
+[data-theme="dark"] .nearest-distance {
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .nearest-services-header {
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .nearest-services-icon {
+  color: #a78bfa !important;
+}
+
+[data-theme="dark"] .nearest-count-badge {
+  background: #374151 !important;
+  color: #e5e7eb !important;
+}
+
+[data-theme="dark"] .nearest-service-card {
+  background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.04) 100%) !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+}
+
+[data-theme="dark"] .nearest-next-stop {
+  color: #34d399 !important;
+}
+
+[data-theme="dark"] .nearest-direction {
+  color: #cbd5e1 !important;
+}
+
+[data-theme="dark"] .nearest-real-badge {
+  background: linear-gradient(45deg, #059669, #047857) !important;
+  box-shadow: 0 1px 3px rgba(16,185,129,0.5) !important;
+}
+
+[data-theme="dark"] .nearest-estimate-badge {
+  background: #d97706 !important;
+  opacity: 0.8 !important;
+}
+
+/* Blue marker popup (nearest stops clicked) dark mode styles */
+[data-theme="dark"] .nearest-popup-distance {
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .nearest-popup-real-badge {
+  background: linear-gradient(45deg, #059669, #047857) !important;
+  box-shadow: 0 1px 3px rgba(16,185,129,0.5) !important;
+}
+
+/* Distance section border in dark mode */
+[data-theme="dark"] .stop-popup div[style*="border-bottom: 1px solid #e2e8f0"] {
+  border-bottom-color: rgba(255,255,255,0.1) !important;
+}
+
+/* Live tracking time and duration info dark mode */
+[data-theme="dark"] .live-current-time {
+  color: #e2e8f0 !important;
+}
+
+[data-theme="dark"] .live-duration {
+  color: #34d399 !important;
+}
+
+/* Dark mode for time info */
+[data-theme="dark"] .popup-card-friendly div[style*="background: linear-gradient(135deg, #dbeafe"] {
+  background: linear-gradient(135deg, #1e3a8a 0%, #065f46 100%) !important;
+  border-color: #3b82f6 !important;
+}
+
+/* Dark mode for ETA confidence badge backgrounds */
+[data-theme="dark"] .popup-card-friendly div[style*="background: #dcfce7"] {
+  background: #064e3b !important;
+  border-color: #10b981 !important;
+}
+
+[data-theme="dark"] .popup-card-friendly div[style*="background: #fef3c7"] {
+  background: #78350f !important;
+  border-color: #f59e0b !important;
+}
+
+[data-theme="dark"] .popup-card-friendly div[style*="background: #f1f5f9"] {
+  background: #374151 !important;
+  border-color: #6b7280 !important;
+}
+
+/* Dark mode for ETA confidence badges (small inner divs) */
+[data-theme="dark"] .popup-card-friendly div[style*="background: #bbf7d0"] {
+  background: #065f46 !important;
+  color: #34d399 !important;
+}
+
+[data-theme="dark"] .popup-card-friendly div[style*="background: #fde68a"] {
+  background: #92400e !important;
+  color: #fbbf24 !important;
+}
+
+[data-theme="dark"] .popup-card-friendly div[style*="background: #e2e8f0"] {
+  background: #4b5563 !important;
+  color: #d1d5db !important;
+}
+
+/* Dark mode for weather info */
+[data-theme="dark"] .weather-info-live {
+  background: linear-gradient(135deg, #0c4a6e 0%, #075985 100%) !important;
+  border-color: #0ea5e9 !important;
+  color: #7dd3fc !important;
+}
+
+/* Dark mode for route distance info */
+[data-theme="dark"] .route-distance-live {
+  background: linear-gradient(135deg, #78350f 0%, #92400e 100%) !important;
+  border-color: #f59e0b !important;
+  color: #fbbf24 !important;
+}
+
+/* Dark mode for distance trend indicators */
+[data-theme="dark"] .popup-card-friendly .fa-location-arrow {
+  color: #34d399 !important;
+}
+
+[data-theme="dark"] .popup-card-friendly .fa-location-crosshairs {
+  color: #f87171 !important;
+}
+
+[data-theme="dark"] .popup-card-friendly .fa-minus {
+  color: #9ca3af !important;
+}
+
+[data-theme="dark"] .popup-card-friendly .fa-location-dot {
+  color: #9ca3af !important;
+}
+
+/* Dark mode for speed warning */
+[data-theme="dark"] .popup-card-friendly .fa-triangle-exclamation {
+  color: #f87171 !important;
+}
+
+/* Dark mode for arrival state text colors */
+[data-theme="dark"] .popup-card-friendly[style*="#e6fffa"] span[style*="color:#047857"] {
+  color: #34d399 !important;
+}
+
+[data-theme="dark"] .popup-card-friendly[style*="#e6fffa"] span[style*="color:#10b981"] {
+  color: #34d399 !important;
+}
+
+[data-theme="dark"] .popup-card-friendly[style*="#e6fffa"] span[style*="background:#dcfce7"] {
+  background: #065f46 !important;
+  color: #34d399 !important;
+}
+
+[data-theme="dark"] .popup-card-friendly div[style*="background: linear-gradient(135deg, rgba(59,130,246,0.08)"] {
+  background: linear-gradient(135deg, rgba(59,130,246,0.15) 0%, rgba(16,185,129,0.15) 100%) !important;
+  border-color: rgba(59,130,246,0.25) !important;
+}
+
+/* Cache Management Section Dark Mode */
+[data-theme="dark"] #clearCacheBtn {
+  background-color: transparent !important;
+  border-color: #dc2626 !important;
+  color: #f87171 !important;
+}
+
+[data-theme="dark"] #clearCacheBtn:hover {
+  background-color: #dc2626 !important;
+  border-color: #dc2626 !important;
+  color: white !important;
+}
+
+[data-theme="dark"] #clearCacheBtn:disabled {
+  background-color: #374151 !important;
+  border-color: #6b7280 !important;
+  color: #9ca3af !important;
+}
+
+[data-theme="dark"] #settingsBody hr {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+[data-theme="dark"] #settingsBody .text-muted {
+  color: #9ca3af !important;
+}
+
+[data-theme="dark"] #settingsBody .fw-semibold {
+  color: #f3f4f6 !important;
+}
+
+/* Live Tracking Popup Enhancements */
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Dark mode for enhanced live tracking popup - solid backgrounds */
+[data-theme="dark"] .popup-card-friendly {
+  background: linear-gradient(135deg, #1e293b 0%, #334155 100%) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Dark mode for arrival popup (green theme) - solid green background */
+[data-theme="dark"] .popup-card-friendly[style*="#e6fffa"] {
+  background: linear-gradient(135deg, #064e3b 0%, #065f46 100%) !important;
+  border-color: #10b981 !important;
+  box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4), 0 0 0 1px rgba(16, 185, 129, 0.3) !important;
+}
+
+[data-theme="dark"] .popup-card-friendly hr {
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+/* Text contrast for arrival popup in dark mode */
+[data-theme="dark"] .popup-card-friendly[style*="#e6fffa"] .text-muted {
+  color: #d1fae5 !important;
+}
+
+[data-theme="dark"] .popup-card-friendly[style*="#e6fffa"] div[style*="color:#475569"] {
+  color: #ecfdf5 !important;
+}
+
+[data-theme="dark"] .popup-card-friendly[style*="#e6fffa"] div[style*="color:#374151"] {
+  color: #f0fdf4 !important;
+}
+
+/* Status indicator dark mode - solid backgrounds */
+[data-theme="dark"] .popup-card-friendly div[style*="background: #fee2e2"] {
+  background: #7f1d1d !important;
+  border-color: #ef4444 !important;
+}
+
+/* Dark mode for speed warning status (dc2626) */
+[data-theme="dark"] .popup-card-friendly div[style*="color: #dc2626"] {
+  color: #f87171 !important;
+}
+
+[data-theme="dark"] .popup-card-friendly div[style*="background: #fef3c7"] {
+  background: #78350f !important;
+  border-color: #f59e0b !important;
+}
+
+[data-theme="dark"] .popup-card-friendly div[style*="background: #dcfce7"] {
+  background: #064e3b !important;
+  border-color: #10b981 !important;
+}
+
+[data-theme="dark"] .popup-card-friendly div[style*="background: #dbeafe"] {
+  background: #1e3a8a !important;
+  border-color: #3b82f6 !important;
+}
+
+[data-theme="dark"] .popup-card-friendly div[style*="background: #ede9fe"] {
+  background: #581c87 !important;
+  border-color: #8b5cf6 !important;
+}
+
+[data-theme="dark"] .popup-card-friendly div[style*="background: #f1f5f9"] {
+  background: #374151 !important;
+  border-color: #6b7280 !important;
+}
 #carouselaktif {
   content: url('image/logo_light.png');
   display: block;
@@ -323,4 +648,175 @@ label {
   background-color:  #fafafa;
   color: #0E1419 !important;
  font-size: 1.2em;
+}
+
+/* Facility info for live tracking */
+[data-theme="dark"] .facility-info-live {
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%) !important;
+    border: 1px solid #475569 !important;
+    color: #e2e8f0 !important;
+}
+
+[data-theme="dark"] .facility-info-live .fa-info-circle {
+    color: #60a5fa !important;
+}
+
+[data-theme="dark"] .facility-info-live .fa-wheelchair {
+    color: #34d399 !important;
+}
+
+[data-theme="dark"] .facility-info-live .fa-building {
+    color: #60a5fa !important;
+}
+
+[data-theme="dark"] .facility-info-live .fa-door-open {
+    color: #9ca3af !important;
+}
+
+[data-theme="dark"] .facility-info-live .fa-train-subway {
+    color: #a78bfa !important;
+}
+
+/* Platform info in arrival state */
+[data-theme="dark"] .fa-train-subway[style*="color: #059669"] {
+    color: #34d399 !important;
+}
+
+/* Intermodal info for live tracking */
+[data-theme="dark"] .intermodal-info-live {
+    background: linear-gradient(135deg, #2d1b47 0%, #1e1b4b 100%) !important;
+    border: 1px solid #6366f1 !important;
+    color: #e2e8f0 !important;
+}
+
+[data-theme="dark"] .intermodal-info-live .fa-route {
+    color: #a78bfa !important;
+}
+
+[data-theme="dark"] .intermodal-info-live span[style*="color: #6b21a8"] {
+    color: #c4b5fd !important;
+}
+
+/* Intermodal badges in dark mode */
+[data-theme="dark"] .intermodal-info-live div[style*="background: rgba(255,255,255,0.8)"] {
+    background: rgba(55, 65, 81, 0.9) !important;
+    border: 1px solid rgba(255,255,255,0.2) !important;
+    box-shadow: 0 1px 3px rgba(255,255,255,0.1) !important;
+}
+
+[data-theme="dark"] .intermodal-info-live div[style*="background: rgba(255,255,255,0.8)"] span {
+    color: #f3f4f6 !important;
+}
+
+/* Intermodal images in dark mode - slightly brightened for visibility */
+[data-theme="dark"] .intermodal-info-live .intermodal-icon-img {
+    opacity: 0.95;
+    filter: brightness(1.05);
+}
+
+/* Intermodal info items for popup halte and radius halte */
+[data-theme="dark"] .intermodal-info-item {
+    background: rgba(55, 65, 81, 0.9) !important;
+    border: 1px solid rgba(255,255,255,0.2) !important;
+    box-shadow: 0 1px 2px rgba(255,255,255,0.05) !important;
+}
+
+[data-theme="dark"] .intermodal-info-item span {
+    color: #f3f4f6 !important;
+}
+
+[data-theme="dark"] .intermodal-info-item .intermodal-icon-img {
+    opacity: 0.95;
+    filter: brightness(1.05);
+}
+
+/* Intermodal station info for popup halte */
+[data-theme="dark"] .intermodal-station-info {
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%) !important;
+    border: 1px solid #475569 !important;
+    color: #e2e8f0 !important;
+}
+
+[data-theme="dark"] .intermodal-station-info .fa-train {
+    color: #60a5fa !important;
+}
+
+[data-theme="dark"] .intermodal-station-info span[style*="color: #0284c7"] {
+    color: #60a5fa !important;
+}
+
+[data-theme="dark"] .intermodal-station-info span[style*="color: #374151"] {
+    color: #e2e8f0 !important;
+}
+
+/* Compact scrollbar for intermodal station info */
+[data-theme="dark"] .intermodal-station-info div[style*="overflow-y: auto"] {
+    scrollbar-width: thin;
+    scrollbar-color: #475569 #334155;
+}
+
+[data-theme="dark"] .intermodal-station-info div[style*="overflow-y: auto"]::-webkit-scrollbar {
+    width: 4px;
+}
+
+[data-theme="dark"] .intermodal-station-info div[style*="overflow-y: auto"]::-webkit-scrollbar-track {
+    background: #334155;
+    border-radius: 2px;
+}
+
+[data-theme="dark"] .intermodal-station-info div[style*="overflow-y: auto"]::-webkit-scrollbar-thumb {
+    background: #475569;
+    border-radius: 2px;
+}
+
+[data-theme="dark"] .intermodal-station-info div[style*="overflow-y: auto"]::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
+}
+
+/* Street name info in live tracking */
+[data-theme="dark"] .street-name-info {
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%) !important;
+    border: 1px solid #475569 !important;
+}
+
+[data-theme="dark"] .street-name-info span {
+    color: #e2e8f0 !important;
+}
+
+[data-theme="dark"] .street-name-info .fa-road {
+    color: #94a3b8 !important;
+}
+
+/* Enhanced arrival state styling for dark mode */
+[data-theme="dark"] .popup-card-friendly[style*="#e6fffa"] {
+    background: linear-gradient(135deg, #064e3b 0%, #065f46 100%) !important;
+    border: 1px solid #10b981 !important;
+    box-shadow: 0 8px 25px rgba(16,185,129,0.4), 0 0 0 1px rgba(16,185,129,0.2) !important;
+}
+
+/* Dark mode for new arrival notification banner */
+[data-theme="dark"] .popup-card-friendly div[style*="#dcfce7"][style*="#bbf7d0"] {
+    background: linear-gradient(135deg, #064e3b 0%, #065f46 100%) !important;
+    border: 1px solid #10b981 !important;
+    box-shadow: 0 2px 4px rgba(16,185,129,0.3) !important;
+    color: #10b981 !important;
+}
+
+/* Dark mode for arrival countdown text */
+[data-theme="dark"] .popup-card-friendly span[style*="color:#10b981"] {
+    color: #34d399 !important;
+}
+
+/* Other services in live tracking */
+[data-theme="dark"] .other-services-live {
+    background: linear-gradient(135deg, #1e1b17 0%, #2d251a 100%) !important;
+    border: 1px solid #f59e0b !important;
+}
+
+[data-theme="dark"] .other-services-live span[style*="color:#92400e"] {
+    color: #fbbf24 !important;
+}
+
+[data-theme="dark"] .other-services-live .fa-bus {
+    color: #f59e0b !important;
 }

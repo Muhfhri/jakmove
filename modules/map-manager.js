@@ -253,8 +253,9 @@ export class MapManager {
             if (this.map.getLayer('stops-hitbox')) this.map.moveLayer('stops-hitbox');
             if (this.map.getLayer('platform-dots')) this.map.moveLayer('platform-dots');
             if (this.map.getLayer('platform-hitbox')) this.map.moveLayer('platform-hitbox');
-            if (this.map.getLayer(this._radiusLayerId)) this.map.moveLayer(this._radiusLayerId);
             if (this.map.getLayer('radius-platform-dots')) this.map.moveLayer('radius-platform-dots');
+            // Ensure radius icons are on top of platform dots
+            if (this.map.getLayer(this._radiusLayerId)) this.map.moveLayer(this._radiusLayerId);
         } catch (e) {}
     }
 
@@ -675,28 +676,19 @@ export class MapManager {
                             const props = f.properties || {};
                             const code = props.platformCode || '';
                             let routeIds = [];
-                            try { routeIds = Array.isArray(props.routeIds) ? props.routeIds : (typeof props.routeIds === 'string' ? JSON.parse(props.routeIds) : []); } catch (e) { routeIds = []; }
+                            try { 
+                                routeIds = Array.isArray(props.routeIds) ? props.routeIds : 
+                                          (typeof props.routeIds === 'string' ? JSON.parse(props.routeIds) : []);
+                            } catch (e) { routeIds = []; }
+                            
                             if (!Array.isArray(routeIds) || routeIds.length === 0) {
                                 const sid = props.stopId;
                                 if (sid && stopToRoutes[sid]) routeIds = Array.from(stopToRoutes[sid]);
                             }
-                            const routesAll = window.transJakartaApp.modules.gtfs.getRoutes();
-                            const badges = (routeIds || []).map(rid => {
-                                const r = routesAll.find(rt => rt.route_id === rid);
-                                if (!r) return '';
-                                const color = r.route_color ? `#${r.route_color}` : '#6c757d';
-                                return `<span class=\"badge badge-koridor-interaktif\" style=\"background:${color};color:#fff;font-weight:600;font-size:0.72em;padding:3px 7px;margin-right:6px;margin-bottom:6px;border-radius:9999px;\" data-routeid=\"${r.route_id}\">${r.route_short_name}</span>`;
-                            }).join('');
-                            const title = code ? `Platform ${code}` : 'Platform';
-                            const html = `
-                                <div class=\"stop-popup plus-jakarta-sans\" style=\"min-width:220px;max-width:300px;padding:10px 12px;\">
-                                    <div style=\"color:#333;padding:6px 0;border-bottom:1px solid #eee;margin-bottom:6px;display:flex;align-items:center;gap:6px;\">
-                                        <div style=\"font-size:13px;font-weight:700;\">${title}</div>
-                                    </div>
-                                    <div style=\"font-size:11px;color:#666;margin-bottom:6px;\">Layanan pada platform ini</div>
-                                    <div style=\"display:flex;flex-wrap:nowrap;gap:4px;overflow-x:auto;-webkit-overflow-scrolling:touch;\">${badges}</div>
-                                </div>`;
-                            this.showHtmlPopupAt(e.lngLat.lng, e.lngLat.lat, html);
+                            
+                            // Use the enhanced platform popup without moving map
+                            const coords = f.geometry.coordinates;
+                            this.showPlatformPopupAt(code, coords[1], coords[0], routeIds);
                         };
                         this.map.on('click', pfHitId, this._onPlatformClick);
                         this.map.on('mouseenter', pfHitId, () => { this.map.getCanvas().style.cursor = 'pointer'; });
@@ -954,14 +946,61 @@ export class MapManager {
             jenisHtml = `<div style=\"font-size: 12px; color: #64748b; margin-bottom: 6px;\">Platform: ${platformCodes.join('-')}</div>`;
         }
 
-        // Semua layanan di halte
+        // Semua layanan di halte dengan jurusan
         const semuaBadges = unionRouteIds
             .filter(rid => !currentRouteId || String(rid) !== String(currentRouteId))
             .map(rid => {
                 const r = routes.find(rt => rt.route_id === rid);
                 if (!r) return '';
                 const color = r.route_color ? `#${r.route_color}` : '#6c757d';
-            return `<span class=\"badge badge-koridor-interaktif\" style=\"background:${color};color:#fff;cursor:pointer;font-weight:600;font-size:0.74em;padding:3px 7px;margin-right:6px;margin-bottom:6px;border-radius:9999px;\" data-routeid=\"${r.route_id}\">${r.route_short_name}</span>`;
+                const routeName = r.route_short_name || r.route_id;
+                const direction = r.route_long_name || '';
+                
+                return `
+                    <div class="route-service-item badge-koridor-interaktif" style="
+                        background: linear-gradient(135deg, ${color}15 0%, ${color}08 100%);
+                        border: 1px solid ${color}30;
+                        border-radius: 12px;
+                        padding: 8px 12px;
+                        margin-bottom: 8px;
+                        cursor: pointer;
+                        transition: all 0.2s ease;
+                        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+                        width: 100%;
+                        box-sizing: border-box;
+                    " data-routeid="${r.route_id}"
+                       onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'"
+                       onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 4px rgba(0,0,0,0.05)'">
+                        <div style="display: flex; align-items: flex-start; gap: 8px; width: 100%;">
+                            <span class="route-badge" style="
+                                background: ${color};
+                                color: white;
+                                padding: 4px 10px;
+                                border-radius: 20px;
+                                font-weight: bold;
+                                font-size: 0.85em;
+                                box-shadow: 0 2px 4px ${color}40;
+                                flex-shrink: 0;
+                                white-space: nowrap;
+                            ">${routeName}</span>
+                            ${direction ? `<span style="
+                                color: #475569;
+                                font-size: 0.85em;
+                                font-weight: 500;
+                                line-height: 1.4;
+                                flex: 1;
+                                word-wrap: break-word;
+                                overflow-wrap: break-word;
+                                hyphens: auto;
+                                min-width: 0;
+                                max-width: 100%;
+                                padding-top: 1px;
+                                display: block;
+                                white-space: normal;
+                            ">${direction}</span>` : ''}
+                        </div>
+                    </div>
+                `;
             }).join('');
 
         // Active route prefix before stop name as a badge
@@ -1061,12 +1100,68 @@ export class MapManager {
 						if (!r) return '';
 						const color = r.route_color ? `#${r.route_color}` : '#6c757d';
 						const shortName = r.route_short_name || rid;
-						return `<div class=\"pf-next-item\" data-routeid=\"${r.route_id}\" style=\"display:flex;align-items:center;gap:8px;margin:2px 0;cursor:pointer;\"><span class=\"badge\" data-routeid=\"${r.route_id}\" style=\"background:${color};color:#fff;font-weight:700;font-size:0.72em;padding:3px 7px;border-radius:9999px;\">${shortName}</span><span class=\"next-name\" style=\"color:#111827;\">-<\/span><\/div>`;
+						
+						// Get next stop for this route from this platform
+						let nextStopName = '';
+						try {
+							if (gtfs && gtfs.calculateNextStopForRoute) {
+								// Try to find platform stop ID for this platform
+								const platformStop = gtfs.getStops().find(s => 
+									String(s.stop_id || '').startsWith('G') && 
+									String(s.platform_code || '').trim() === String(p.code || '').trim()
+								);
+								if (platformStop) {
+									nextStopName = gtfs.calculateNextStopForRoute(platformStop.stop_id, rid) || '';
+								}
+							}
+						} catch (e) {
+							console.log('Error getting next stop for platform:', e);
+						}
+						
+						const displayNextStop = nextStopName || '-';
+						return `<div class=\"pf-next-item\" data-routeid=\"${r.route_id}\" style=\"display:flex;align-items:center;gap:8px;margin:2px 0;cursor:pointer;\"><span class=\"badge\" data-routeid=\"${r.route_id}\" style=\"background:${color};color:#fff;font-weight:700;font-size:0.72em;padding:3px 7px;border-radius:9999px;\">${shortName}</span><span class=\"next-name\" style=\"color:#111827;\">${displayNextStop}<\/span><\/div>`;
 			}).join('');
 				}
 				
 				return `
-				<div class=\"pf-block\" data-pf=\"${idx}\" data-code=\"${p.code}\" data-lat=\"${p.lat || 0}\" data-lng=\"${p.lng || 0}\" style=\"margin:8px 0;\">\n\t\t\t\t\t<div class=\"pf-row\" style=\"font-weight:600;color:#475569;\">Platform ${p.code}<\/div>\n\t\t\t\t\t<div class=\"pf-next\">${perRoute}<\/div>\n\t\t\t\t\t<div class=\"pf-actions\" style=\"margin-top:6px;\"><button class=\"pf-open btn btn-sm btn-outline-secondary\" data-code=\"${p.code}\" data-lat=\"${p.lat || 0}\" data-lng=\"${p.lng || 0}\" data-rids=\"${encodeURIComponent(JSON.stringify(p.routeIds||[]))}\" style=\"padding:3px 8px;font-size:11px;\">Lihat<\/button><\/div>\n\t\t\t\t<\/div>`;
+				<div class="pf-block" data-pf="${idx}" data-code="${p.code}" data-lat="${p.lat || 0}" data-lng="${p.lng || 0}" style="
+					background: white;
+					border-radius: 8px;
+					padding: 10px;
+					margin-bottom: 8px;
+					border: 1px solid #e2e8f0;
+					box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+				">
+					<div class="pf-row" style="
+						font-weight: 700;
+						color: #1f2937;
+						font-size: 13px;
+						margin-bottom: 6px;
+						display: flex;
+						align-items: center;
+						gap: 6px;
+					">
+						<i class="fa-solid fa-location-dot" style="color: #8b5cf6; font-size: 12px;"></i>
+						Platform ${p.code}
+					</div>
+					<div class="pf-next" style="margin-bottom: 8px;">${perRoute}</div>
+					<div class="pf-actions">
+						<button class="pf-open btn btn-sm" data-code="${p.code}" data-lat="${p.lat || 0}" data-lng="${p.lng || 0}" data-rids="${encodeURIComponent(JSON.stringify(p.routeIds||[]))}" style="
+							background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+							color: white;
+							border: none;
+							padding: 4px 12px;
+							font-size: 11px;
+							border-radius: 6px;
+							font-weight: 500;
+							box-shadow: 0 2px 4px rgba(59,130,246,0.3);
+							transition: all 0.2s ease;
+						" onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 8px rgba(59,130,246,0.4)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 4px rgba(59,130,246,0.3)'">
+							<i class="fa-solid fa-eye" style="margin-right: 4px;"></i>
+							Lihat
+						</button>
+					</div>
+				</div>`;
 			}).filter(row => row !== '').join('');
 			// Collapse logic: show first 2 rows, toggle to show all
 			const total = platformMap.length;
@@ -1074,9 +1169,31 @@ export class MapManager {
 			const htmlRows = `
 				<div id=\"${pfId}-rows\">${rows}</div>
 			`;
-			const toggleBtn = total > visible ? `<button id=\"${pfId}-toggle\" class=\"btn btn-sm btn-link p-0\" type=\"button\">Tampilkan semua (${total})</button>` : '';
+			const toggleBtn = total > visible ? `<button id=\"${pfId}-toggle\" class=\"btn btn-sm pf-toggle-btn\" type=\"button\" style=\"background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; padding: 4px 8px; font-size: 11px; border-radius: 6px; font-weight: 500; transition: all 0.15s ease;\">Tampilkan semua (${total})</button>` : '';
 			platformDetailHtml = `
-				<div style=\"margin-top:8px;\">\n\t\t\t\t\t<div style=\"font-size:11px;color:#666;margin-bottom:4px;\">Per Platform</div>\n\t\t\t\t\t<div id=\"${pfId}\">${htmlRows}${toggleBtn}</div>\n\t\t\t\t</div>`;
+				<div style="margin-bottom: 16px;">
+					<div class="pf-header" style="
+						font-size: 12px; 
+						color: #64748b; 
+						font-weight: 600; 
+						margin-bottom: 12px;
+						display: flex;
+						align-items: center;
+						gap: 6px;
+					">
+						<i class="fa-solid fa-train-subway pf-header-icon" style="color: #8b5cf6;"></i>
+						Per Platform
+					</div>
+					<div id="${pfId}" class="pf-container" style="
+						background: #f8fafc;
+						border-radius: 12px;
+						padding: 12px;
+						border: 1px solid #e2e8f0;
+					">
+						${htmlRows}
+						${toggleBtn ? `<div style="text-align: center; margin-top: 8px;">${toggleBtn}</div>` : ''}
+					</div>
+				</div>`;
 			// After popup render we will collapse extra rows and bind toggle
 			setTimeout(() => {
 				try {
@@ -1091,11 +1208,25 @@ export class MapManager {
 						}
 						const btn = container.querySelector('#' + CSS.escape(pfId) + '-toggle');
 						let expanded = false;
-						if (btn) btn.addEventListener('click', () => {
+						if (btn) {
+							// Click handler
+							btn.addEventListener('click', () => {
 							expanded = !expanded;
 							for (let i = 2; i < blocks.length; i++) blocks[i].style.display = expanded ? '' : 'none';
 							btn.textContent = expanded ? 'Sembunyikan' : `Tampilkan semua (${blocks.length})`;
 						});
+							// Hover effects
+							btn.addEventListener('mouseenter', () => {
+								btn.style.background = '#e2e8f0';
+								btn.style.borderColor = '#cbd5e1';
+								btn.style.transform = 'translateY(-1px)';
+							});
+							btn.addEventListener('mouseleave', () => {
+								btn.style.background = '#f8fafc';
+								btn.style.borderColor = '#e2e8f0';
+								btn.style.transform = 'translateY(0)';
+							});
+						}
 					}
 					// Bind per-route click to select route and (conditionally) start Live from this platform
 					const onRouteClick = (ev) => {
@@ -1185,7 +1316,153 @@ export class MapManager {
         const weatherHtml = this.getStopWeatherHtml(thisStop);
 
         const popupContent = `
-            <div class=\"stop-popup plus-jakarta-sans\" style=\"min-width: 220px; max-width: 330px; padding: 10px 12px;\">\n                <div style=\"color: #333; padding: 6px 0; border-bottom: 1px solid #eee; margin-bottom: 6px; display:flex; align-items:center; gap:6px;\">\n                    <div style=\"display:flex;align-items:center;gap:6px;\">${activePrefix}<span style=\"font-size: 14px; font-weight: 600;\">${stop.properties.stopName}</span>\n                        ${(() => { try { const rm = window.transJakartaApp.modules.routes; const stopObj = window.transJakartaApp.modules.gtfs.getStops().find(s => String(s.stop_id) === String(stop.properties.stopId)); if (!rm || !stopObj) return ''; const html = rm.buildIntermodalIconsForStop ? rm.buildIntermodalIconsForStop(stopObj) : ''; return html || ''; } catch(e){ return ''; } })()}\n                        ${(() => { try { const rm = window.transJakartaApp.modules.routes; const stopObj = window.transJakartaApp.modules.gtfs.getStops().find(s => String(s.stop_id) === String(stop.properties.stopId)); if (!rm || !stopObj) return ''; if (rm.shouldShowJaklingkoBadge && rm.shouldShowJaklingkoBadge(stopObj)) { return '<img class="jaklingko-badge" src="https://transportforjakarta.or.id/wp-content/uploads/2024/10/jaklingko-w-AR0bObLen0c7yK8n-768x768.png" alt="JakLingko" title="Terintegrasi JakLingko" />'; } return ''; } catch(e){ return ''; } })()}\n                    </div>\n                    ${wheelchairIconHtml}\n                </div>\n                ${weatherHtml}\n                <div class=\"popup-scroll\" style=\"max-height:56vh;overflow:auto;\">\n                ${jenisHtml}\n                    ${semuaBadges ? `\n                <div>\n                        <div style=\"font-size: 11px; color: #666; margin-bottom: 6px;\">Layanan</div>\n                        <div style=\"display:flex;flex-wrap:wrap;gap:4px;\">\n                            ${semuaBadges}\n                    </div>\n                </div>` : ''}\n                    ${platformDetailHtml}\n                </div>\n            </div>\n        `;
+            <div class="stop-popup plus-jakarta-sans" style="
+                min-width: 280px; 
+                max-width: 420px; 
+                padding: 16px;
+                background: white;
+                border-radius: 16px;
+                box-shadow: 0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08);
+                border: 1px solid rgba(0,0,0,0.06);
+                word-wrap: break-word;
+                overflow-wrap: break-word;
+            ">
+                <!-- Header -->
+                <div style="
+                    color: #1f2937; 
+                    padding: 0 0 12px 0; 
+                    border-bottom: 2px solid #f1f5f9; 
+                    margin-bottom: 16px; 
+                    display: flex; 
+                    align-items: center; 
+                    gap: 8px;
+                ">
+                    <div style="display: flex; align-items: center; gap: 8px; flex: 1;">
+                        ${activePrefix}
+                        <span style="font-size: 16px; font-weight: 700; color: #1f2937;">
+                            ${stop.properties.stopName}
+                        </span>
+                        ${(() => { 
+                            try { 
+                                const rm = window.transJakartaApp.modules.routes; 
+                                const stopObj = window.transJakartaApp.modules.gtfs.getStops().find(s => String(s.stop_id) === String(stop.properties.stopId)); 
+                                if (!rm || !stopObj) return ''; 
+                                const html = rm.buildIntermodalIconsForStop ? rm.buildIntermodalIconsForStop(stopObj) : ''; 
+                                return html || ''; 
+                            } catch(e){ return ''; } 
+                        })()}
+                        ${(() => { 
+                            try { 
+                                const rm = window.transJakartaApp.modules.routes; 
+                                const stopObj = window.transJakartaApp.modules.gtfs.getStops().find(s => String(s.stop_id) === String(stop.properties.stopId)); 
+                                if (!rm || !stopObj) return ''; 
+                                if (rm.shouldShowJaklingkoBadge && rm.shouldShowJaklingkoBadge(stopObj)) { 
+                                    return '<img class="jaklingko-badge" src="https://transportforjakarta.or.id/wp-content/uploads/2024/10/jaklingko-w-AR0bObLen0c7yK8n-768x768.png" alt="JakLingko" title="Terintegrasi JakLingko" style="width: 20px; height: 20px; border-radius: 4px;" />'; 
+                                } 
+                                return ''; 
+                            } catch(e){ return ''; } 
+                        })()}
+                    </div>
+                    <div style="font-size: 18px;">${wheelchairIconHtml}</div>
+                </div>
+                
+                ${(() => {
+                    // Add distance from user for nearest stops (below header)
+                    if (allowAutoLive && options.origin === 'nearest') {
+                        try {
+                            const loc = window.transJakartaApp.modules.location;
+                            if (loc && (loc.lastUserPosSmoothed || loc.lastUserPos)) {
+                                const userPos = loc.lastUserPosSmoothed || loc.lastUserPos;
+                                const stopLat = lngLat.lat || parseFloat(stop.geometry.coordinates[1]);
+                                const stopLon = lngLat.lng || parseFloat(stop.geometry.coordinates[0]);
+                                
+                                const distance = loc.haversine(
+                                    userPos.lat, userPos.lon, 
+                                    stopLat, stopLon
+                                );
+                                
+                                const distText = distance < 1000 ? 
+                                    `${Math.round(distance)} m` : 
+                                    `${(distance/1000).toFixed(2)} km`;
+                                    
+                                return `
+                                    <div style="
+                                        display: flex;
+                                        align-items: center;
+                                        gap: 8px;
+                                        padding: 8px 0;
+                                        border-bottom: 1px solid #e2e8f0;
+                                        margin-bottom: 12px;
+                                    ">
+                                        <i class="fa-solid fa-route" style="color: #64748b; font-size: 12px;"></i>
+                                        <span class="nearest-popup-distance" style="
+                                            color: #64748b;
+                                            font-size: 13px;
+                                            font-weight: 500;
+                                        ">Jarak: ${distText}</span>
+                                        <span style="
+                                            background: linear-gradient(45deg, #10b981, #059669);
+                                            color: white;
+                                            font-size: 9px;
+                                            padding: 2px 8px;
+                                            border-radius: 12px;
+                                            font-weight: 600;
+                                            text-transform: uppercase;
+                                            letter-spacing: 0.5px;
+                                            box-shadow: 0 1px 3px rgba(16,185,129,0.3);
+                                        " class="nearest-popup-real-badge" title="Jarak dihitung secara real-time dari posisi Anda saat ini">
+                                            REAL
+                                        </span>
+                                    </div>
+                                `;
+                            }
+                        } catch (e) {
+                            console.debug('[Map] Error calculating distance for nearest popup:', e);
+                        }
+                    }
+                    return '';
+                })()}
+                
+                ${weatherHtml}
+                
+                ${(() => { 
+                    try { 
+                        const rm = window.transJakartaApp.modules.routes; 
+                        const stopObj = window.transJakartaApp.modules.gtfs.getStops().find(s => String(s.stop_id) === String(stop.properties.stopId)); 
+                        if (!rm || !stopObj) return ''; 
+                        const html = rm.buildIntermodalStationInfo ? rm.buildIntermodalStationInfo(stopObj) : ''; 
+                        return html || ''; 
+                    } catch(e){ return ''; } 
+                })()}
+                
+                <!-- Content -->
+                <div class="popup-scroll" style="max-height: 60vh; overflow: auto;">
+                    ${jenisHtml}
+                    
+                    ${semuaBadges ? `
+                        <div style="margin-bottom: 16px;">
+                            <div style="
+                                font-size: 12px; 
+                                color: #64748b; 
+                                font-weight: 600; 
+                                margin-bottom: 12px;
+                                display: flex;
+                                align-items: center;
+                                gap: 6px;
+                            ">
+                                <i class="fa-solid fa-route" style="color: #3b82f6;"></i>
+                                Layanan Tersedia
+                            </div>
+                            <div class="services-container">
+                                ${semuaBadges}
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    ${platformDetailHtml}
+                </div>
+            </div>
+        `;
 
         if (this._currentPopup) this._currentPopup.remove();
         this._currentPopup = this.featurePopup.setLngLat(lngLat).setHTML(popupContent).addTo(this.map);
@@ -1253,8 +1530,45 @@ export class MapManager {
                         if (this._currentPopup) { this._currentPopup.remove(); this._currentPopup = null; }
                     }
                 };
-                badge.addEventListener('click', handler);
-                badge.addEventListener('touchstart', handler, { passive: false });
+                // Proper click/touch handling - avoid triggering on hold
+                let touchStartTime = 0;
+                let touchMoved = false;
+                
+                // Handle touch events properly
+                badge.addEventListener('touchstart', (e) => {
+                    touchStartTime = Date.now();
+                    touchMoved = false;
+                    // Add visual feedback for touch
+                    badge.style.opacity = '0.7';
+                    badge.style.transform = 'scale(0.98)';
+                }, { passive: true });
+                
+                badge.addEventListener('touchmove', (e) => {
+                    touchMoved = true;
+                    // Remove visual feedback if user moves finger
+                    badge.style.opacity = '';
+                    badge.style.transform = '';
+                }, { passive: true });
+                
+                badge.addEventListener('touchend', (e) => {
+                    const touchDuration = Date.now() - touchStartTime;
+                    // Reset visual feedback
+                    badge.style.opacity = '';
+                    badge.style.transform = '';
+                    
+                    // Only trigger if it's a quick tap (not a hold) and no movement
+                    if (touchDuration < 500 && !touchMoved) {
+                        e.preventDefault();
+                        handler(e);
+                    }
+                }, { passive: false });
+                
+                // Handle regular mouse clicks
+                badge.addEventListener('click', (e) => {
+                    // Prevent double triggering on devices that fire both touch and mouse events
+                    if (e.detail === 0) return; // Ignore programmatic clicks
+                    handler(e);
+                });
             });
         }, 50);
     }
@@ -1285,10 +1599,24 @@ export class MapManager {
 
     // Implement radius markers
     showHalteRadius(centerLng, centerLat, radius = 300) {
-        // Throttle updates to avoid jank
-        this._radiusRequest = { centerLng, centerLat, radius };
-        if (this._radiusUpdateTimer) clearTimeout(this._radiusUpdateTimer);
-        this._radiusUpdateTimer = setTimeout(() => this._updateHalteRadius(), 120);
+		// Skip tiny moves to avoid unnecessary recompute
+		try {
+			const zoom = this.map && this.map.getZoom ? this.map.getZoom() : undefined;
+			if (this._lastRadiusCenter && typeof zoom === 'number' && typeof this._lastRadiusZoom === 'number') {
+				const dMove = this._haversine(this._lastRadiusCenter.lat, this._lastRadiusCenter.lng, centerLat, centerLng);
+				const dz = Math.abs(zoom - this._lastRadiusZoom);
+				if (dMove < 70 && dz < 0.15) {
+					return; // ignore micro-pans/zooms
+				}
+			}
+			this._lastRadiusCenter = { lat: centerLat, lng: centerLng };
+			this._lastRadiusZoom = zoom;
+		} catch (e) {}
+
+		// Throttle updates to avoid jank
+		this._radiusRequest = { centerLng, centerLat, radius };
+		if (this._radiusUpdateTimer) clearTimeout(this._radiusUpdateTimer);
+		this._radiusUpdateTimer = setTimeout(() => this._updateHalteRadius(), 220);
     }
 
     _updateHalteRadius() {
@@ -1328,7 +1656,7 @@ export class MapManager {
                         isPlatform: String(s.stop_id||'').startsWith('G')
                     };
                 }).filter(o => o.d <= radius).sort((a,b) => a.d - b.d);
-                const limited = computed.slice(0, 30);
+                const limited = computed.slice(0, 24);
                 // Separate base stops and platforms for proper handling
                 selected = limited.filter(o => !o.isPlatform).map(o => ({ 
                     type: 'Feature', 
@@ -1372,39 +1700,90 @@ export class MapManager {
                 this.map.addSource(this._radiusSourceId, { type: 'geojson', data });
             }
 
-            // Add a lightweight circle layer for performance
-            if (!this.map.getLayer(this._radiusLayerId)) {
-                this.map.addLayer({
-                    id: this._radiusLayerId,
-                    type: 'circle',
-                    source: this._radiusSourceId,
-                    paint: {
-                        'circle-radius': [
-                            'case',
-                            ['==', ['get', 'stopType'], 'Pengumpan'], 4.5,
-                            5.5
-                        ],
-                        'circle-color': [
-                            'case',
-                            ['==', ['get', 'stopType'], 'Pengumpan'], '#f59e0b',
-                            '#2563eb'
-                        ],
-                        'circle-stroke-color': '#ffffff',
-                        'circle-stroke-width': 1.2
-                    }
-                });
-            } else {
-                // Update paint to ensure styling persists
+            // Switchable: image icons vs simple circles based on settings
+            const useImages = (() => {
                 try {
-                    this.map.setPaintProperty(this._radiusLayerId, 'circle-radius', [
-                        'case', ['==', ['get', 'stopType'], 'Pengumpan'], 4.5, 5.5
-                    ]);
-                    this.map.setPaintProperty(this._radiusLayerId, 'circle-color', [
-                        'case', ['==', ['get', 'stopType'], 'Pengumpan'], '#f59e0b', '#2563eb'
-                    ]);
-                    this.map.setPaintProperty(this._radiusLayerId, 'circle-stroke-color', '#ffffff');
-                    this.map.setPaintProperty(this._radiusLayerId, 'circle-stroke-width', 1.2);
-                } catch (e) {}
+                    const settings = window.transJakartaApp?.modules?.settings;
+                    return !settings || settings.isEnabled('radiusImageIcons');
+                } catch (e) { return true; }
+            })();
+
+            if (useImages) {
+                this._ensureStopIconsLoaded();
+                if (!this.map.getLayer(this._radiusLayerId)) {
+                    this.map.addLayer({
+                        id: this._radiusLayerId,
+                        type: 'symbol',
+                        source: this._radiusSourceId,
+                        layout: {
+                            'icon-image': [
+                                'case',
+                                ['==', ['get', 'stopType'], 'Pengumpan'], 'tj-stop-feeder',
+                                'tj-stop-brt'
+                            ],
+                            'icon-size': [
+                                'case',
+                                ['==', ['get', 'stopType'], 'Pengumpan'], 0.008,
+                                0.012
+                            ],
+                            'icon-rotate': [
+                                'case',
+                                ['==', ['get', 'stopType'], 'Pengumpan'], 180,
+                                0
+                            ],
+                            'icon-allow-overlap': true,
+                            'icon-ignore-placement': true
+                        }
+                    });
+                } else {
+                    try {
+                        this.map.setLayoutProperty(this._radiusLayerId, 'icon-image', [
+                            'case', ['==', ['get', 'stopType'], 'Pengumpan'], 'tj-stop-feeder', 'tj-stop-brt'
+                        ]);
+                        this.map.setLayoutProperty(this._radiusLayerId, 'icon-size', [
+                            'case', ['==', ['get', 'stopType'], 'Pengumpan'], 0.008, 0.012
+                        ]);
+                        this.map.setLayoutProperty(this._radiusLayerId, 'icon-rotate', [
+                            'case', ['==', ['get', 'stopType'], 'Pengumpan'], 180, 0
+                        ]);
+                        this.map.setLayoutProperty(this._radiusLayerId, 'icon-allow-overlap', true);
+                        this.map.setLayoutProperty(this._radiusLayerId, 'icon-ignore-placement', true);
+                    } catch (e) {}
+                }
+            } else {
+                // Fallback to lightweight circles for performance
+                if (!this.map.getLayer(this._radiusLayerId)) {
+                    this.map.addLayer({
+                        id: this._radiusLayerId,
+                        type: 'circle',
+                        source: this._radiusSourceId,
+                        paint: {
+                            'circle-radius': [
+                                'case',
+                                ['==', ['get', 'stopType'], 'Pengumpan'], 4.5,
+                                5.5
+                            ],
+                            'circle-color': [
+                                'case',
+                                ['==', ['get', 'stopType'], 'Pengumpan'], '#f59e0b',
+                                '#2563eb'
+                            ],
+                            'circle-stroke-color': '#ffffff',
+                            'circle-stroke-width': 1.2
+                        }
+                    });
+                } else {
+                    try {
+                        this.map.setPaintProperty(this._radiusLayerId, 'circle-radius', [
+                            'case', ['==', ['get', 'stopType'], 'Pengumpan'], 4.5, 5.5
+                        ]);
+                        this.map.setPaintProperty(this._radiusLayerId, 'circle-color', [
+                            'case', ['==', ['get', 'stopType'], 'Pengumpan'], '#f59e0b', '#2563eb'
+                        ]);
+                        this.map.setPaintProperty(this._radiusLayerId, 'circle-stroke-color', '#ffffff');
+                        this.map.setPaintProperty(this._radiusLayerId, 'circle-stroke-width', 1.2);
+                    } catch (e) {}
+                }
             }
 
             // Platform dots overlay for radius
@@ -1540,10 +1919,13 @@ export class MapManager {
                 const app = window.transJakartaApp;
                 if (routeIdsAtStop.length === 1) {
                     try { app.modules.location.suspendUpdates(true); } catch (e) {}
-                    app.modules.routes.selectRoute(routeIdsAtStop[0]);
+                    // Defer route select slightly to keep map interaction smooth
+                    setTimeout(() => app.modules.routes.selectRoute(routeIdsAtStop[0]), 0);
                     this._resumeAfterIdle();
                 } else {
-                    this.showStopPopup(f, e.lngLat);
+                    // Use requestAnimationFrame to defer heavy popup build off the gesture
+                    const feature = f; const lngLat = e.lngLat;
+                    requestAnimationFrame(() => this.showStopPopup(feature, lngLat));
                 }
             };
             this.map.on('click', this._radiusLayerId, this._onRadiusClick);
@@ -2308,45 +2690,6 @@ export class MapManager {
         this.map.on('idle', resume);
     }
 
-    navigateToPlatformAndShow(code, lat, lng, routeIds) {
-        const routes = window.transJakartaApp.modules.gtfs.getRoutes();
-        // Focus map to platform location
-        try { this.setView(lat, lng, Math.max(this.map.getZoom() || 16, 18)); } catch (e) {}
-        // Build badges
-        const badges = (routeIds || []).map(rid => {
-            const r = routes.find(rt => String(rt.route_id) === String(rid));
-            if (!r) return '';
-            const color = r.route_color ? `#${r.route_color}` : '#6c757d';
-            return `<span class="badge badge-koridor-interaktif" style="background:${color};color:#fff;font-weight:600;font-size:0.72em;padding:3px 7px;margin-right:6px;margin-bottom:6px;" data-routeid="${r.route_id}">${r.route_short_name}</span>`;
-        }).join('');
-        const title = code ? `Platform ${code}` : 'Platform';
-        const html = `
-            <div class="stop-popup plus-jakarta-sans" style="min-width:220px;max-width:300px;padding:10px 12px;">
-                <div style="color:#333;padding:6px 0;border-bottom:1px solid #eee;margin-bottom:6px;display:flex;align-items:center;gap:6px;">
-                    <div style="font-size:13px;font-weight:700;">${title}</div>
-                </div>
-                <div style="font-size:11px;color:#666;margin-bottom:6px;">Layanan pada platform ini</div>
-                <div style="display:flex;flex-wrap:wrap;gap:4px;">${badges}</div>
-            </div>`;
-        this.showHtmlPopupAt(lng, lat, html);
-        // Bind route badge clicks (no auto-live here)
-        setTimeout(() => {
-            const el = this._currentPopup && this._currentPopup.getElement();
-            if (!el) return;
-            el.querySelectorAll('.badge-koridor-interaktif').forEach(badge => {
-                const handler = (e) => {
-                    e.stopPropagation(); e.preventDefault();
-                    const routeId = badge.getAttribute('data-routeid');
-                    try { window.transJakartaApp.modules.location.suspendUpdates(true); } catch (e) {}
-                    window.transJakartaApp.modules.routes.selectRoute(routeId);
-                    this._resumeAfterIdle();
-                    if (this._currentPopup) { this._currentPopup.remove(); this._currentPopup = null; }
-                };
-                badge.addEventListener('click', handler);
-                badge.addEventListener('touchstart', handler, { passive: false });
-            });
-        }, 50);
-    }
 
     // Control user marker visibility (avoid duplicate visuals during live popup)
     setUserMarkerVisible(visible) {
@@ -2375,25 +2718,627 @@ export class MapManager {
 
     navigateToPlatformAndShow(code, lat, lng, routeIds) {
         const routes = window.transJakartaApp.modules.gtfs.getRoutes();
+        const gtfs = window.transJakartaApp.modules.gtfs;
+        
         // Focus map to platform location
         try { this.setView(lat, lng, Math.max(this.map.getZoom() || 16, 18)); } catch (e) {}
-        // Build badges
-        const badges = (routeIds || []).map(rid => {
+        
+        // Find platform stop to get parent halte name
+        let platformStop = null;
+        let parentHalteName = '';
+        try {
+            const allStops = gtfs.getStops() || [];
+            platformStop = allStops.find(s => 
+                String(s.stop_id || '').startsWith('G') && 
+                String(s.platform_code || '').trim() === String(code || '').trim() &&
+                Math.abs(parseFloat(s.stop_lat) - lat) < 0.001 && 
+                Math.abs(parseFloat(s.stop_lon) - lng) < 0.001
+            );
+            
+            if (platformStop && platformStop.parent_station) {
+                const parentStop = allStops.find(s => String(s.stop_id) === String(platformStop.parent_station));
+                if (parentStop) {
+                    parentHalteName = parentStop.stop_name || '';
+                }
+            } else if (platformStop) {
+                // Fallback: find by name clustering
+                const normalizeName = (n) => String(n || '').trim().replace(/\s+/g, ' ');
+                const platformName = normalizeName(platformStop.stop_name);
+                const nameBasedParent = allStops.find(s => 
+                    String(s.stop_id || '').startsWith('H') && 
+                    normalizeName(s.stop_name) === platformName
+                );
+                if (nameBasedParent) {
+                    parentHalteName = nameBasedParent.stop_name || '';
+                }
+            }
+        } catch (e) {
+            console.log('Error finding parent halte:', e);
+        }
+        
+        // Get intermodal station info for the parent halte
+        let intermodalStationInfo = '';
+        try {
+            const rm = window.transJakartaApp.modules.routes;
+            if (rm && rm.buildIntermodalStationInfo && platformStop) {
+                // Try to find parent halte for intermodal info
+                const allStops = gtfs.getStops() || [];
+                let targetStop = null;
+                
+                if (platformStop.parent_station) {
+                    targetStop = allStops.find(s => String(s.stop_id) === String(platformStop.parent_station));
+                } else {
+                    // Use platform stop name to find H-type stop
+                    const normalizeName = (n) => String(n || '').trim().replace(/\s+/g, ' ');
+                    const platformName = normalizeName(platformStop.stop_name);
+                    targetStop = allStops.find(s => 
+                        String(s.stop_id || '').startsWith('H') && 
+                        normalizeName(s.stop_name) === platformName
+                    );
+                }
+                
+                if (targetStop) {
+                    intermodalStationInfo = rm.buildIntermodalStationInfo(targetStop) || '';
+                }
+            }
+        } catch(e) {
+            console.log('Error building intermodal info:', e);
+        }
+        
+        // Build enhanced service cards with route directions and next stops
+        const serviceCards = (routeIds || []).map(rid => {
             const r = routes.find(rt => String(rt.route_id) === String(rid));
             if (!r) return '';
             const color = r.route_color ? `#${r.route_color}` : '#6c757d';
-            return `<span class="badge badge-koridor-interaktif" style="background:${color};color:#fff;font-weight:600;font-size:0.72em;padding:3px 7px;margin-right:6px;margin-bottom:6px;" data-routeid="${r.route_id}">${r.route_short_name}</span>`;
-        }).join('');
-        const title = code ? `Platform ${code}` : 'Platform';
-        const html = `
-            <div class="stop-popup plus-jakarta-sans" style="min-width:220px;max-width:300px;padding:10px 12px;">
-                <div style="color:#333;padding:6px 0;border-bottom:1px solid #eee;margin-bottom:6px;display:flex;align-items:center;gap:6px;">
-                    <div style="font-size:13px;font-weight:700;">${title}</div>
+            const routeName = r.route_short_name || r.route_id;
+            const direction = r.route_long_name || '';
+            
+            // Get next stop for this route from this platform
+            let nextStopName = '';
+            try {
+                if (platformStop) {
+                    nextStopName = gtfs.calculateNextStopForRoute ? 
+                        gtfs.calculateNextStopForRoute(platformStop.stop_id, rid) : '';
+                }
+            } catch (e) {
+                console.log('Error getting next stop:', e);
+            }
+            
+            return `
+                <div class="route-service-item badge-koridor-interaktif" style="
+                    background: linear-gradient(135deg, ${color}15 0%, ${color}08 100%);
+                    border: 1px solid ${color}30;
+                    border-radius: 12px;
+                    padding: 12px 16px;
+                    margin-bottom: 12px;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+                    width: 100%;
+                    box-sizing: border-box;
+                    overflow: hidden;
+                    position: relative;
+                " data-routeid="${r.route_id}"
+                   onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'"
+                   onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 4px rgba(0,0,0,0.05)'">
+                    <div style="display: flex; flex-direction: column; gap: 6px; width: 100%; min-width: 0;">
+                        <!-- Route header -->
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                            <span class="route-badge" style="
+                                background: ${color};
+                                color: white;
+                                padding: 4px 10px;
+                                border-radius: 20px;
+                                font-weight: bold;
+                                font-size: 0.85em;
+                                box-shadow: 0 2px 4px ${color}40;
+                                flex-shrink: 0;
+                                white-space: nowrap;
+                            ">${routeName}</span>
+                            ${nextStopName ? `<div style="
+                                display: flex;
+                                align-items: flex-start;
+                                gap: 6px;
+                                flex: 1;
+                                min-width: 0;
+                                margin-top: 2px;
+                            ">
+                                <i class="fa-solid fa-arrow-right" style="color: #64748b; font-size: 0.7em; flex-shrink: 0; margin-top: 2px;"></i>
+                                <span style="
+                                    color: #059669;
+                                    font-size: 0.8em;
+                                    font-weight: 600;
+                                    line-height: 1.5;
+                                    padding: 3px 0;
+                                    white-space: normal;
+                                    word-wrap: break-word;
+                                    overflow-wrap: break-word;
+                                    display: block;
+                                    max-width: 100%;
+                                ">${nextStopName}</span>
+                            </div>` : ''}
+                        </div>
+                        
+                        <!-- Route direction -->
+                        ${direction ? `<div style="
+                            color: #475569;
+                            font-size: 0.85em;
+                            font-weight: 500;
+                            line-height: 1.5;
+                            word-wrap: break-word;
+                            overflow-wrap: break-word;
+                            hyphens: auto;
+                            margin-left: 2px;
+                            max-width: 100%;
+                            white-space: normal;
+                            display: block;
+                        ">${direction}</div>` : ''}
+                    </div>
                 </div>
-                <div style="font-size:11px;color:#666;margin-bottom:6px;">Layanan pada platform ini</div>
-                <div style="display:flex;flex-wrap:wrap;gap:4px;">${badges}</div>
+            `;
+        }).join('');
+        
+        const title = code ? `Platform ${code}` : 'Platform';
+        const locationInfo = parentHalteName ? `di ${parentHalteName}` : '';
+        
+        const html = `
+            <div class="stop-popup plus-jakarta-sans" style="
+                min-width: 340px; 
+                max-width: 520px; 
+                padding: 16px;
+                background: white;
+                border-radius: 16px;
+                box-shadow: 0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08);
+                border: 1px solid rgba(0,0,0,0.06);
+                word-wrap: break-word;
+                overflow-wrap: break-word;
+                box-sizing: border-box;
+            ">
+                <!-- Header -->
+                <div style="
+                    color: #1f2937; 
+                    padding: 0 0 12px 0; 
+                    border-bottom: 2px solid #f1f5f9; 
+                    margin-bottom: 16px; 
+                    display: flex; 
+                    align-items: center; 
+                    gap: 12px;
+                ">
+                    <div style="
+                        background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+                        color: white;
+                        width: 36px;
+                        height: 36px;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 16px;
+                        font-weight: bold;
+                        box-shadow: 0 4px 12px rgba(139,92,246,0.3);
+                    ">
+                        <i class="fa-solid fa-location-dot"></i>
+                </div>
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="font-size: 18px; font-weight: 700; color: #1f2937; line-height: 1.2;">
+                            ${title}
+                        </div>
+                        ${locationInfo ? `<div style="font-size: 13px; color: #64748b; font-weight: 500; margin-top: 2px;">
+                            ${locationInfo}
+                        </div>` : ''}
+                        <div style="
+                            font-size: 11px; 
+                            color: #8b5cf6; 
+                            font-weight: 600; 
+                            margin-top: 4px;
+                            text-transform: uppercase;
+                            letter-spacing: 0.5px;
+                        ">
+                            Layanan Transit
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Content -->
+                <div style="max-height: 65vh; overflow: auto;">
+                    ${serviceCards ? `
+                        <div style="margin-bottom: 16px;">
+                            <div style="
+                                font-size: 13px; 
+                                color: #64748b; 
+                                font-weight: 600; 
+                                margin-bottom: 14px;
+                                display: flex;
+                                align-items: center;
+                                gap: 8px;
+                            ">
+                                <i class="fa-solid fa-route" style="color: #8b5cf6; font-size: 14px;"></i>
+                                Layanan Tersedia
+                                <span style="
+                                    background: #8b5cf620;
+                                    color: #8b5cf6;
+                                    padding: 2px 8px;
+                                    border-radius: 12px;
+                                    font-size: 11px;
+                                    font-weight: 700;
+                                ">${routeIds.length}</span>
+                            </div>
+                            <div class="services-container" style="
+                                display: flex;
+                                flex-direction: column;
+                                gap: 4px;
+                                width: 100%;
+                                box-sizing: border-box;
+                            ">
+                                ${serviceCards}
+                            </div>
+                        </div>
+                    ` : `
+                        <div style="
+                            text-align: center;
+                            padding: 24px 20px;
+                            color: #64748b;
+                            font-style: italic;
+                        ">
+                            <i class="fa-solid fa-info-circle" style="
+                                font-size: 28px; 
+                                margin-bottom: 12px; 
+                                opacity: 0.4;
+                                color: #8b5cf6;
+                            "></i>
+                            <div style="font-size: 14px; font-weight: 500;">
+                                Tidak ada layanan tersedia
+                            </div>
+                            <div style="font-size: 12px; margin-top: 4px; opacity: 0.7;">
+                                Platform ini mungkin sedang tidak beroperasi
+                            </div>
+                        </div>
+                    `}
+                    
+                    ${intermodalStationInfo}
+                </div>
             </div>`;
         this.showHtmlPopupAt(lng, lat, html);
+        
+        // Bind route badge clicks to select route only (no auto-start live here)
+        setTimeout(() => {
+            const el = this._currentPopup && this._currentPopup.getElement();
+            if (!el) return;
+            el.querySelectorAll('.badge-koridor-interaktif').forEach(badge => {
+                const handler = (e) => {
+                    e.stopPropagation(); e.preventDefault();
+                    const routeId = badge.getAttribute('data-routeid');
+                    // Select route only
+                    try { window.transJakartaApp.modules.routes.selectRoute(routeId); } catch (e) {}
+                    this._resumeAfterIdle();
+                    if (this._currentPopup) { this._currentPopup.remove(); this._currentPopup = null; }
+                };
+                
+                // Proper click/touch handling - avoid triggering on hold
+                let touchStartTime = 0;
+                let touchMoved = false;
+                
+                // Handle touch events properly
+                badge.addEventListener('touchstart', (e) => {
+                    touchStartTime = Date.now();
+                    touchMoved = false;
+                    // Add visual feedback for touch
+                    badge.style.opacity = '0.7';
+                    badge.style.transform = 'scale(0.98)';
+                }, { passive: true });
+                
+                badge.addEventListener('touchmove', (e) => {
+                    touchMoved = true;
+                    // Remove visual feedback if user moves finger
+                    badge.style.opacity = '';
+                    badge.style.transform = '';
+                }, { passive: true });
+                
+                badge.addEventListener('touchend', (e) => {
+                    const touchDuration = Date.now() - touchStartTime;
+                    // Reset visual feedback
+                    badge.style.opacity = '';
+                    badge.style.transform = '';
+                    
+                    // Only trigger if it's a quick tap (not a hold) and no movement
+                    if (touchDuration < 500 && !touchMoved) {
+                        e.preventDefault();
+                        handler(e);
+                    }
+                }, { passive: false });
+                
+                // Handle regular mouse clicks
+                badge.addEventListener('click', (e) => {
+                    // Prevent double triggering on devices that fire both touch and mouse events
+                    if (e.detail === 0) return; // Ignore programmatic clicks
+                    handler(e);
+                });
+            });
+        }, 50);
+    }
+
+    // Show platform popup without moving map (for platform dots)
+    showPlatformPopupAt(code, lat, lng, routeIds) {
+        const routes = window.transJakartaApp.modules.gtfs.getRoutes();
+        const gtfs = window.transJakartaApp.modules.gtfs;
+        
+        // Find platform stop to get parent halte name
+        let platformStop = null;
+        let parentHalteName = '';
+        try {
+            const allStops = gtfs.getStops() || [];
+            platformStop = allStops.find(s => 
+                String(s.stop_id || '').startsWith('G') && 
+                String(s.platform_code || '').trim() === String(code || '').trim() &&
+                Math.abs(parseFloat(s.stop_lat) - lat) < 0.001 && 
+                Math.abs(parseFloat(s.stop_lon) - lng) < 0.001
+            );
+            
+            if (platformStop && platformStop.parent_station) {
+                const parentStop = allStops.find(s => String(s.stop_id) === String(platformStop.parent_station));
+                if (parentStop) {
+                    parentHalteName = parentStop.stop_name || '';
+                }
+            } else if (platformStop) {
+                // Fallback: find by name clustering
+                const normalizeName = (n) => String(n || '').trim().replace(/\s+/g, ' ');
+                const platformName = normalizeName(platformStop.stop_name);
+                const nameBasedParent = allStops.find(s => 
+                    String(s.stop_id || '').startsWith('H') && 
+                    normalizeName(s.stop_name) === platformName
+                );
+                if (nameBasedParent) {
+                    parentHalteName = nameBasedParent.stop_name || '';
+                }
+            }
+        } catch (e) {
+            console.log('Error finding parent halte:', e);
+        }
+        
+        // Get intermodal station info for the parent halte
+        let intermodalStationInfo = '';
+        try {
+            const rm = window.transJakartaApp.modules.routes;
+            if (rm && rm.buildIntermodalStationInfo && platformStop) {
+                // Try to find parent halte for intermodal info
+                const allStops = gtfs.getStops() || [];
+                let targetStop = null;
+                
+                if (platformStop.parent_station) {
+                    targetStop = allStops.find(s => String(s.stop_id) === String(platformStop.parent_station));
+                } else {
+                    // Use platform stop name to find H-type stop
+                    const normalizeName = (n) => String(n || '').trim().replace(/\s+/g, ' ');
+                    const platformName = normalizeName(platformStop.stop_name);
+                    targetStop = allStops.find(s => 
+                        String(s.stop_id || '').startsWith('H') && 
+                        normalizeName(s.stop_name) === platformName
+                    );
+                }
+                
+                if (targetStop) {
+                    intermodalStationInfo = rm.buildIntermodalStationInfo(targetStop) || '';
+                }
+            }
+        } catch(e) {
+            console.log('Error building intermodal info:', e);
+        }
+        
+        // Build enhanced service cards with route directions and next stops
+        const serviceCards = (routeIds || []).map(rid => {
+            const r = routes.find(rt => String(rt.route_id) === String(rid));
+            if (!r) return '';
+            const color = r.route_color ? `#${r.route_color}` : '#6c757d';
+            const routeName = r.route_short_name || r.route_id;
+            const direction = r.route_long_name || '';
+            
+            // Get next stop for this route from this platform
+            let nextStopName = '';
+            try {
+                if (platformStop) {
+                    nextStopName = gtfs.calculateNextStopForRoute ? 
+                        gtfs.calculateNextStopForRoute(platformStop.stop_id, rid) : '';
+                }
+            } catch (e) {
+                console.log('Error getting next stop:', e);
+            }
+            
+            return `
+                <div class="route-service-item badge-koridor-interaktif" style="
+                    background: linear-gradient(135deg, ${color}15 0%, ${color}08 100%);
+                    border: 1px solid ${color}30;
+                    border-radius: 12px;
+                    padding: 12px 16px;
+                    margin-bottom: 12px;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+                    width: 100%;
+                    box-sizing: border-box;
+                    overflow: hidden;
+                    position: relative;
+                " data-routeid="${r.route_id}"
+                   onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'"
+                   onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 4px rgba(0,0,0,0.05)'">
+                    <div style="display: flex; flex-direction: column; gap: 6px; width: 100%; min-width: 0;">
+                        <!-- Route header -->
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                            <span class="route-badge" style="
+                                background: ${color};
+                                color: white;
+                                padding: 4px 10px;
+                                border-radius: 20px;
+                                font-weight: bold;
+                                font-size: 0.85em;
+                                box-shadow: 0 2px 4px ${color}40;
+                                flex-shrink: 0;
+                                white-space: nowrap;
+                            ">${routeName}</span>
+                            ${nextStopName ? `<div style="
+                                display: flex;
+                                align-items: flex-start;
+                                gap: 6px;
+                                flex: 1;
+                                min-width: 0;
+                                margin-top: 2px;
+                            ">
+                                <i class="fa-solid fa-arrow-right" style="color: #64748b; font-size: 0.7em; flex-shrink: 0; margin-top: 2px;"></i>
+                                <span style="
+                                    color: #059669;
+                                    font-size: 0.8em;
+                                    font-weight: 600;
+                                    line-height: 1.5;
+                                    padding: 3px 0;
+                                    white-space: normal;
+                                    word-wrap: break-word;
+                                    overflow-wrap: break-word;
+                                    display: block;
+                                    max-width: 100%;
+                                ">${nextStopName}</span>
+                            </div>` : ''}
+                        </div>
+                        
+                        <!-- Route direction -->
+                        ${direction ? `<div style="
+                            color: #475569;
+                            font-size: 0.85em;
+                            font-weight: 500;
+                            line-height: 1.5;
+                            word-wrap: break-word;
+                            overflow-wrap: break-word;
+                            hyphens: auto;
+                            margin-left: 2px;
+                            max-width: 100%;
+                            white-space: normal;
+                            display: block;
+                        ">${direction}</div>` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        const title = code ? `Platform ${code}` : 'Platform';
+        const locationInfo = parentHalteName ? `di ${parentHalteName}` : '';
+        
+        const html = `
+            <div class="stop-popup plus-jakarta-sans" style="
+                min-width: 340px; 
+                max-width: 520px; 
+                padding: 16px;
+                background: white;
+                border-radius: 16px;
+                box-shadow: 0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08);
+                border: 1px solid rgba(0,0,0,0.06);
+                word-wrap: break-word;
+                overflow-wrap: break-word;
+                box-sizing: border-box;
+            ">
+                <!-- Header -->
+                <div style="
+                    color: #1f2937; 
+                    padding: 0 0 12px 0; 
+                    border-bottom: 2px solid #f1f5f9; 
+                    margin-bottom: 16px; 
+                    display: flex; 
+                    align-items: center; 
+                    gap: 12px;
+                ">
+                    <div style="
+                        background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+                        color: white;
+                        width: 36px;
+                        height: 36px;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 16px;
+                        font-weight: bold;
+                        box-shadow: 0 4px 12px rgba(139,92,246,0.3);
+                    ">
+                        <i class="fa-solid fa-location-dot"></i>
+                </div>
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="font-size: 18px; font-weight: 700; color: #1f2937; line-height: 1.2;">
+                            ${title}
+                        </div>
+                        ${locationInfo ? `<div style="font-size: 13px; color: #64748b; font-weight: 500; margin-top: 2px;">
+                            ${locationInfo}
+                        </div>` : ''}
+                        <div style="
+                            font-size: 11px; 
+                            color: #8b5cf6; 
+                            font-weight: 600; 
+                            margin-top: 4px;
+                            text-transform: uppercase;
+                            letter-spacing: 0.5px;
+                        ">
+                            Layanan Transit
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Content -->
+                <div style="max-height: 65vh; overflow: auto;">
+                    ${serviceCards ? `
+                        <div style="margin-bottom: 16px;">
+                            <div style="
+                                font-size: 13px; 
+                                color: #64748b; 
+                                font-weight: 600; 
+                                margin-bottom: 14px;
+                                display: flex;
+                                align-items: center;
+                                gap: 8px;
+                            ">
+                                <i class="fa-solid fa-route" style="color: #8b5cf6; font-size: 14px;"></i>
+                                Layanan Tersedia
+                                <span style="
+                                    background: #8b5cf620;
+                                    color: #8b5cf6;
+                                    padding: 2px 8px;
+                                    border-radius: 12px;
+                                    font-size: 11px;
+                                    font-weight: 700;
+                                ">${routeIds.length}</span>
+                            </div>
+                            <div class="services-container" style="
+                                display: flex;
+                                flex-direction: column;
+                                gap: 4px;
+                                width: 100%;
+                                box-sizing: border-box;
+                            ">
+                                ${serviceCards}
+                            </div>
+                        </div>
+                    ` : `
+                        <div style="
+                            text-align: center;
+                            padding: 24px 20px;
+                            color: #64748b;
+                            font-style: italic;
+                        ">
+                            <i class="fa-solid fa-info-circle" style="
+                                font-size: 28px; 
+                                margin-bottom: 12px; 
+                                opacity: 0.4;
+                                color: #8b5cf6;
+                            "></i>
+                            <div style="font-size: 14px; font-weight: 500;">
+                                Tidak ada layanan tersedia
+                            </div>
+                            <div style="font-size: 12px; margin-top: 4px; opacity: 0.7;">
+                                Platform ini mungkin sedang tidak beroperasi
+                            </div>
+                        </div>
+                    `}
+                    
+                    ${intermodalStationInfo}
+                </div>
+            </div>`;
+        this.showHtmlPopupAt(lng, lat, html);
+        
         // Bind route badge clicks to select route only (no auto-start live here)
         setTimeout(() => {
             const el = this._currentPopup && this._currentPopup.getElement();
@@ -2407,8 +3352,46 @@ export class MapManager {
                         this._resumeAfterIdle();
                     if (this._currentPopup) { this._currentPopup.remove(); this._currentPopup = null; }
                 };
-                badge.addEventListener('click', handler);
-                badge.addEventListener('touchstart', handler, { passive: false });
+                
+                // Proper click/touch handling - avoid triggering on hold
+                let touchStartTime = 0;
+                let touchMoved = false;
+                
+                // Handle touch events properly
+                badge.addEventListener('touchstart', (e) => {
+                    touchStartTime = Date.now();
+                    touchMoved = false;
+                    // Add visual feedback for touch
+                    badge.style.opacity = '0.7';
+                    badge.style.transform = 'scale(0.98)';
+                }, { passive: true });
+                
+                badge.addEventListener('touchmove', (e) => {
+                    touchMoved = true;
+                    // Remove visual feedback if user moves finger
+                    badge.style.opacity = '';
+                    badge.style.transform = '';
+                }, { passive: true });
+                
+                badge.addEventListener('touchend', (e) => {
+                    const touchDuration = Date.now() - touchStartTime;
+                    // Reset visual feedback
+                    badge.style.opacity = '';
+                    badge.style.transform = '';
+                    
+                    // Only trigger if it's a quick tap (not a hold) and no movement
+                    if (touchDuration < 500 && !touchMoved) {
+                        e.preventDefault();
+                        handler(e);
+                    }
+                }, { passive: false });
+                
+                // Handle regular mouse clicks
+                badge.addEventListener('click', (e) => {
+                    // Prevent double triggering on devices that fire both touch and mouse events
+                    if (e.detail === 0) return; // Ignore programmatic clicks
+                    handler(e);
+                });
             });
         }, 50);
     }

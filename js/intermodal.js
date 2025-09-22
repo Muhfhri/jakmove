@@ -5,33 +5,79 @@
 		if (!window.transJakartaApp || !window.transJakartaApp.modules || !window.transJakartaApp.modules.routes) {
 			return false;
 		}
-		// Example mapping; replace with your own
+		// Enhanced mapping with station names
 		const mapping = {
-			// By stop_id
-			'G123': ['MRT'],
-			'G456': ['KRL', 'LRT'],
-			// By exact stop_name
-			'Dukuh Atas': ['MRT', 'KRL', 'LRT'],
-			'Bundaran HI Astra': ['MRT'],
-			'Asean': ['MRT'],
-			'Blok M': ['MRT'],
-			'Polda Metro Jaya': ['MRT'],
-			'Bundaran Senayan': ['MRT'],
-			'Tosari': ['MRT'],
-			'Galunggung': ['LRT'],
-			'Senen TOYOTA Rangga': ['KRL'],
-			'Kota': ['KRL'],
-			'Simpang Buaran': ['KRL'],
-			'St. Cikini Barat': ['KRL'],
-			'St. Cikini Selatan': ['KRL'],
-			'St. Cikini Timur': ['KRL'],
-			'Stasiun Klender': ['KRL'],
-			'Stasiun Jatinegara': ['KRL'],
-			'Juanda': ['KRL'],
-			'Matraman Baru': ['KRL'],
-			'Cikoko Arah Timur': ['LRT','KRL'],
-			'Cikoko Arah Barat': ['LRT','KRL'],
-			'Kuningan': ['LRT'],
+			// Format: 'Halte TransJakarta': { 'MODE': 'Nama Stasiun Asli' }
+			'Dukuh Atas': {
+				'MRT': 'Dukuh Atas BNI',
+				'KRL': 'Sudirman', 
+				'LRT': 'Dukuh Atas'
+			},
+			'Bundaran HI Astra': {
+				'MRT': 'Bundaran HI Bank Jakarta'
+			},
+			'Asean': {
+				'MRT': 'ASEAN'
+			},
+			'Blok M': {
+				'MRT': 'Blok M BCA'
+			},
+			'Polda Metro Jaya': {
+				'MRT': 'Istora Mandiri'
+			},
+			'Bundaran Senayan': {
+				'MRT': 'Senayan Mastercard'
+			},
+			'Galunggung': {
+				'LRT': 'Galunggung'
+			},
+			'Senen TOYOTA Rangga': {
+				'KRL': 'Pasar Senen'
+			},
+			'Jaga Jakarta': {
+				'KRL': 'Pasar Senen'
+			},
+			'Kota': {
+				'KRL': 'Jakarta Kota'
+			},
+			'Simpang Buaran': {
+				'KRL': 'Buaran'
+			},
+			'St. Cikini Barat': {
+				'KRL': 'Cikini'
+			},
+			'St. Cikini Selatan': {
+				'KRL': 'Cikini'
+			},
+			'St. Cikini Timur': {
+				'KRL': 'Cikini'
+			},
+			'Stasiun Klender': {
+				'KRL': 'Klender Baru'
+			},
+			'Stasiun Jatinegara': {
+				'KRL': 'Jatinegara'
+			},
+			'Juanda': {
+				'KRL': 'Juanda'
+			},
+			'Matraman Baru': {
+				'KRL': 'Matraman'
+			},
+			'Cikoko Arah Timur': {
+				'LRT': 'Cikoko',
+				'KRL': 'Cawang'
+			},
+			'Cikoko Arah Barat': {
+				'LRT': 'Cikoko', 
+				'KRL': 'Cawang'
+			},
+			'Kuningan': {
+				'LRT': 'Kuningan'
+			},
+			'Rasuna Said': {
+				'LRT': 'Rasuna Said'
+			}
 		};
 		try {
 			window.transJakartaApp.modules.routes.setIntermodalMapping(mapping);

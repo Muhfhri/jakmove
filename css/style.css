@@ -7083,3 +7083,149 @@ body.no-scroll { overflow: hidden; height: 100vh; }
     color: #4FA8DE !important;
 }
 
+/* Settings - modern card-like toggles (light) */
+#settingsBody .form-check.form-switch {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 12px 14px;
+	margin: 8px 0;
+	border: 1px solid #e5e7eb;
+	border-radius: 12px;
+	background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+	box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+	transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+#settingsBody .form-check.form-switch:hover {
+	transform: translateY(-1px);
+	box-shadow: 0 6px 16px rgba(0,0,0,0.06);
+	border-color: #e2e8f0;
+}
+#settingsBody .form-check.form-switch .form-check-input {
+	cursor: pointer;
+}
+#settingsBody .form-check.form-switch .form-check-label {
+	display: inline-flex;
+	align-items: center;
+	gap: 10px;
+	margin: 0;
+	font-weight: 600;
+	color: #374151;
+}
+#settingsBody .form-check.form-switch .form-check-label::before {
+	content: "";
+	display: inline-block;
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	background: var(--setting-accent, #3b82f6);
+	box-shadow: 0 0 0 6px color-mix(in srgb, var(--setting-accent, #3b82f6) 12%, transparent);
+}
+
+/* Accent colors per setting */
+#settingBatterySaver + label { --setting-accent: #f59e0b; }
+#settingShowIntermodal + label { --setting-accent: #6366f1; }
+#settingShowJaklingko + label { --setting-accent: #10b981; }
+#settingShowAccessibility + label { --setting-accent: #059669; }
+#settingFilterAccess + label { --setting-accent: #94a3b8; }
+#settingShowWeather + label { --setting-accent: #0ea5e9; }
+#settingRadiusImageIcons + label { --setting-accent: #2563eb; }
+
+/* Dark mode adjustments */
+[data-theme="dark"] #settingsBody .form-check.form-switch {
+	background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+	border-color: rgba(255,255,255,0.08);
+	box-shadow: 0 1px 2px rgba(0,0,0,0.4);
+}
+[data-theme="dark"] #settingsBody .form-check.form-switch:hover {
+	box-shadow: 0 10px 20px rgba(0,0,0,0.45);
+}
+[data-theme="dark"] #settingsBody .form-check.form-switch .form-check-label {
+	color: #e5e7eb;
+}
+
+/* Settings grid modern layout */
+#settingsBody .settings-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+}
+@media (min-width: 576px) {
+    #settingsBody .settings-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+#settingsBody .setting-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+}
+#settingsBody .setting-item:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.06);
+    border-color: #e2e8f0;
+}
+#settingsBody .setting-item .setting-text { min-width: 0; }
+#settingsBody .setting-item .setting-title {
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 2px;
+}
+#settingsBody .setting-item .setting-desc {
+    font-size: 0.85em;
+    color: #6b7280;
+}
+#settingsBody .setting-item .setting-example {
+    margin-top: 4px;
+    font-size: 0.8em;
+    color: #374151;
+    opacity: 0.8;
+}
+#settingsBody .setting-item .form-check-input { width: 2.6em; height: 1.4em; }
+
+/* Off state dim effect */
+#settingsBody .setting-item.off { opacity: 0.65; filter: grayscale(10%); }
+
+/* Dark mode for modern grid */
+[data-theme="dark"] #settingsBody .setting-item {
+    background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+    border-color: rgba(255,255,255,0.08);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.4);
+}
+[data-theme="dark"] #settingsBody .setting-item .setting-title { color: #e5e7eb; }
+[data-theme="dark"] #settingsBody .setting-item .setting-desc { color: #9ca3af; }
+[data-theme="dark"] #settingsBody .setting-item .setting-example { color: #cbd5e1; }
+
+/* In-card switch: reset card styles on the right switch container */
+#settingsBody .setting-item .form-check.form-switch {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    padding: 0;
+    margin: 0;
+}
+#settingsBody .setting-item .form-check.form-switch:hover {
+    transform: none;
+    box-shadow: none;
+    border-color: transparent;
+}
+#settingsBody .setting-item .form-check.form-switch .form-check-input {
+    width: 2.6em;
+    height: 1.4em;
+}
+#settingsBody .setting-item .form-check-input:checked {
+    background-color: #2563eb;
+    border-color: #2563eb;
+}
+[data-theme="dark"] #settingsBody .setting-item .form-check-input:checked {
+    background-color: #60a5fa;
+    border-color: #60a5fa;
+}
+

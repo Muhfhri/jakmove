@@ -503,29 +503,102 @@
                     </button>
                 </div>
                 <div id="settingsBody" class="mt-2" style="display:none;">
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="settingShowIntermodal">
-                        <label class="form-check-label" for="settingShowIntermodal">Tampilkan ikon intermoda (MRT/LRT/KRL)</label>
+                    <div class="settings-grid">
+                        <div class="setting-item" data-setting="showIntermodalIcons">
+                            <div class="setting-text">
+                                <div class="setting-title">Ikon Intermoda</div>
+                                <div class="setting-desc">MRT/LRT/KRL di popup dan halte</div>
+                                <div class="setting-example"><i class="fa-solid fa-train-subway me-1"></i> Stasiun MRT Lebak Bulus</div>
+                            </div>
+                            <div class="form-check form-switch m-0">
+                                <input class="form-check-input setting-toggle" type="checkbox" id="settingShowIntermodal" aria-label="Toggle Ikon Intermoda">
+                            </div>
+                        </div>
+
+                        <div class="setting-item" data-setting="showJaklingkoBadge">
+                            <div class="setting-text">
+                                <div class="setting-title">Badge JakLingko</div>
+                                <div class="setting-desc">Tampilkan label layanan terintegrasi</div>
+                                <div class="setting-example"><span class="badge bg-success-subtle text-success fw-semibold">JakLingko</span></div>
+                            </div>
+                            <div class="form-check form-switch m-0">
+                                <input class="form-check-input setting-toggle" type="checkbox" id="settingShowJaklingko" aria-label="Toggle Badge JakLingko">
+                            </div>
+                        </div>
+
+                        <div class="setting-item" data-setting="showAccessibilityIcon">
+                            <div class="setting-text">
+                                <div class="setting-title">Aksesibilitas</div>
+                                <div class="setting-desc">Ikon ramah kursi roda di halte</div>
+                                <div class="setting-example"><i class="fa-solid fa-wheelchair me-1" style="color:#059669;"></i> Ramah kursi roda</div>
+                            </div>
+                            <div class="form-check form-switch m-0">
+                                <input class="form-check-input setting-toggle" type="checkbox" id="settingShowAccessibility" aria-label="Toggle Aksesibilitas">
+                            </div>
+                        </div>
+
+                        <div class="setting-item" data-setting="filterAccessStops">
+                            <div class="setting-text">
+                                <div class="setting-title">Saring Halte Akses</div>
+                                <div class="setting-desc">Sembunyikan halte tipe E/H</div>
+                                <div class="setting-example"><code>Halte E/H</code> disembunyikan</div>
+                            </div>
+                            <div class="form-check form-switch m-0">
+                                <input class="form-check-input setting-toggle" type="checkbox" id="settingFilterAccess" aria-label="Toggle Saring Halte Akses">
+                            </div>
+                        </div>
+
+                        <div class="setting-item" data-setting="showWeatherInfo">
+                            <div class="setting-text">
+                                <div class="setting-title">Info Cuaca</div>
+                                <div class="setting-desc">Tampilkan cuaca realtime dan peringatan</div>
+                                <div class="setting-example"><i class="fa-solid fa-cloud-sun me-1" style="color:#0ea5e9"></i> 30°C Berawan</div>
+                            </div>
+                            <div class="form-check form-switch m-0">
+                                <input class="form-check-input setting-toggle" type="checkbox" id="settingShowWeather" aria-label="Toggle Info Cuaca">
+                            </div>
+                        </div>
+
+                        <div class="setting-item" data-setting="radiusImageIcons">
+                            <div class="setting-text">
+                                <div class="setting-title">Ikon Radius</div>
+                                <div class="setting-desc">Pilih gambar (lebih detail) atau titik (lebih ringan)</div>
+                                <div class="setting-example"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/26/JakIcon_BusBRT.svg/1200px-JakIcon_BusBRT.svg.png" alt="BRT" style="width:18px;height:18px;vertical-align:middle;"> vs •</div>
+                            </div>
+                            <div class="form-check form-switch m-0">
+                                <input class="form-check-input setting-toggle" type="checkbox" id="settingRadiusImageIcons" aria-label="Toggle Ikon Radius">
+                            </div>
+                        </div>
+
+                        <div class="setting-item" data-setting="batterySaver">
+                            <div class="setting-text">
+                                <div class="setting-title">Hemat Baterai</div>
+                                <div class="setting-desc">Minim animasi, peta ringan, paksa dark</div>
+                                <div class="setting-example"><i class="fa-solid fa-bolt me-1" style="color:#f59e0b"></i> Performa diutamakan</div>
+                            </div>
+                            <div class="form-check form-switch m-0">
+                                <input class="form-check-input setting-toggle" type="checkbox" id="settingBatterySaver" aria-label="Toggle Hemat Baterai">
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="settingShowJaklingko">
-                        <label class="form-check-label" for="settingShowJaklingko">Tampilkan badge JakLingko</label>
-                    </div>
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="settingShowAccessibility">
-                        <label class="form-check-label" for="settingShowAccessibility">Tampilkan ikon aksesibilitas</label>
-                    </div>
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="settingFilterAccess">
-                        <label class="form-check-label" for="settingFilterAccess">Sembunyikan halte akses (E/H)</label>
-                    </div>
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="settingShowWeather">
-                        <label class="form-check-label" for="settingShowWeather">Tampilkan informasi cuaca</label>
-                    </div>
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="settingBatterySaver">
-                        <label class="form-check-label" for="settingBatterySaver">Mode hemat baterai (minim animasi & peta ringan)</label>
+                    
+                    <!-- Cache Management Section -->
+                    <hr class="my-3">
+                    <div class="d-flex flex-column gap-2">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div>
+                                <div class="fw-semibold" style="font-size: 0.9em;">Kelola Cache</div>
+                                <div class="text-muted" style="font-size: 0.8em;">Hapus semua data cache untuk memperbaiki masalah</div>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-outline-danger btn-sm" id="clearCacheBtn">
+                            <i class="fa-solid fa-trash-can me-2"></i>
+                            Hapus Semua Cache
+                        </button>
+                        <div class="text-muted" style="font-size: 0.75em;">
+                            <i class="fa-solid fa-info-circle me-1"></i>
+                            Akan menghapus semua data GTFS, pengaturan, dan cache browser
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1064,6 +1137,7 @@
             const elFilterAccess = document.getElementById('settingFilterAccess');
             const elShowWeather = document.getElementById('settingShowWeather');
             const elBatterySaver = document.getElementById('settingBatterySaver');
+            const elRadiusImageIcons = document.getElementById('settingRadiusImageIcons');
             const toggleBtn = document.getElementById('toggleSettingsBtn');
             const body = document.getElementById('settingsBody');
             const panel = document.getElementById('settingsPanel');
@@ -1096,6 +1170,14 @@
                         app.modules.search.handleSearch(searchInput.value);
                     }
                 } catch (e) {}
+                // Refresh radius layer to apply icon style
+                try {
+                    const mapMgr = app.modules.map;
+                    if (mapMgr && mapMgr._radiusRequest) {
+                        const req = mapMgr._radiusRequest;
+                        mapMgr.showHalteRadius(req.centerLng, req.centerLat, req.radius);
+                    }
+                } catch (e) {}
             }
 
             function bindToggle(app, el, key) {
@@ -1105,6 +1187,15 @@
                     app.modules.settings.set(key, el.checked);
                     refreshUI(app);
                 });
+                // Visual off-state dimming on parent .setting-item
+                try {
+                    const item = el.closest('.setting-item');
+                    if (item) {
+                        const setState = () => item.classList.toggle('off', !el.checked);
+                        setState();
+                        el.addEventListener('change', setState);
+                    }
+                } catch (e) {}
             }
 
             // Wait for app + settings to be ready, then bind toggles
@@ -1120,6 +1211,7 @@
                     bindToggle(app, elShowAccessibility, 'showAccessibilityIcon');
                     bindToggle(app, elFilterAccess, 'filterAccessStops');
                     bindToggle(app, elShowWeather, 'showWeatherInfo');
+                    bindToggle(app, elRadiusImageIcons, 'radiusImageIcons');
                     // Battery Saver binding with side-effects
                     if (elBatterySaver) {
                         elBatterySaver.checked = !!app.modules.settings.get('batterySaver');
@@ -1230,6 +1322,170 @@
                             const basemapSelect = document.getElementById('basemapSelector');
                             if (basemapSelect) basemapSelect.disabled = elBatterySaver.checked;
                         } catch (e) {}
+                    }
+                    
+                    // Comprehensive Cache Clearing Function
+                    async function clearAllCache() {
+                        const results = [];
+                        
+                        try {
+                            // 1. Clear localStorage
+                            const localStorageCount = localStorage.length;
+                            localStorage.clear();
+                            results.push(`localStorage: ${localStorageCount} items cleared`);
+                        } catch (e) {
+                            results.push(`localStorage: Error - ${e.message}`);
+                        }
+                        
+                        try {
+                            // 2. Clear sessionStorage
+                            const sessionStorageCount = sessionStorage.length;
+                            sessionStorage.clear();
+                            results.push(`sessionStorage: ${sessionStorageCount} items cleared`);
+                        } catch (e) {
+                            results.push(`sessionStorage: Error - ${e.message}`);
+                        }
+                        
+                        try {
+                            // 3. Clear IndexedDB
+                            if ('indexedDB' in window) {
+                                const databases = await indexedDB.databases();
+                                for (const db of databases) {
+                                    if (db.name) {
+                                        try {
+                                            indexedDB.deleteDatabase(db.name);
+                                            results.push(`IndexedDB: ${db.name} deleted`);
+                                        } catch (e) {
+                                            results.push(`IndexedDB ${db.name}: Error - ${e.message}`);
+                                        }
+                                    }
+                                }
+                                if (databases.length === 0) {
+                                    results.push('IndexedDB: No databases found');
+                                }
+                            } else {
+                                results.push('IndexedDB: Not supported');
+                            }
+                        } catch (e) {
+                            results.push(`IndexedDB: Error - ${e.message}`);
+                        }
+                        
+                        try {
+                            // 4. Clear Cache API (Service Worker caches)
+                            if ('caches' in window) {
+                                const cacheNames = await caches.keys();
+                                for (const cacheName of cacheNames) {
+                                    await caches.delete(cacheName);
+                                    results.push(`Cache API: ${cacheName} deleted`);
+                                }
+                                if (cacheNames.length === 0) {
+                                    results.push('Cache API: No caches found');
+                                }
+                            } else {
+                                results.push('Cache API: Not supported');
+                            }
+                        } catch (e) {
+                            results.push(`Cache API: Error - ${e.message}`);
+                        }
+                        
+                        try {
+                            // 5. Clear WebSQL (deprecated but might still exist)
+                            if ('openDatabase' in window) {
+                                results.push('WebSQL: Detected (deprecated, manual clearing needed)');
+                            } else {
+                                results.push('WebSQL: Not found');
+                            }
+                        } catch (e) {
+                            results.push(`WebSQL: Error - ${e.message}`);
+                        }
+                        
+                        try {
+                            // 6. Clear Application Cache (deprecated but might exist)
+                            if ('applicationCache' in window && window.applicationCache) {
+                                try {
+                                    window.applicationCache.update();
+                                    results.push('Application Cache: Update triggered');
+                                } catch (e) {
+                                    results.push(`Application Cache: Error - ${e.message}`);
+                                }
+                            } else {
+                                results.push('Application Cache: Not found');
+                            }
+                        } catch (e) {
+                            results.push(`Application Cache: Error - ${e.message}`);
+                        }
+                        
+                        try {
+                            // 7. Unregister Service Workers
+                            if ('serviceWorker' in navigator) {
+                                const registrations = await navigator.serviceWorker.getRegistrations();
+                                for (const registration of registrations) {
+                                    await registration.unregister();
+                                    results.push(`Service Worker: ${registration.scope} unregistered`);
+                                }
+                                if (registrations.length === 0) {
+                                    results.push('Service Worker: No registrations found');
+                                }
+                            } else {
+                                results.push('Service Worker: Not supported');
+                            }
+                        } catch (e) {
+                            results.push(`Service Worker: Error - ${e.message}`);
+                        }
+                        
+                        // Log results for debugging
+                        console.log('Cache clearing results:', results);
+                        
+                        return results;
+                    }
+                    
+                    // Clear Cache Button Event Listener
+                    const clearCacheBtn = document.getElementById('clearCacheBtn');
+                    if (clearCacheBtn) {
+                        clearCacheBtn.addEventListener('click', async () => {
+                            const confirmed = confirm(
+                                'Apakah Anda yakin ingin menghapus semua cache?\n\n' +
+                                'Ini akan menghapus:\n' +
+                                '• Semua data GTFS yang tersimpan\n' +
+                                '• Pengaturan aplikasi\n' +
+                                '• Cache browser\n' +
+                                '• Data lokasi tersimpan\n' +
+                                '• Service Worker cache\n' +
+                                '• IndexedDB databases\n\n' +
+                                'Halaman akan dimuat ulang setelah penghapusan.'
+                            );
+                            
+                            if (confirmed) {
+                                try {
+                                    // Show loading state
+                                    clearCacheBtn.disabled = true;
+                                    clearCacheBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Menghapus...';
+                                    
+                                    // Use SettingsManager method if available, otherwise use inline function
+                                    let results;
+                                    if (app && app.modules && app.modules.settings && app.modules.settings.clearAllCache) {
+                                        results = await app.modules.settings.clearAllCache();
+                                    } else {
+                                        results = await clearAllCache();
+                                    }
+                                    
+                                    console.log('Cache cleared successfully:', results);
+                                    
+                                    // Show success and reload
+                                    alert('Cache berhasil dihapus! Halaman akan dimuat ulang.');
+                                    
+                                    // Force reload with cache bypass
+                                    window.location.reload(true);
+                                } catch (error) {
+                                    console.error('Error clearing cache:', error);
+                                    alert('Terjadi kesalahan saat menghapus cache: ' + error.message);
+                                    
+                                    // Reset button state
+                                    clearCacheBtn.disabled = false;
+                                    clearCacheBtn.innerHTML = '<i class="fa-solid fa-trash-can me-2"></i>Hapus Semua Cache';
+                                }
+                            }
+                        });
                     }
                 } catch (e) {}
             })();
