@@ -1598,11 +1598,11 @@ export class MapManager {
     }
 
     // Implement radius markers
-    showHalteRadius(centerLng, centerLat, radius = 300) {
+    showHalteRadius(centerLng, centerLat, radius = 300, force = false) {
 		// Skip tiny moves to avoid unnecessary recompute
 		try {
 			const zoom = this.map && this.map.getZoom ? this.map.getZoom() : undefined;
-			if (this._lastRadiusCenter && typeof zoom === 'number' && typeof this._lastRadiusZoom === 'number') {
+            if (!force && this._lastRadiusCenter && typeof zoom === 'number' && typeof this._lastRadiusZoom === 'number') {
 				const dMove = this._haversine(this._lastRadiusCenter.lat, this._lastRadiusCenter.lng, centerLat, centerLng);
 				const dz = Math.abs(zoom - this._lastRadiusZoom);
 				if (dMove < 70 && dz < 0.15) {
@@ -1707,6 +1707,15 @@ export class MapManager {
                     return !settings || settings.isEnabled('radiusImageIcons');
                 } catch (e) { return true; }
             })();
+
+            // If layer exists but type mismatches desired, remove it so we can recreate with correct type
+            try {
+                const existing = this.map.getLayer(this._radiusLayerId);
+                const desiredType = useImages ? 'symbol' : 'circle';
+                if (existing && existing.type && existing.type !== desiredType) {
+                    this.map.removeLayer(this._radiusLayerId);
+                }
+            } catch (e) {}
 
             if (useImages) {
                 this._ensureStopIconsLoaded();
