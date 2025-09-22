@@ -1175,7 +1175,7 @@
                     const mapMgr = app.modules.map;
                     if (mapMgr && mapMgr._radiusRequest) {
                         const req = mapMgr._radiusRequest;
-                        mapMgr.showHalteRadius(req.centerLng, req.centerLat, req.radius);
+                        mapMgr.showHalteRadius(req.centerLng, req.centerLat, req.radius, true);
                     }
                 } catch (e) {}
             }
