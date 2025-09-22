@@ -1613,9 +1613,9 @@ export class MapManager {
 			this._lastRadiusZoom = zoom;
 		} catch (e) {}
 
-		// Throttle updates to avoid jank
-		this._radiusRequest = { centerLng, centerLat, radius };
-		if (this._radiusUpdateTimer) clearTimeout(this._radiusUpdateTimer);
+        // Throttle updates to avoid jank
+        this._radiusRequest = { centerLng, centerLat, radius };
+        if (this._radiusUpdateTimer) clearTimeout(this._radiusUpdateTimer);
 		this._radiusUpdateTimer = setTimeout(() => this._updateHalteRadius(), 220);
     }
 
@@ -1761,37 +1761,37 @@ export class MapManager {
                 }
             } else {
                 // Fallback to lightweight circles for performance
-                if (!this.map.getLayer(this._radiusLayerId)) {
-                    this.map.addLayer({
-                        id: this._radiusLayerId,
-                        type: 'circle',
-                        source: this._radiusSourceId,
-                        paint: {
-                            'circle-radius': [
-                                'case',
-                                ['==', ['get', 'stopType'], 'Pengumpan'], 4.5,
-                                5.5
-                            ],
-                            'circle-color': [
-                                'case',
-                                ['==', ['get', 'stopType'], 'Pengumpan'], '#f59e0b',
-                                '#2563eb'
-                            ],
-                            'circle-stroke-color': '#ffffff',
-                            'circle-stroke-width': 1.2
-                        }
-                    });
-                } else {
-                    try {
-                        this.map.setPaintProperty(this._radiusLayerId, 'circle-radius', [
-                            'case', ['==', ['get', 'stopType'], 'Pengumpan'], 4.5, 5.5
-                        ]);
-                        this.map.setPaintProperty(this._radiusLayerId, 'circle-color', [
-                            'case', ['==', ['get', 'stopType'], 'Pengumpan'], '#f59e0b', '#2563eb'
-                        ]);
-                        this.map.setPaintProperty(this._radiusLayerId, 'circle-stroke-color', '#ffffff');
-                        this.map.setPaintProperty(this._radiusLayerId, 'circle-stroke-width', 1.2);
-                    } catch (e) {}
+            if (!this.map.getLayer(this._radiusLayerId)) {
+                this.map.addLayer({
+                    id: this._radiusLayerId,
+                    type: 'circle',
+                    source: this._radiusSourceId,
+                    paint: {
+                        'circle-radius': [
+                            'case',
+                            ['==', ['get', 'stopType'], 'Pengumpan'], 4.5,
+                            5.5
+                        ],
+                        'circle-color': [
+                            'case',
+                            ['==', ['get', 'stopType'], 'Pengumpan'], '#f59e0b',
+                            '#2563eb'
+                        ],
+                        'circle-stroke-color': '#ffffff',
+                        'circle-stroke-width': 1.2
+                    }
+                });
+            } else {
+                try {
+                    this.map.setPaintProperty(this._radiusLayerId, 'circle-radius', [
+                        'case', ['==', ['get', 'stopType'], 'Pengumpan'], 4.5, 5.5
+                    ]);
+                    this.map.setPaintProperty(this._radiusLayerId, 'circle-color', [
+                        'case', ['==', ['get', 'stopType'], 'Pengumpan'], '#f59e0b', '#2563eb'
+                    ]);
+                    this.map.setPaintProperty(this._radiusLayerId, 'circle-stroke-color', '#ffffff');
+                    this.map.setPaintProperty(this._radiusLayerId, 'circle-stroke-width', 1.2);
+                } catch (e) {}
                 }
             }
 

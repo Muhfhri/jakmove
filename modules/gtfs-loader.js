@@ -16,7 +16,7 @@ export class GTFSLoader {
         // Configuration
         this.CACHE_KEY = 'jakmove_gtfs_data';
         this.CACHE_VERSION_KEY = 'jakmove_gtfs_version';
-        this.CURRENT_VERSION = '2.0'; // Restructured version
+        this.CURRENT_VERSION = '2.1'; // Include parent_station in cached stops
         this.CACHE_TIMEOUT = 1500; // Faster cache timeout for better UX
         this._worker = null;
         
@@ -83,7 +83,17 @@ export class GTFSLoader {
         this.updateSlideNotification(85, '<i class="fas fa-wrench" style="color: #10b981;"></i> Menyiapkan data cache...');
         console.log(`📋 Cache loaded: ${Object.keys(this.stopToRoutes).length} stop mappings`);
         
-        // Process with cache flag (much faster)
+        // Ensure critical structures exist even when coming from cache
+        try {
+            this.validateData();
+        } catch (e) {
+            console.warn('Cached data validation triggered rebuild:', e?.message || e);
+        }
+        // Build essential structures that UI expects (cheap and fast)
+        try { this.buildTripSequenceCache(); } catch(_) {}
+        try { this.buildPlatformLookup(); } catch(_) {}
+        
+        // Process with cache flag (skip heavy work but keep consistency)
         await this.unifiedDataProcessing('cache');
     }
 
@@ -648,9 +658,16 @@ export class GTFSLoader {
     compressDataForCache() {
         return {
             stops: this.data.stops.map(s => ({
-                stop_id: s.stop_id, stop_name: s.stop_name,
-                stop_lat: parseFloat(s.stop_lat), stop_lon: parseFloat(s.stop_lon),
-                location_type: s.location_type, platform_code: s.platform_code
+                stop_id: s.stop_id,
+                stop_name: s.stop_name,
+                stop_lat: parseFloat(s.stop_lat),
+                stop_lon: parseFloat(s.stop_lon),
+                location_type: s.location_type,
+                platform_code: s.platform_code,
+                parent_station: s.parent_station || '',
+                stop_code: s.stop_code || '',
+                stop_desc: s.stop_desc || '',
+                wheelchair_boarding: s.wheelchair_boarding || '0'
             })),
             routes: this.data.routes.map(r => ({
                 route_id: r.route_id, route_short_name: r.route_short_name,

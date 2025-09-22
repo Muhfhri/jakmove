@@ -7083,6 +7083,20 @@ body.no-scroll { overflow: hidden; height: 100vh; }
     color: #4FA8DE !important;
 }
 
+/* Weather detail modal styling */
+.weather-detail-head .text-muted { letter-spacing: 0.3px; }
+.weather-card { background: linear-gradient(135deg,#ffffff 0%,#f8fafc 100%); border:1px solid #e5e7eb; border-radius:10px; padding:10px; }
+.forecast-card { background: linear-gradient(135deg,#ffffff 0%,#f8fafc 100%); border:1px solid #e5e7eb; border-radius:10px; padding:10px; text-align:center; }
+.forecast-card .forecast-day { font-weight:700; color:#111827; margin-bottom:2px; }
+.forecast-card .forecast-icon { font-size:1.4rem; }
+.forecast-card .forecast-temp { font-weight:700; }
+.forecast-card .forecast-temp .hot { color:#ef4444; }
+.forecast-card .forecast-temp .cool { color:#3b82f6; }
+
+[data-theme="dark"] .weather-card,
+[data-theme="dark"] .forecast-card { background: linear-gradient(135deg,#1f2937 0%,#111827 100%); border-color: rgba(255,255,255,0.08); }
+[data-theme="dark"] .forecast-card .forecast-day { color:#e5e7eb; }
+
 /* Settings - modern card-like toggles (light) */
 #settingsBody .form-check.form-switch {
 	display: flex;

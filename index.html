@@ -509,22 +509,22 @@
                                 <div class="setting-title">Ikon Intermoda</div>
                                 <div class="setting-desc">MRT/LRT/KRL di popup dan halte</div>
                                 <div class="setting-example"><i class="fa-solid fa-train-subway me-1"></i> Stasiun MRT Lebak Bulus</div>
-                            </div>
+                    </div>
                             <div class="form-check form-switch m-0">
                                 <input class="form-check-input setting-toggle" type="checkbox" id="settingShowIntermodal" aria-label="Toggle Ikon Intermoda">
-                            </div>
-                        </div>
+                    </div>
+                    </div>
 
                         <div class="setting-item" data-setting="showJaklingkoBadge">
                             <div class="setting-text">
                                 <div class="setting-title">Badge JakLingko</div>
                                 <div class="setting-desc">Tampilkan label layanan terintegrasi</div>
                                 <div class="setting-example"><span class="badge bg-success-subtle text-success fw-semibold">JakLingko</span></div>
-                            </div>
+                    </div>
                             <div class="form-check form-switch m-0">
                                 <input class="form-check-input setting-toggle" type="checkbox" id="settingShowJaklingko" aria-label="Toggle Badge JakLingko">
-                            </div>
-                        </div>
+                    </div>
+                    </div>
 
                         <div class="setting-item" data-setting="showAccessibilityIcon">
                             <div class="setting-text">
@@ -599,6 +599,41 @@
                             <i class="fa-solid fa-info-circle me-1"></i>
                             Akan menghapus semua data GTFS, pengaturan, dan cache browser
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Weather Detail Modal -->
+        <div class="modal fade" id="weatherDetailModal" tabindex="-1" aria-labelledby="weatherDetailLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="weatherDetailLabel">Cuaca Lengkap</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="weatherSource" id="weatherSrcCurrent" value="current" checked>
+                                <label class="form-check-label" for="weatherSrcCurrent">Lokasi saya</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="weatherSource" id="weatherSrcCustom" value="custom">
+                                <label class="form-check-label" for="weatherSrcCustom">Kustom</label>
+                            </div>
+                        </div>
+                        <div id="weatherCustomRow" class="d-flex gap-2 align-items-center mb-3" style="display:none;">
+                            <input type="text" class="form-control" id="weatherCustomQuery" placeholder="Ketik kota/alamat (mis. Lebak Bulus)">
+                            <button class="btn btn-outline-primary" id="weatherCustomSearchBtn"><i class="fa-solid fa-magnifying-glass"></i></button>
+                        </div>
+                        <div id="weatherDetailContent" class="small"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Tutup</button>
+                        <button type="button" class="btn btn-primary" id="weatherDetailRefreshBtn">
+                            <i class="fa-solid fa-rotate"></i> Perbarui
+                        </button>
                     </div>
                 </div>
             </div>
@@ -1485,6 +1520,135 @@
                                     clearCacheBtn.innerHTML = '<i class="fa-solid fa-trash-can me-2"></i>Hapus Semua Cache';
                                 }
                             }
+                        });
+                    }
+                } catch (e) {}
+
+                // Weather detail modal logic
+                try {
+                    const refreshBtn = document.getElementById('refreshWeatherBtn');
+                    const modalEl = document.getElementById('weatherDetailModal');
+                    const modal = modalEl ? new bootstrap.Modal(modalEl) : null;
+                    const content = document.getElementById('weatherDetailContent');
+                    const srcCurrent = document.getElementById('weatherSrcCurrent');
+                    const srcCustom = document.getElementById('weatherSrcCustom');
+                    const customRow = document.getElementById('weatherCustomRow');
+                    const customInput = document.getElementById('weatherCustomQuery');
+                    const customBtn = document.getElementById('weatherCustomSearchBtn');
+                    const detailRefresh = document.getElementById('weatherDetailRefreshBtn');
+                    const infoSpan = document.getElementById('weather-info');
+
+                    function setCustomVisible() {
+                        if (!customRow) return;
+                        customRow.style.display = srcCustom && srcCustom.checked ? 'flex' : 'none';
+                    }
+                    if (srcCurrent) srcCurrent.addEventListener('change', setCustomVisible);
+                    if (srcCustom) srcCustom.addEventListener('change', setCustomVisible);
+
+                    async function geocodeQuery(q) {
+                        // Simple Nominatim geocoding (no key)
+                        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1&accept-language=id`;
+                        const resp = await fetch(url, { headers: { 'User-Agent': 'jakmove' } });
+                        if (!resp.ok) throw new Error('Geocoding failed');
+                        const arr = await resp.json();
+                        if (!arr || !arr.length) throw new Error('Lokasi tidak ditemukan');
+                        return { lat: parseFloat(arr[0].lat), lon: parseFloat(arr[0].lon), display: arr[0].display_name };
+                    }
+
+                    async function fetchOWMByLatLon(lat, lon) {
+                        const key = '962322a87800402e0b9d7052cb5e8f16';
+                        const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${key}&units=metric&lang=id`;
+                        const r = await fetch(url, { cache: 'no-store' });
+                        if (!r.ok) throw new Error('Weather fetch failed');
+                        return await r.json();
+                    }
+
+                    function renderDetail(data, locationLabel) {
+                        try {
+                            const w = data.weather && data.weather[0] || {};
+                            const main = data.main || {};
+                            const wind = data.wind || {};
+                            const sys = data.sys || {};
+                            const icon = (window.weatherIcons && window.weatherIcons[w.icon]) || '🌤️';
+                            const loc = locationLabel || (data.name ? `${data.name}${sys.country ? ', ' + sys.country : ''}` : 'Lokasi');
+                            const alerts = (data.alerts && data.alerts.length) ? data.alerts : [];
+                            content.innerHTML = `
+                                <div class="d-flex align-items-center gap-2 mb-2">
+                                    <div style="font-size:1.4rem">${icon}</div>
+                                    <div>
+                                        <div class="fw-bold">${loc}</div>
+                                        <div class="text-muted" style="font-size:0.9em">${(w.description||'').toUpperCase()}</div>
+                                    </div>
+                                </div>
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <div class="p-2 border rounded" style="background:#f8fafc"><span class="fw-semibold">Suhu:</span> ${Math.round(main.temp)}°C (feels ${Math.round(main.feels_like||main.temp)}°C)</div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="p-2 border rounded" style="background:#f8fafc"><span class="fw-semibold">Kelembaban:</span> ${main.humidity||0}%</div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="p-2 border rounded" style="background:#f8fafc"><span class="fw-semibold">Tekanan:</span> ${main.pressure||0} hPa</div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="p-2 border rounded" style="background:#f8fafc"><span class="fw-semibold">Angin:</span> ${(wind.speed||0)} m/s</div>
+                                    </div>
+                                </div>
+                                ${alerts.length ? `<div class="mt-2 alert alert-warning p-2"><div class="fw-semibold mb-1">Peringatan Cuaca</div>${alerts.map(a=>`<div>${a.event||'Alert'}</div>`).join('')}</div>`:''}
+                            `;
+                        } catch (e) {
+                            content.innerHTML = '<div class="text-danger">Gagal merender detail cuaca.</div>';
+                        }
+                    }
+
+                    async function loadDetailFromCurrent() {
+                        content.innerHTML = '<div class="text-muted">Memuat cuaca lokasi saat ini...</div>';
+                        try {
+                            // gunakan app location jika ada, fallback ke pusat peta
+                            const mapMgr = app.modules.map;
+                            let lat, lon;
+                            try {
+                                const src = mapMgr && mapMgr.map && mapMgr.map.getSource('user-source');
+                                if (src && src._data) { lon = src._data.geometry.coordinates[0]; lat = src._data.geometry.coordinates[1]; }
+                            } catch (_) {}
+                            if (!(lat && lon)) {
+                                const c = mapMgr && mapMgr.map && mapMgr.map.getCenter();
+                                if (c) { lon = c.lng; lat = c.lat; }
+                            }
+                            if (!(lat && lon)) throw new Error('Lokasi tidak tersedia');
+                            const data = await fetchOWMByLatLon(lat, lon);
+                            renderDetail(data);
+                        } catch (e) {
+                            content.innerHTML = '<div class="text-danger">Tidak bisa memuat cuaca lokasi saat ini.</div>';
+                        }
+                    }
+
+                    async function loadDetailFromCustom() {
+                        const q = (customInput && customInput.value || '').trim();
+                        if (!q) { content.innerHTML = '<div class="text-muted">Masukkan nama lokasi terlebih dahulu.</div>'; return; }
+                        content.innerHTML = '<div class="text-muted">Mencari lokasi...</div>';
+                        try {
+                            const loc = await geocodeQuery(q);
+                            const data = await fetchOWMByLatLon(loc.lat, loc.lon);
+                            renderDetail(data, loc.display || q);
+                        } catch (e) {
+                            content.innerHTML = '<div class="text-danger">Pencarian lokasi gagal.</div>';
+                        }
+                    }
+
+                    if (customBtn) customBtn.addEventListener('click', loadDetailFromCustom);
+                    if (detailRefresh) detailRefresh.addEventListener('click', () => {
+                        if (srcCustom && srcCustom.checked) loadDetailFromCustom(); else loadDetailFromCurrent();
+                    });
+                    // Open detail from weather description (not refresh button)
+                    if (infoSpan && modal) {
+                        infoSpan.style.cursor = 'pointer';
+                        infoSpan.title = 'Detail cuaca';
+                        infoSpan.addEventListener('click', async () => {
+                            if (srcCurrent) srcCurrent.checked = true;
+                            setCustomVisible();
+                            await loadDetailFromCurrent();
+                            modal.show();
                         });
                     }
                 } catch (e) {}
