@@ -18,6 +18,9 @@ export class MapManager {
         this._platformMapCache = new Map(); // key => { platformMap, ts }
         this._stickyPopup = false; // when true, do not auto-close on map click
         this._journeyBtn = null; // store ref to planner button for state styling
+        this._journeyStartMarker = null; // draggable start marker for Journey Planner
+        this._journeyEndMarker = null; // draggable end marker for Journey Planner
+        this._isPanning = false; // track map panning state to avoid accidental marker drags
     }
 
     init() {
@@ -124,6 +127,15 @@ export class MapManager {
 
     setupMapEvents() {
         this.map.on('load', () => { console.log('Map loaded'); });
+        // Track panning to avoid accidental marker drag visual glitches
+        this.map.on('dragstart', () => { 
+            this._isPanning = true; 
+            this._toggleJourneyMarkersInteractivity(false);
+        });
+        this.map.on('dragend', () => { 
+            this._isPanning = false; 
+            this._toggleJourneyMarkersInteractivity(true);
+        });
         
         // Close feature popup when clicking outside
         this.map.on('click', (e) => {
@@ -150,6 +162,22 @@ export class MapManager {
                 this.removeHalteRadiusMarkers();
             }
         });
+    }
+
+    _toggleJourneyMarkersInteractivity(enable) {
+        try {
+            const startMk = this._journeyStartMarker;
+            const endMk = this._journeyEndMarker;
+            const pe = enable ? 'auto' : 'none';
+            if (startMk && startMk.getElement) {
+                try { startMk.getElement().style.pointerEvents = pe; } catch(_){}
+                try { startMk.setDraggable(!!enable); } catch(_){}
+            }
+            if (endMk && endMk.getElement) {
+                try { endMk.getElement().style.pointerEvents = pe; } catch(_){}
+                try { endMk.setDraggable(!!enable); } catch(_){}
+            }
+        } catch (e) {}
     }
 
     setBaseStyle(name) {
@@ -752,7 +780,24 @@ export class MapManager {
     }
 
     showStopPopup(stop, lngLat, options = {}) {
+        // Ensure GTFS is ready to avoid building popup with incomplete data after normal refresh
+        try {
+            if (!window.gtfsDataReady) {
+                setTimeout(() => this.showStopPopup(stop, lngLat, options), 300);
+                return;
+            }
+        } catch (e) {}
         const routes = window.transJakartaApp.modules.gtfs.getRoutes();
+        // Robust route lookup with fallback when route catalog is not yet hydrated
+        const routeIndex = (() => {
+            try { return new Map((routes || []).map(r => [String(r.route_id), r])); } catch (_) { return new Map(); }
+        })();
+        const getRouteSafe = (rid) => {
+            const r = routeIndex.get(String(rid));
+            if (r) return r;
+            // Fallback placeholder to avoid empty UI on refresh
+            return { route_id: String(rid), route_short_name: String(rid), route_color: '6c757d', route_long_name: '' };
+        };
         const currentRouteId = window.transJakartaApp.modules.routes.selectedRouteId;
         const allowAutoLive = options && options.origin === 'nearest';
 
@@ -770,18 +815,27 @@ export class MapManager {
         };
         const stopId = String(stop.properties.stopId || '');
         const thisStop = byId.get(stopId);
+        // If stop is not found (or structures not yet hydrated), build a name-based cluster as fallback
+        let nameFallbackCluster = [];
+        if (!thisStop) {
+            try {
+                const rawName = String(stop.properties.stopName || '').trim();
+                const key = `NAME:${normalizeName(rawName)}`;
+                nameFallbackCluster = allStops.filter(s => buildClusterKey(s) === key);
+            } catch (e) { nameFallbackCluster = []; }
+        }
         let unionRouteIds = [];
         let platformCodes = [];
         let platformMap = [];
-        if (thisStop) {
+        if (thisStop || nameFallbackCluster.length) {
             const sid = String(thisStop.stop_id || '');
             if (sid.startsWith('B')) {
                 // Feeder: do not merge across name; use only this stop's routes
                 unionRouteIds = stopToRoutes[sid] ? Array.from(stopToRoutes[sid]) : [];
             } else {
                 // BRT: cluster by parent/name and union
-                const key = buildClusterKey(thisStop);
-                const cluster = allStops.filter(s => buildClusterKey(s) === key);
+                const key = thisStop ? buildClusterKey(thisStop) : (nameFallbackCluster.length ? buildClusterKey(nameFallbackCluster[0]) : '');
+                const cluster = key ? allStops.filter(s => buildClusterKey(s) === key) : nameFallbackCluster;
                 const routeSet = new Set();
                 const codeToSet = new Map();
                 const codeSet = new Set();
@@ -915,9 +969,62 @@ export class MapManager {
         // Fallback to feature properties if cluster lookup failed
         if (!unionRouteIds.length) unionRouteIds = Array.isArray(stop.properties.routeIds) ? stop.properties.routeIds : [];
         if (!platformCodes.length) platformCodes = Array.isArray(stop.properties.platformCodes) ? stop.properties.platformCodes : [];
-        if (!platformMap.length) {
-            platformMap = Array.isArray(stop.properties.platformMap) ? stop.properties.platformMap : [];
-            console.log('Using fallback platformMap for stop', stopId, '- platforms:', platformMap.length);
+        if (!platformMap.length || platformMap.every(p => !p.code || (Array.isArray(p.routeIds) && p.routeIds.length === 0))) {
+            // Before falling back to feature props, try to compute from GTFS structures to ensure consistency after refresh
+            try {
+                const gtfs = window.transJakartaApp.modules.gtfs;
+                const stops = gtfs.getStops() || [];
+                const stopToRoutes = gtfs.getStopToRoutes() || {};
+                const thisStop2 = stops.find(s => String(s.stop_id || '') === String(stopId));
+                if (thisStop2) {
+                    const sid2 = String(thisStop2.stop_id || '');
+                    const normalizeName = (n) => String(n || '').trim().replace(/\s+/g, ' ');
+                    const buildClusterKey2 = (s) => {
+                        const sid = String(s.stop_id || '');
+                        if (s.parent_station) return String(s.parent_station);
+                        if (sid.startsWith('H')) return sid;
+                        return `NAME:${normalizeName(s.stop_name)}`;
+                    };
+                    if (sid2.startsWith('B')) {
+                        unionRouteIds = stopToRoutes[sid2] ? Array.from(stopToRoutes[sid2]) : unionRouteIds;
+                    } else {
+                        const key2 = buildClusterKey2(thisStop2);
+                        const cluster2 = stops.filter(s => buildClusterKey2(s) === key2);
+                        const routeSet2 = new Set();
+                        const codeToSet2 = new Map();
+                        const codeSet2 = new Set();
+                        cluster2.forEach(cs => {
+                            const cid = String(cs.stop_id || '');
+                            if (cid.startsWith('E')) return;
+                            const rids = stopToRoutes[cid] ? Array.from(stopToRoutes[cid]) : [];
+                            rids.forEach(r => routeSet2.add(String(r)));
+                            if (cid.startsWith('G')) {
+                                const code = String(cs.platform_code || '').trim();
+                                if (code) {
+                                    codeSet2.add(code);
+                                    let set = codeToSet2.get(code);
+                                    if (!set) { set = new Set(); codeToSet2.set(code, set); }
+                                    rids.forEach(r => set.add(String(r)));
+                                }
+                            }
+                        });
+                        if (!unionRouteIds.length) unionRouteIds = Array.from(routeSet2);
+                        if (!platformCodes.length) platformCodes = Array.from(codeSet2).sort();
+                        if (!platformMap.length) platformMap = Array.from(codeToSet2.entries()).map(([code, set]) => ({ code, routeIds: Array.from(set) })).sort((a,b)=>a.code.localeCompare(b.code));
+                    }
+                }
+            } catch (e) {}
+
+            if (!platformMap.length) {
+                platformMap = Array.isArray(stop.properties.platformMap) ? stop.properties.platformMap : [];
+                // Discard empty platformMap to force regeneration
+                if (platformMap.every(p => !p || !p.code || (Array.isArray(p.routeIds) && p.routeIds.length === 0))) {
+                    platformMap = [];
+                }
+                console.log('Using fallback platformMap for stop', stopId, '- platforms:', platformMap.length);
+            } else {
+                console.log('Built platformMap for stop (recomputed)', stopId, '- platforms:', platformMap.length);
+            }
         } else {
             console.log('Built platformMap for stop', stopId, '- platforms:', platformMap.length);
         }
@@ -950,7 +1057,7 @@ export class MapManager {
         const semuaBadges = unionRouteIds
             .filter(rid => !currentRouteId || String(rid) !== String(currentRouteId))
             .map(rid => {
-                const r = routes.find(rt => rt.route_id === rid);
+                const r = getRouteSafe(rid);
                 if (!r) return '';
                 const color = r.route_color ? `#${r.route_color}` : '#6c757d';
                 const routeName = r.route_short_name || r.route_id;
@@ -1012,7 +1119,7 @@ export class MapManager {
                 const hasActiveHere = (unionRouteIds || []).some(r => String(r) === idStr);
                 if (!hasActiveHere) return '';
             } catch (e) {}
-            const r = routes.find(rt => String(rt.route_id) === idStr);
+            const r = getRouteSafe(idStr);
             if (!r) return '';
             const color = r.route_color ? `#${r.route_color}` : '#6c757d';
             const shortName = r.route_short_name || '';
@@ -1031,7 +1138,7 @@ export class MapManager {
         });
         
         // Enhanced platform detection - try multiple sources
-        if (!isFeeder && (!platformMap.length || platformMap.every(p => !p.code))) {
+        if (!isFeeder && (!platformMap.length || platformMap.every(p => !p.code || (Array.isArray(p.routeIds) && p.routeIds.length === 0)))) {
             console.log('Attempting enhanced platform detection for stop', stopId);
             
             // First, try to regenerate platform cache if it's missing
@@ -1043,34 +1150,65 @@ export class MapManager {
                 
                 // Try to get from cache again
                 const cached = this._platformMapCache.get(cacheKey);
-                if (cached && cached.platformMap) {
+                if (cached && Array.isArray(cached.platformMap) && cached.platformMap.length) {
                     platformMap = cached.platformMap;
                     console.log('Platform data regenerated from cache:', platformMap.length);
                 }
             }
             
             // If still no platform data, try alternative approach using platformCodes
-            if (!platformMap.length && platformCodes.length > 0) {
-                platformMap = platformCodes.map(code => ({
-                    code: code,
-                    routeIds: unionRouteIds, // Use all routes as fallback
-                    nextByRoute: unionRouteIds.map(rid => ({ rid: String(rid), nextName: '' })),
-                    headsign: '',
-                    nextName: '',
-                    bearingDeg: null,
-                    directionArrow: '',
-                    lat: parseFloat(stop.geometry?.coordinates?.[1] || 0),
-                    lng: parseFloat(stop.geometry?.coordinates?.[0] || 0)
-                }));
+            if ((!platformMap.length || platformMap.every(p => !p.code || (Array.isArray(p.routeIds) && p.routeIds.length === 0))) && platformCodes.length > 0) {
+                // Derive routeIds per platform code from GTFS if unionRouteIds is empty
+                try {
+                    const gtfs = window.transJakartaApp.modules.gtfs;
+                    const stops = gtfs.getStops() || [];
+                    const stopToRoutes = gtfs.getStopToRoutes() || {};
+                    const codeToRouteSet = new Map();
+                    for (const s of stops) {
+                        const code = (s.platform_code || '').toString().trim();
+                        if (!code) continue;
+                        if (!codeToRouteSet.has(code)) codeToRouteSet.set(code, new Set());
+                        const routesAt = stopToRoutes[s.stop_id] || [];
+                        for (const rid of routesAt) codeToRouteSet.get(code).add(String(rid));
+                    }
+                    platformMap = platformCodes.map(code => {
+                        const rids = Array.from(codeToRouteSet.get(code) || new Set(unionRouteIds || []));
+                        return {
+                            code: code,
+                            routeIds: rids,
+                            nextByRoute: rids.map(rid => ({ rid: String(rid), nextName: '' })),
+                            headsign: '',
+                            nextName: '',
+                            bearingDeg: null,
+                            directionArrow: '',
+                            lat: parseFloat(stop.geometry?.coordinates?.[1] || 0),
+                            lng: parseFloat(stop.geometry?.coordinates?.[0] || 0)
+                        };
+                    });
+                } catch (e) {
+                    platformMap = platformCodes.map(code => ({
+                        code: code,
+                        routeIds: unionRouteIds,
+                        nextByRoute: unionRouteIds.map(rid => ({ rid: String(rid), nextName: '' })),
+                        headsign: '',
+                        nextName: '',
+                        bearingDeg: null,
+                        directionArrow: '',
+                        lat: parseFloat(stop.geometry?.coordinates?.[1] || 0),
+                        lng: parseFloat(stop.geometry?.coordinates?.[0] || 0)
+                    }));
+                }
                 console.log('Created fallback platformMap from platformCodes:', platformMap.length);
                 
-                // Cache the fallback data
-                if (this._platformMapCache) {
+            // Cache the fallback data (avoid caching empty/invalid maps)
+            if (this._platformMapCache) {
+                if (Array.isArray(platformMap) && platformMap.length && !platformMap.every(p => !p.code || (Array.isArray(p.routeIds) && p.routeIds.length === 0))) {
                     this._platformMapCache.set(cacheKey, {
                         platformMap: platformMap,
                         ts: Date.now()
                     });
                 }
+            }
             }
         }
         
@@ -1087,7 +1225,7 @@ export class MapManager {
 				let perRoute = '';
 				if (p.nextByRoute && Array.isArray(p.nextByRoute)) {
 					perRoute = p.nextByRoute.map(({ rid, nextName }) => {
-					const r = routes.find(rt => String(rt.route_id) === String(rid));
+                    const r = getRouteSafe(rid);
 					if (!r) return '';
 					const color = r.route_color ? `#${r.route_color}` : '#6c757d';
 					const shortName = r.route_short_name || rid;
@@ -1096,7 +1234,7 @@ export class MapManager {
 				} else if (p.routeIds && Array.isArray(p.routeIds)) {
 					// Fallback: use routeIds if nextByRoute is not available
 					perRoute = p.routeIds.map(rid => {
-						const r = routes.find(rt => String(rt.route_id) === String(rid));
+                        const r = getRouteSafe(rid);
 						if (!r) return '';
 						const color = r.route_color ? `#${r.route_color}` : '#6c757d';
 						const shortName = r.route_short_name || rid;
@@ -1621,6 +1759,13 @@ export class MapManager {
 
     _updateHalteRadius() {
         this._ensureStyleReady(() => {
+            // Wait for GTFS to be ready to avoid caching incomplete data after a normal refresh
+            try {
+                if (!window.gtfsDataReady) {
+                    setTimeout(() => this._updateHalteRadius(), 300);
+                    return;
+                }
+            } catch (e) {}
             const req = this._radiusRequest || {};
             const centerLng = req.centerLng, centerLat = req.centerLat, radius = req.radius || 300;
             if (typeof centerLng !== 'number' || typeof centerLat !== 'number') return;
@@ -2042,6 +2187,210 @@ export class MapManager {
             if (this.map.getSource(entry.sourceId)) this.map.removeSource(entry.sourceId);
             this.layers.delete(last);
         }
+    }
+
+    // Custom fixed-position journey markers using map layers (not DOM markers)
+    addJourneyMarker(type, lat, lon, onDragEnd, onDragStart, onDrag) {
+        try {
+            if (!this.map) return null;
+            const isStart = String(type) === 'start';
+            const color = isStart ? '#22c55e' : '#ef4444';
+            const id = `journey-marker-${type}`;
+            const sourceId = `${id}-source`;
+            
+            // Remove existing marker if any
+            if (this.map.getLayer(id)) this.map.removeLayer(id);
+            if (this.map.getSource(sourceId)) this.map.removeSource(sourceId);
+            
+            // Add as map layer - this won't move with popups/debounce
+            const data = {
+                type: 'Feature',
+                geometry: { type: 'Point', coordinates: [lon, lat] },
+                properties: { type, color }
+            };
+            
+            this.map.addSource(sourceId, { type: 'geojson', data });
+            this.map.addLayer({
+                id,
+                type: 'circle',
+                source: sourceId,
+                paint: {
+                    'circle-radius': 7,
+                    'circle-color': color,
+                    'circle-stroke-color': '#fff',
+                    'circle-stroke-width': 2
+                }
+            });
+            
+            // Add a larger invisible hitbox for easier dragging
+            const hitboxId = `${id}-hitbox`;
+            this.map.addLayer({
+                id: hitboxId,
+                type: 'circle',
+                source: sourceId,
+                paint: {
+                    'circle-radius': 12,
+                    'circle-color': 'rgba(0,0,0,0)',
+                    'circle-stroke-width': 0
+                }
+            });
+            
+            // Add drag functionality with touch and mouse support
+            let isDragging = false;
+            let startCoords = null;
+            let dragStartTime = 0;
+            let hasMoved = false;
+            
+            const startDrag = (lngLat, originalEvent) => {
+                originalEvent.preventDefault();
+                originalEvent.stopPropagation();
+                isDragging = true;
+                hasMoved = false;
+                dragStartTime = Date.now();
+                startCoords = [lngLat.lng, lngLat.lat];
+                this.map.getCanvas().style.cursor = 'grabbing';
+                this.map.dragPan.disable();
+                this.map.touchZoomRotate.disable();
+                if (typeof onDragStart === 'function') onDragStart();
+            };
+            
+            const updateDrag = (lngLat) => {
+                if (!isDragging) return;
+                hasMoved = true;
+                const coords = [lngLat.lng, lngLat.lat];
+                
+                // Update marker position immediately
+                this.map.getSource(sourceId).setData({
+                    type: 'Feature',
+                    geometry: { type: 'Point', coordinates: coords },
+                    properties: { type, color }
+                });
+                
+                if (typeof onDrag === 'function') onDrag(lngLat.lat, lngLat.lng);
+            };
+            
+            const endDrag = (lngLat) => {
+                if (!isDragging) return;
+                isDragging = false;
+                this.map.getCanvas().style.cursor = '';
+                this.map.dragPan.enable();
+                this.map.touchZoomRotate.enable();
+                
+                // Only trigger dragend if actually moved and held long enough
+                const dragDuration = Date.now() - dragStartTime;
+                if (hasMoved && dragDuration > 100) {
+                    if (typeof onDragEnd === 'function') {
+                        onDragEnd(lngLat.lat, lngLat.lng);
+                    }
+                }
+            };
+            
+            // Mouse events
+            const onMouseDown = (e) => {
+                startDrag(e.lngLat, e.originalEvent);
+                
+                const onMouseMove = (e) => {
+                    updateDrag(e.lngLat);
+                };
+                
+                const onMouseUp = (e) => {
+                    endDrag(e.lngLat);
+                    this.map.off('mousemove', onMouseMove);
+                    this.map.off('mouseup', onMouseUp);
+                };
+                
+                this.map.on('mousemove', onMouseMove);
+                this.map.on('mouseup', onMouseUp);
+            };
+            
+            // Touch events for mobile
+            const onTouchStart = (e) => {
+                if (e.originalEvent.touches.length !== 1) return; // Only single touch
+                startDrag(e.lngLat, e.originalEvent);
+                
+                const onTouchMove = (e) => {
+                    if (e.originalEvent.touches.length !== 1) return;
+                    e.preventDefault();
+                    updateDrag(e.lngLat);
+                };
+                
+                const onTouchEnd = (e) => {
+                    endDrag(e.lngLat);
+                    this.map.off('touchmove', onTouchMove);
+                    this.map.off('touchend', onTouchEnd);
+                };
+                
+                this.map.on('touchmove', onTouchMove);
+                this.map.on('touchend', onTouchEnd);
+            };
+            
+            // Bind events to the hitbox layer for easier interaction
+            this.map.on('mousedown', hitboxId, onMouseDown);
+            this.map.on('touchstart', hitboxId, onTouchStart);
+            this.map.on('mouseenter', hitboxId, () => { 
+                if (!isDragging) this.map.getCanvas().style.cursor = 'grab'; 
+            });
+            this.map.on('mouseleave', hitboxId, () => { 
+                if (!isDragging) this.map.getCanvas().style.cursor = ''; 
+            });
+            
+            // Also bind to visible marker for redundancy
+            this.map.on('mousedown', id, onMouseDown);
+            this.map.on('touchstart', id, onTouchStart);
+            this.map.on('mouseenter', id, () => { 
+                if (!isDragging) this.map.getCanvas().style.cursor = 'grab'; 
+            });
+            this.map.on('mouseleave', id, () => { 
+                if (!isDragging) this.map.getCanvas().style.cursor = ''; 
+            });
+            
+            const marker = { id, sourceId, lat, lon, type };
+            
+            if (isStart) {
+                if (this._journeyStartMarker) this._removeJourneyMarker(this._journeyStartMarker);
+                this._journeyStartMarker = marker;
+            } else {
+                if (this._journeyEndMarker) this._removeJourneyMarker(this._journeyEndMarker);
+                this._journeyEndMarker = marker;
+            }
+            
+            return marker;
+        } catch (e) { return null; }
+    }
+    
+    _removeJourneyMarker(marker) {
+        try {
+            if (marker && marker.id) {
+                const hitboxId = `${marker.id}-hitbox`;
+                if (this.map.getLayer(hitboxId)) this.map.removeLayer(hitboxId);
+                if (this.map.getLayer(marker.id)) this.map.removeLayer(marker.id);
+                if (this.map.getSource(marker.sourceId)) this.map.removeSource(marker.sourceId);
+            }
+        } catch (e) {}
+    }
+
+    updateJourneyMarker(type, lat, lon) {
+        try {
+            const isStart = String(type) === 'start';
+            const marker = isStart ? this._journeyStartMarker : this._journeyEndMarker;
+            if (marker && marker.sourceId) {
+                const color = isStart ? '#22c55e' : '#ef4444';
+                this.map.getSource(marker.sourceId).setData({
+                    type: 'Feature',
+                    geometry: { type: 'Point', coordinates: [lon, lat] },
+                    properties: { type, color }
+                });
+                marker.lat = lat;
+                marker.lon = lon;
+            }
+        } catch (e) {}
+    }
+
+    clearJourneyMarkers() {
+        try { if (this._journeyStartMarker) this._removeJourneyMarker(this._journeyStartMarker); } catch(e) {}
+        try { if (this._journeyEndMarker) this._removeJourneyMarker(this._journeyEndMarker); } catch(e) {}
+        this._journeyStartMarker = null;
+        this._journeyEndMarker = null;
     }
 
     addNearestStopMarker(lat, lng, stop, distance) {
