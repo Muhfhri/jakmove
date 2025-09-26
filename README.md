@@ -142,7 +142,7 @@ jakmove/
 
 ### Akses Online
 Aplikasi dapat diakses langsung melalui browser tanpa instalasi:
-- **Website Utama**: [JakMove Web App](https://yourwebsite.com)
+- **Website Utama**: [JakMove Web App](https://muhfhri.github.io/jakmove)
 
 ### Local Development
 ```bash
