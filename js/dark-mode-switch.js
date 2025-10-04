@@ -8,19 +8,26 @@ var darkSwitch = document.getElementById("darkSwitch");
 
 // Fungsi untuk memperbarui tema dan menyimpan preferensi
 function resetTheme() {
-    var isDarkMode = darkSwitch.checked;
+    var currentTheme = document.documentElement.getAttribute("data-theme");
+    var newTheme = currentTheme === "dark" ? "light" : "dark";
     
     document.documentElement.style.transition = "background-color 0.3s ease, color 0.3s ease";
-    document.documentElement.setAttribute("data-theme", isDarkMode ? "dark" : "light");
+    document.documentElement.setAttribute("data-theme", newTheme);
     
-    localStorage.setItem("darkSwitch", isDarkMode ? "dark" : "light");
+    localStorage.setItem("darkSwitch", newTheme);
+    localStorage.setItem("theme", newTheme);
 }
 
 // Jalankan inisialisasi setelah halaman selesai dimuat
 window.addEventListener("DOMContentLoaded", function() {
     if (darkSwitch) {
-        var darkThemeSelected = localStorage.getItem("darkSwitch") === "dark";
-        darkSwitch.checked = darkThemeSelected;
-        darkSwitch.addEventListener("change", resetTheme);
+        // Modern navbar toggle is a button, not a checkbox
+        darkSwitch.addEventListener("click", resetTheme);
+    }
+    
+    // Mobile dark mode toggle
+    var darkSwitchMobile = document.getElementById("darkSwitchMobile");
+    if (darkSwitchMobile) {
+        darkSwitchMobile.addEventListener("click", resetTheme);
     }
 });

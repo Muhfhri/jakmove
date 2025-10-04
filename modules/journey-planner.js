@@ -357,7 +357,11 @@ export class JourneyPlanner {
         }
         const grouped = this._groupByRoute(path);
         // Hindari efek kedip saat drag: render hanya ketika tidak sedang drag
-        if (!this._isDragging) this._renderPlan(start, goal, grouped);
+        if (!this._isDragging) {
+            // Pass steps from _lastPlan if available
+            const stepsToUse = (this._lastPlan && this._lastPlan.steps) ? this._lastPlan.steps : [];
+            this._renderPlan(start, goal, grouped, stepsToUse);
+        }
         // Show popup immediately at origin with full steps and make it sticky
         try {
             const mapMod = this.app.modules.map;
@@ -815,7 +819,7 @@ export class JourneyPlanner {
         return legs;
     }
 
-    _renderPlan(startStop, goalStop, legs) {
+    _renderPlan(startStop, goalStop, legs, planSteps = []) {
         const gtfs = this.app.modules.gtfs;
         const stopsById = new Map((gtfs.getStops() || []).map(s => [String(s.stop_id||''), s]));
         const routes = gtfs.getRoutes() || [];
@@ -827,17 +831,37 @@ export class JourneyPlanner {
         this._addEndpointMarker(this.origin.lat, this.origin.lon, 'start');
         this._addEndpointMarker(this.destination.lat, this.destination.lon, 'end');
 
-        // Draw walking: origin -> startStop (ensure complete path)
+        // Parse steps to determine actual walks needed
+        const walksFromSteps = new Set();
+        for (const step of planSteps) {
+            if (step.type === 'walk') {
+                // Extract walk info from step text
+                walksFromSteps.add(step.text);
+            }
+        }
+        
+        console.log(`📋 Steps contain ${walksFromSteps.size} walk segments:`, Array.from(walksFromSteps));
+
+        // Draw walking: origin -> startStop ONLY if steps include it
         const dStart = this._haversine(this.origin.lat, this.origin.lon, parseFloat(startStop.stop_lat), parseFloat(startStop.stop_lon));
-        if (dStart > 5) { // Only draw if not already at stop
+        const hasInitialWalk = Array.from(walksFromSteps).some(w => w.includes(startStop.stop_name));
+        if (dStart > 5 && hasInitialWalk) { // Only draw if not already at stop AND step exists
+            console.log(`  🚶 Drawing initial walk to ${startStop.stop_name}`);
             this._drawWalk(this.origin.lat, this.origin.lon, parseFloat(startStop.stop_lat), parseFloat(startStop.stop_lon), 
                 { type: 'walk', toStopName: startStop.stop_name, preferStraight: dStart <= 100, ensureComplete: true });
+        } else {
+            console.log(`  ⏭️ Skipping initial walk (${dStart.toFixed(0)}m, hasStep=${hasInitialWalk})`);
         }
-        // Draw walking: goalStop -> destination (ensure complete path)
+        
+        // Draw walking: goalStop -> destination ONLY if steps include it
         const dEnd = this._haversine(parseFloat(goalStop.stop_lat), parseFloat(goalStop.stop_lon), this.destination.lat, this.destination.lon);
-        if (dEnd > 5) { // Only draw if not already at destination
+        const hasFinalWalk = Array.from(walksFromSteps).some(w => w.includes('tujuan'));
+        if (dEnd > 5 && hasFinalWalk) { // Only draw if not already at destination AND step exists
+            console.log(`  🚶 Drawing final walk to destination`);
             this._drawWalk(parseFloat(goalStop.stop_lat), parseFloat(goalStop.stop_lon), this.destination.lat, this.destination.lon, 
                 { type: 'walk', toStopName: 'Tujuan', preferStraight: dEnd <= 100, ensureComplete: true });
+        } else {
+            console.log(`  ⏭️ Skipping final walk (${dEnd.toFixed(0)}m, hasStep=${hasFinalWalk})`);
         }
         // Draw transit legs (chunked to avoid blocking UI)
         const seq = ++this._drawSeq;
@@ -859,21 +883,7 @@ export class JourneyPlanner {
                     this._addTextAt(sLat, sLon, `Naik ${this._routeLabel(leg.routeId)} di ${fromStop?.stop_name || ''}${plat ? ' (Platform ' + plat + ')' : ''}`, color);
                 } catch(e){}
                 try { const [eLat, eLon] = segment[segment.length - 1]; this._addTextAt(eLat, eLon, `Turun di ${toStop?.stop_name || ''}`, color); } catch(e){}
-                // Bridge small gaps from/to exact stop locations if needed
-                try {
-                    const [sLat, sLon] = segment[0];
-                    const [eLat, eLon] = segment[segment.length-1];
-                        const dStartGap = this._haversine(parseFloat(fromStop.stop_lat), parseFloat(fromStop.stop_lon), sLat, sLon);
-                        if (dStartGap > 10) { // Reduced threshold for better gap detection
-                            this._drawWalk(parseFloat(fromStop.stop_lat), parseFloat(fromStop.stop_lon), sLat, sLon, 
-                                { type: 'walk', toStopName: 'Platform', preferStraight: true, ensureComplete: true });
-                        }
-                        const dEndGap = this._haversine(eLat, eLon, parseFloat(toStop.stop_lat), parseFloat(toStop.stop_lon));
-                        if (dEndGap > 10) { // Reduced threshold for better gap detection
-                            this._drawWalk(eLat, eLon, parseFloat(toStop.stop_lat), parseFloat(toStop.stop_lon), 
-                                { type: 'walk', toStopName: toStop.stop_name, preferStraight: true, ensureComplete: true });
-                        }
-                } catch(_) {}
+                // NO GAP BRIDGING - shapes should be accurate enough, and we don't want to add walks not in steps
             } else {
                 // Fallback: render stop-by-stop using shapes when possible
                 for (let i = 0; i < leg.stops.length - 1; i++) {
@@ -896,15 +906,7 @@ export class JourneyPlanner {
                         const [eLat, eLon] = coords[coords.length - 1]; 
                         if (i === leg.stops.length - 2) this._addTextAt(eLat, eLon, `Turun di ${b?.stop_name || ''}`, color); 
                     } catch(e){}
-                    // Bridge gaps if shape segment doesn't reach exact stop location
-                    try {
-                        const [sLat, sLon] = coords[0];
-                        const [eLat, eLon] = coords[coords.length-1];
-                        const dStartGap = this._haversine(parseFloat(a.stop_lat), parseFloat(a.stop_lon), sLat, sLon);
-                        if (dStartGap > 25) this._drawWalk(parseFloat(a.stop_lat), parseFloat(a.stop_lon), sLat, sLon, { type: 'walk', toStopName: a.stop_name, preferStraight: dStartGap <= 120 });
-                        const dEndGap = this._haversine(eLat, eLon, parseFloat(b.stop_lat), parseFloat(b.stop_lon));
-                        if (dEndGap > 25) this._drawWalk(eLat, eLon, parseFloat(b.stop_lat), parseFloat(b.stop_lon), { type: 'walk', toStopName: b.stop_name, preferStraight: dEndGap <= 120 });
-                    } catch(_) {}
+                    // NO GAP BRIDGING in fallback mode either
                 }
             }
             // Mark transfer at start of each subsequent leg
@@ -917,42 +919,45 @@ export class JourneyPlanner {
         };
         legs.forEach((leg, idx) => { setTimeout(() => drawOneLeg(leg, idx), idx * 0); });
 
-        // Draw walking between transfer stops when legs are not contiguous at the same stop, or when drawn segments have a physical gap
+        // Draw walking between transfer stops ONLY if mentioned in steps
+        console.log(`🔄 Checking ${legs.length - 1} potential transfers...`);
         for (let i = 0; i < legs.length - 1; i++) {
             const currLastId = String(legs[i].stops[legs[i].stops.length - 1]);
             const nextFirstId = String(legs[i+1].stops[0]);
-            if (currLastId !== nextFirstId) {
-                const a = stopsById.get(currLastId);
-                const b = stopsById.get(nextFirstId);
-                if (a && b) {
-                    const nearD = this._haversine(parseFloat(a.stop_lat), parseFloat(a.stop_lon), parseFloat(b.stop_lat), parseFloat(b.stop_lon));
-                    const sameParent = String(a.parent_station || '') && String(a.parent_station || '') === String(b.parent_station || '');
-                    
-                    // Skip very long walks between transit stops (>500m is unreasonable)
-                    if (nearD > 500 && !sameParent) {
-                        console.warn(`Transit walk distance ${nearD}m between ${a.stop_name} and ${b.stop_name} is too far`);
-                    }
-                    
-                    this._drawWalk(
-                        parseFloat(a.stop_lat), parseFloat(a.stop_lon),
-                        parseFloat(b.stop_lat), parseFloat(b.stop_lon),
-                        { type: 'walk', toStopName: b.stop_name, preferStraight: sameParent || nearD <= 100, ensureComplete: true }
-                    );
-                }
+            
+            // Get stop objects
+            const a = stopsById.get(currLastId);
+            const b = stopsById.get(nextFirstId);
+            if (!a || !b) continue;
+            
+            // Check if steps explicitly mention walking between these stops
+            const transferWalk = Array.from(walksFromSteps).find(w => 
+                w.includes(a.stop_name) && w.includes(b.stop_name)
+            );
+            
+            if (!transferWalk) {
+                console.log(`  ⏭️ No walk step for transfer ${a.stop_name} → ${b.stop_name}, skipping`);
+                continue;
+            }
+            
+            // Calculate actual distance
+            const stopDistance = this._haversine(parseFloat(a.stop_lat), parseFloat(a.stop_lon), parseFloat(b.stop_lat), parseFloat(b.stop_lon));
+            
+            console.log(`  🚶 Drawing transfer walk: ${a.stop_name} → ${b.stop_name} (${stopDistance.toFixed(0)}m)`);
+            
+            // Only draw if distance is significant and not same location
+            if (stopDistance > 20 && currLastId !== nextFirstId) {
+                this._drawWalk(
+                    parseFloat(a.stop_lat), parseFloat(a.stop_lon),
+                    parseFloat(b.stop_lat), parseFloat(b.stop_lon),
+                    { type: 'walk', toStopName: b.stop_name, preferStraight: stopDistance <= 150, ensureComplete: true }
+                );
             } else {
-                // Same stop id across legs; if physical gap exists between drawn segments, bridge it
-                try {
-                    const prev = legEndpoints[i];
-                    const next = legEndpoints[i+1];
-                    if (prev && next && Array.isArray(prev.end) && Array.isArray(next.start)) {
-                        const gap = this._haversine(prev.end[0], prev.end[1], next.start[0], next.start[1]);
-                        if (gap > 20) {
-                            this._drawWalk(prev.end[0], prev.end[1], next.start[0], next.start[1], { type: 'walk', toStopName: 'Pindah platform', preferStraight: gap <= 150 });
-                        }
-                    }
-                } catch(_) {}
+                console.log(`    ⏭️ Too short or same stop, skipping visual`);
             }
         }
+        
+        // NO MORE automatic gap bridging - only draw what's in steps
 
         // Steps UI
         const steps = [];
@@ -1145,11 +1150,24 @@ export class JourneyPlanner {
     _drawWalk(lat1, lon1, lat2, lon2, meta = {}) {
         const straightDist = this._haversine(lat1, lon1, lat2, lon2);
         
+        // SKIP walking lines for very short distances or internal gaps (noise reduction)
+        if (straightDist < 10) {
+            console.log(`  ⏭️ Skipping walk: too short (${straightDist.toFixed(0)}m)`);
+            return; // Don't draw anything for sub-10m distances
+        }
+        
+        // For gap bridging (not actual user walking), use invisible/minimal lines
+        const isGapBridge = meta && (meta.type === 'walk') && (meta.toStopName === 'Platform' || meta.toStopName === 'Pindah platform');
+        if (isGapBridge && straightDist < 100) {
+            console.log(`  ⏭️ Skipping gap bridge: too short (${straightDist.toFixed(0)}m)`);
+            return; // Don't draw gap bridges less than 100m
+        }
+        
         // Create unique ID for this walk segment to replace placeholder later
         const walkId = `walk-${Date.now()}-${Math.random().toString(36).slice(2)}`;
         
         const drawStraight = (approx = true, isPlaceholder = false) => {
-                const path = [[lat1, lon1], [lat2, lon2]];
+            const path = [[lat1, lon1], [lat2, lon2]];
             const label = approx ? `Perkiraan (garis lurus) • ${this._fmtDist(straightDist)}` : `Jalan kaki • ${this._fmtDist(straightDist)}`;
             const metaData = { ...meta, type: 'walk', approximate: approx, distance: straightDist, walkId: isPlaceholder ? walkId : undefined };
             this._drawPolyline(path, '#10b981', 3, 0.9, [2, 2], metaData);
@@ -1158,12 +1176,11 @@ export class JourneyPlanner {
         
         // Check if walking distance is reasonable
         if (straightDist > 1000 && !meta.ensureComplete) {
-            console.warn(`Walking distance ${straightDist}m is too far`);
-            drawStraight(true);
-            return;
+            console.warn(`  ⚠️ Walking distance ${straightDist.toFixed(0)}m is too far, not drawing`);
+            return; // Don't draw anything for unreasonably long walks
         }
         
-        // Prefer straight within campus/terminal atau jarak sangat pendek
+        // For very short walks or forced straight, just draw simple line without OSRM
         try {
             if ((meta && (meta.forceStraight || meta.preferStraight)) || straightDist <= 100) {
                 drawStraight(false);
@@ -1171,8 +1188,19 @@ export class JourneyPlanner {
             }
         } catch (_) {}
         
+        // For gap bridges or very short walks, skip OSRM entirely (just draw straight line)
+        if (isGapBridge || straightDist <= 150) {
+            console.log(`  🚶 Drawing simple walk: ${straightDist.toFixed(0)}m (skipping OSRM)`);
+            drawStraight(false); // Draw without "Perkiraan" label
+            return;
+        }
+        
+        // Only use OSRM for actual user walking (origin/destination or significant transfers)
+        console.log(`  🗺️ Fetching OSRM route for ${straightDist.toFixed(0)}m walk`);
+        
         // Tampilkan placeholder garis lurus terlebih dahulu agar tidak "hilang" saat OSRM fetch
-        drawStraight(true, true);
+        drawStraight(false, true); // Use false to avoid "Perkiraan" label on placeholder
+        
         // Snap ke jalan terdekat lalu rute OSRM dengan steps; fallback garis lurus bila tidak konsisten
         const nearestUrl = (lat, lon) => `https://router.project-osrm.org/nearest/v1/foot/${lon},${lat}?number=1`;
         const routeUrl = (sLon, sLat, eLon, eLat) => `https://router.project-osrm.org/route/v1/foot/${sLon},${sLat};${eLon},${eLat}?overview=full&geometries=geojson&steps=true&alternatives=false&radiuses=30;30`;
@@ -1201,14 +1229,16 @@ export class JourneyPlanner {
                 const resp = await fetch(routeUrl(sLon, sLat, eLon, eLat));
                 const data = await resp.json();
                 if (!data || !data.routes || !data.routes[0] || !data.routes[0].geometry) {
-                    drawStraight(true);
+                    console.log(`  ⚠️ OSRM failed, keeping simple straight line`);
+                    // Don't redraw - placeholder is already there
                     return;
                 }
                 const osrmDist = typeof data.routes[0].distance === 'number' ? data.routes[0].distance : null;
                 const osrmDur = typeof data.routes[0].duration === 'number' ? data.routes[0].duration : null;
                 // Hindari detour berlebihan (mis. di dalam terminal)
                 if (osrmDist !== null && osrmDist > Math.max(350, straightDist * 2.2)) {
-                    drawStraight(true);
+                    console.log(`  ⚠️ OSRM route too long (${osrmDist}m vs ${straightDist}m straight), keeping placeholder`);
+                    // Don't redraw - placeholder is already there
                     return;
                 }
                 const coords = data.routes[0].geometry.coordinates.map(([lng, lat]) => [lat, lng]);
@@ -1493,44 +1523,102 @@ export class JourneyPlanner {
                         const midLon = parseFloat(midStop.stop_lon);
                         const idxMid = this._nearestIdx(shp, midLat, midLon);
                         
-                        // If middle stop suggests reverse order, swap
+                        // If middle stop suggests order, use it to determine direction
                         if (idxMid >= 0) {
-                            if ((idxA < idxMid && idxMid < idxB) || (idxB < idxMid && idxMid < idxA)) {
-                                // Normal order is correct
-                                if (i0 > i1) { const tmp = i0; i0 = i1; i1 = tmp; }
+                            // Check if midpoint is between start and end in shape
+                            const isForward = (idxA < idxMid && idxMid < idxB);
+                            const isBackward = (idxB < idxMid && idxMid < idxA);
+                            
+                            if (isForward) {
+                                // Normal forward order (A -> Mid -> B)
+                                i0 = idxA;
+                                i1 = idxB;
+                            } else if (isBackward) {
+                                // Reversed order (B -> Mid -> A), swap them
+                                i0 = idxB;
+                                i1 = idxA;
                             } else {
-                                // Need to check if route goes backward in shape
-                                if (idxA > idxB && idxMid < Math.min(idxA, idxB)) {
-                                    // Route wraps around, need full shape
-                                    i0 = 0;
-                                    i1 = shp.length - 1;
-                                }
+                                // Ambiguous case: use shortest path between A and B
+                                // ALWAYS prefer shorter segment over full shape
+                                if (i0 > i1) { const tmp = i0; i0 = i1; i1 = tmp; }
                             }
+                        } else {
+                            // No midpoint found, ensure forward direction
+                            if (i0 > i1) { const tmp = i0; i0 = i1; i1 = tmp; }
                         }
+                    } else {
+                        // No midpoint available, ensure forward direction
+                        if (i0 > i1) { const tmp = i0; i0 = i1; i1 = tmp; }
                     }
                 } else {
                     // For 2-stop segments, ensure forward direction
                     if (i0 > i1) { const tmp = i0; i0 = i1; i1 = tmp; }
                 }
                 
-                // Expand slightly to ensure smooth connections
-                i0 = Math.max(0, i0 - 2);
-                i1 = Math.min(shp.length - 1, i1 + 2);
+                // Check distance from start/end halte to nearest shape points BEFORE expansion
+                const distToStart = this._haversine(aLat, aLon, shp[i0].lat, shp[i0].lng);
+                const distToEnd = this._haversine(bLat, bLon, shp[i1].lat, shp[i1].lng);
+                
+                // CRITICAL: Reject if shape points are too far from actual halte
+                // This prevents using wrong segments (e.g., starting from Lapangan Banteng instead of Jembatan Merah)
+                if (distToStart > 100 || distToEnd > 100) {
+                    console.warn(`⚠️ Rejecting segment: too far from halte (start: ${distToStart.toFixed(0)}m, end: ${distToEnd.toFixed(0)}m)`);
+                    continue;
+                }
+                
+                // Minimal expansion - only extend if very close to halte
+                let expansion = 0;
+                if (distToStart < 20) expansion = 1; // Only expand 1 point if very close
+                
+                i0 = Math.max(0, i0 - expansion);
+                i1 = Math.min(shp.length - 1, i1 + expansion);
+                
+                // Validate segment length - reject if too long (likely wrong segment)
+                const segmentLength = Math.abs(i1 - i0);
+                const maxReasonableLength = Math.floor(shp.length * 0.7); // Max 70% of total shape
+                
+                if (segmentLength > maxReasonableLength) {
+                    console.warn(`⚠️ Rejecting segment: too long (${segmentLength}/${shp.length} points, ${Math.round(segmentLength/shp.length*100)}%)`);
+                    continue; // Skip this shape, try next one
+                }
+                
                 const pts = shp.slice(i0, i1 + 1);
                 if (pts.length < 2) continue;
+                
                 // Score = distance from endpoints to nearest vertices (smaller is better)
+                // HEAVILY penalize distance from halte to segment start/end
                 const da = this._eu2(aLat, aLon, pts[0].lat, pts[0].lng);
                 const db = this._eu2(bLat, bLon, pts[pts.length - 1].lat, pts[pts.length - 1].lng);
+                
+                // CRITICAL: Very heavy penalty for endpoint mismatch (100x multiplier)
+                const endpointPenalty = (da + db) * 100;
+                
                 const segLen = pts.length;
                 // prefer segments that are not too short (avoid half-drawn)
                 const lengthPenalty = segLen < 6 ? (6 - segLen) * 1e-6 : 0;
-                const score = da + db + lengthPenalty;
+                const score = endpointPenalty + lengthPenalty;
+                
                 if (score < bestScore) {
                     bestScore = score;
                     bestSeg = pts.map(p => [p.lat, p.lng]);
-                    if (bestScore < 1e-8) break; // good enough
+                    console.log(`✅ Found segment: ${segLen} points (${Math.round(segLen/shp.length*100)}% of shape), score: ${score.toFixed(6)}, distStart: ${distToStart.toFixed(0)}m, distEnd: ${distToEnd.toFixed(0)}m`);
+                    if (bestScore < 0.001) break; // good enough (very close match)
                 }
             }
+            
+            if (bestSeg) {
+                const segStart = bestSeg[0];
+                const segEnd = bestSeg[bestSeg.length - 1];
+                const finalDistStart = this._haversine(aLat, aLon, segStart[0], segStart[1]);
+                const finalDistEnd = this._haversine(bLat, bLon, segEnd[0], segEnd[1]);
+                console.log(`🎯 Using best segment for ${this._routeLabel(rid)}: ${bestSeg.length} points`);
+                console.log(`   From: ${firstStop.stop_name} (offset: ${finalDistStart.toFixed(0)}m)`);
+                console.log(`   To: ${lastStop.stop_name} (offset: ${finalDistEnd.toFixed(0)}m)`);
+                console.log(`   Best score: ${bestScore.toFixed(6)}`);
+            } else {
+                console.warn(`⚠️ No valid segment found for ${this._routeLabel(rid)} (${firstStop.stop_name} → ${lastStop.stop_name})`);
+            }
+            
             return bestSeg;
         } catch (e) { return null; }
     }
@@ -1673,8 +1761,8 @@ export class JourneyPlanner {
         try {
             if (!this.enabled || !this._lastPlan || !this.origin || !this.destination) return;
             const { startStop, goalStop, legs, steps } = this._lastPlan;
-            // Re-render overlays
-            this._renderPlan(startStop, goalStop, legs);
+            // Re-render overlays with steps
+            this._renderPlan(startStop, goalStop, legs, steps || []);
             // Restore sticky popup
             if (steps && steps.length) {
                 const html = this._buildFullStepsPopupHTML('Rencana Perjalanan', steps);
@@ -1710,4 +1798,118 @@ export class JourneyPlanner {
             }
         } catch (e) {}
     }
-} 
+
+    // Public: compute a plan between two stop_ids without rendering on the map
+    computePlanByStopIds(startStopId, endStopId, mode = 'balanced') {
+        try {
+            if (!startStopId || !endStopId) return null;
+            if (!this._graphBuilt) {
+                try { this._buildGraph(); } catch (e) {}
+            }
+            const gtfs = this.app.modules.gtfs;
+            const stops = gtfs.getStops() || [];
+            const stopsById = new Map(stops.map(s => [String(s.stop_id || ''), s]));
+            const startStop = stopsById.get(String(startStopId));
+            const goalStop = stopsById.get(String(endStopId));
+            if (!startStop || !goalStop) return null;
+
+            const originalMode = this._mode;
+            this._mode = String(mode || originalMode || 'balanced');
+
+            // Find path with fallbacks similar to _plan()
+            let path = this._findPath(String(startStopId), String(endStopId));
+            if (!path || path.length === 0) { try { this._addFallbackWalkEdges(1); } catch (_) {} path = this._findPath(String(startStopId), String(endStopId)); }
+            if ((!path || path.length === 0) && this._mode !== 'balanced') {
+                const save = this._mode; this._mode = 'balanced';
+                path = this._findPath(String(startStopId), String(endStopId));
+                this._mode = save;
+            }
+            if (!path || path.length === 0) { try { this._addFallbackWalkEdges(2); } catch (_) {} path = this._findPath(String(startStopId), String(endStopId)); }
+            if (!path || path.length === 0) { this._mode = originalMode; return null; }
+
+            const legs = this._groupByRoute(path);
+            // Build steps (no initial/final walking from free coords)
+            const steps = [];
+            for (let i = 0; i < legs.length; i++) {
+                const leg = legs[i];
+                const first = stopsById.get(String(leg.stops[0]));
+                const last = stopsById.get(String(leg.stops[leg.stops.length - 1]));
+                const name = (() => { try { const routes = gtfs.getRoutes() || []; const r = routes.find(rr => String(rr.route_id || '') === String(leg.routeId)); return r ? (r.route_short_name || r.route_id) : leg.routeId; } catch (_) { return leg.routeId; } })();
+                steps.push({ type: 'ride', text: `Naik ${name} dari ${first?.stop_name} ke ${last?.stop_name}` });
+                if (i < legs.length - 1) {
+                    const nextFirst = stopsById.get(String(legs[i + 1].stops[0]));
+                    if (last && nextFirst) {
+                        const d = this._haversine(parseFloat(last.stop_lat), parseFloat(last.stop_lon), parseFloat(nextFirst.stop_lat), parseFloat(nextFirst.stop_lon));
+                        steps.push({ type: 'transfer', text: `Transit di ${last.stop_name}` });
+                        if (d > 1) steps.push({ type: 'walk', text: `Jalan ke ${nextFirst.stop_name} (${this._fmtDist(d)})` });
+                    }
+                }
+            }
+            const fare = this._estimateFare(legs);
+            const duration = this._estimateJourneyDuration(startStop, goalStop, legs, 0, 0);
+            const plan = { startStop, goalStop, legs, steps, fare, duration, mode: this._mode };
+            this._mode = originalMode;
+            return plan;
+        } catch (e) { return null; }
+    }
+
+    // Public: render computed plan on map and show steps popup
+    showPlanOnMap(plan) {
+        try {
+            if (!plan || !plan.startStop || !plan.goalStop || !Array.isArray(plan.legs)) return;
+            // Set internal state for proper rendering
+            this.origin = { lat: parseFloat(plan.startStop.stop_lat), lon: parseFloat(plan.startStop.stop_lon) };
+            this.destination = { lat: parseFloat(plan.goalStop.stop_lat), lon: parseFloat(plan.goalStop.stop_lon) };
+            this._lastPlan = { ...plan };
+            this._clearMapArtifacts();
+            this._renderPlan(plan.startStop, plan.goalStop, plan.legs, plan.steps || []);
+            // Show sticky popup with full steps at origin
+            try {
+                const mapMod = this.app.modules.map;
+                const html = this._buildFullStepsPopupHTML('Rencana Perjalanan', plan.steps || []);
+                const lng = parseFloat(plan.startStop.stop_lon), lat = parseFloat(plan.startStop.stop_lat);
+                mapMod.setStickyPopup(true);
+                mapMod.showHtmlPopupAt(lng, lat, html);
+                try {
+                    const el = mapMod._currentPopup && mapMod._currentPopup.getElement && mapMod._currentPopup.getElement();
+                    const btn = el && el.querySelector('#jp-reset-inline');
+                    if (btn) btn.addEventListener('click', () => { try { this.reset(); } catch (_) {} try { this.app.modules.map.closePopup(); } catch (_) {} });
+                    const group = el && el.querySelector('#jp-mode-inline');
+                    if (group) {
+                        const setActive = (activeId) => {
+                            group.querySelectorAll('button[data-mode]').forEach(b => {
+                                if (b.getAttribute('data-mode') === activeId) { b.classList.remove('btn-outline-primary'); b.classList.add('btn-primary'); }
+                                else { b.classList.add('btn-outline-primary'); b.classList.remove('btn-primary'); }
+                            });
+                        };
+                        setActive(this._mode || 'balanced');
+                        group.querySelectorAll('button[data-mode]').forEach(b => {
+                            b.addEventListener('click', (ev) => {
+                                try { ev.preventDefault(); ev.stopPropagation(); } catch (_e) {}
+                                const m = b.getAttribute('data-mode');
+                                try { localStorage.setItem('jp_mode', m); } catch (_e2) {}
+                                this.setOptimizationMode(m);
+                                // Try to get cached plan from TypedPlanner first, if not available, re-compute
+                                try {
+                                    const typedPlanner = this.app.modules.typedPlanner;
+                                    const cacheKey = `${String(plan.startStop.stop_id)}|${String(plan.goalStop.stop_id)}|${m}`;
+                                    let recomputed = null;
+                                    
+                                    if (typedPlanner && typedPlanner._cachedPlans && typedPlanner._cachedPlans.has(cacheKey)) {
+                                        recomputed = typedPlanner._cachedPlans.get(cacheKey);
+                                        console.log(`🗺️ Using cached plan from popup mode switcher: ${cacheKey}`);
+                                    } else {
+                                        console.log(`⚠️ Plan not in cache, recomputing from popup: ${cacheKey}`);
+                                        recomputed = this.computePlanByStopIds(String(plan.startStop.stop_id), String(plan.goalStop.stop_id), m);
+                                    }
+                                    
+                                    if (recomputed) this.showPlanOnMap(recomputed);
+                                } catch (_) {}
+                            });
+                        });
+                    }
+                } catch (e) {}
+            } catch (e) {}
+        } catch (e) {}
+    }
+}

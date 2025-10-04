@@ -820,3 +820,188 @@ label {
 [data-theme="dark"] .other-services-live .fa-bus {
     color: #f59e0b !important;
 }
+
+/* Weather Detail Modal Dark Mode */
+[data-theme="dark"] #weatherDetailModal .modal-content {
+    background-color: #1e293b;
+    color: #e2e8f0;
+    border-color: #334155;
+}
+
+[data-theme="dark"] #weatherDetailModal .modal-header {
+    background-color: #0f172a;
+    border-bottom-color: #334155;
+}
+
+[data-theme="dark"] #weatherDetailModal .modal-header .btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+[data-theme="dark"] #weatherDetailModal .modal-body {
+    background-color: #1e293b;
+}
+
+[data-theme="dark"] #weatherDetailModal .modal-footer {
+    background-color: #0f172a;
+    border-top-color: #334155;
+}
+
+[data-theme="dark"] #weatherDetailModal .form-control {
+    background-color: #0f172a;
+    border-color: #334155;
+    color: #e2e8f0;
+}
+
+[data-theme="dark"] #weatherDetailModal .form-control:focus {
+    background-color: #1e293b;
+    border-color: #3b82f6;
+    color: #e2e8f0;
+}
+
+[data-theme="dark"] #weatherDetailModal .border {
+    border-color: #334155 !important;
+}
+
+[data-theme="dark"] #weatherDetailModal .rounded[style*="background:#f8fafc"],
+[data-theme="dark"] #weatherDetailModal .p-2.border.rounded {
+    background: #0f172a !important;
+    border-color: #334155 !important;
+}
+
+[data-theme="dark"] #weatherDetailModal .alert-warning {
+    background-color: #422006;
+    border-color: #78350f;
+    color: #fef3c7;
+}
+
+[data-theme="dark"] #weatherDetailModal .form-check-input {
+    background-color: #334155;
+    border-color: #475569;
+}
+
+[data-theme="dark"] #weatherDetailModal .form-check-input:checked {
+    background-color: #3b82f6;
+    border-color: #3b82f6;
+}
+
+[data-theme="dark"] #weatherDetailModal .btn-outline-primary {
+    color: #60a5fa;
+    border-color: #3b82f6;
+}
+
+[data-theme="dark"] #weatherDetailModal .btn-outline-primary:hover {
+    background-color: #3b82f6;
+    border-color: #3b82f6;
+    color: #ffffff;
+}
+
+[data-theme="dark"] #weatherDetailModal .btn-outline-secondary {
+    color: #94a3b8;
+    border-color: #475569;
+}
+
+[data-theme="dark"] #weatherDetailModal .btn-outline-secondary:hover {
+    background-color: #475569;
+    border-color: #475569;
+    color: #ffffff;
+}
+
+[data-theme="dark"] #weatherDetailModal .btn-primary {
+    background-color: #3b82f6;
+    border-color: #3b82f6;
+}
+
+[data-theme="dark"] #weatherDetailModal .btn-primary:hover {
+    background-color: #2563eb;
+    border-color: #2563eb;
+}
+
+/* Journey Planner Popup Dark Mode (stop-popup class) */
+[data-theme="dark"] .stop-popup {
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%) !important;
+    border-color: rgba(255,255,255,0.1) !important;
+    color: #e2e8f0 !important;
+}
+
+[data-theme="dark"] .stop-popup .fw-bold,
+[data-theme="dark"] .stop-popup .fw-semibold {
+    color: #f1f5f9 !important;
+}
+
+[data-theme="dark"] .stop-popup .text-muted {
+    color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .stop-popup .small {
+    color: #cbd5e1 !important;
+}
+
+[data-theme="dark"] .stop-popup hr {
+    border-color: rgba(255,255,255,0.1) !important;
+}
+
+[data-theme="dark"] .stop-popup .btn {
+    background: #3b82f6 !important;
+    border-color: #3b82f6 !important;
+    color: #ffffff !important;
+}
+
+[data-theme="dark"] .stop-popup .btn:hover {
+    background: #2563eb !important;
+    border-color: #2563eb !important;
+}
+
+[data-theme="dark"] .stop-popup .btn-sm {
+    background: #334155 !important;
+    border-color: #475569 !important;
+    color: #e2e8f0 !important;
+}
+
+[data-theme="dark"] .stop-popup .btn-sm:hover {
+    background: #475569 !important;
+    border-color: #64748b !important;
+}
+
+/* Journey planner mode buttons in popup */
+[data-theme="dark"] .stop-popup .btn-outline-primary {
+    color: #60a5fa !important;
+    border-color: #3b82f6 !important;
+    background: transparent !important;
+}
+
+[data-theme="dark"] .stop-popup .btn-outline-primary:hover,
+[data-theme="dark"] .stop-popup .btn-primary {
+    background: #3b82f6 !important;
+    border-color: #3b82f6 !important;
+    color: #ffffff !important;
+}
+
+/* Journey planner ETA and distance info */
+[data-theme="dark"] .stop-popup div[style*="background: #dbeafe"] {
+    background: #1e3a8a !important;
+    border-color: #3b82f6 !important;
+}
+
+[data-theme="dark"] .stop-popup div[style*="background: #fef3c7"] {
+    background: #78350f !important;
+    border-color: #f59e0b !important;
+}
+
+[data-theme="dark"] .stop-popup div[style*="color: #1e40af"] {
+    color: #93c5fd !important;
+}
+
+[data-theme="dark"] .stop-popup div[style*="color: #92400e"] {
+    color: #fbbf24 !important;
+}
+
+/* Journey planner duration estimate box */
+[data-theme="dark"] .stop-popup .small[style*="background:#f8fafc"] {
+    background: #0f172a !important;
+    border-color: #334155 !important;
+    color: #e2e8f0 !important;
+}
+
+[data-theme="dark"] .stop-popup .small[style*="background:#f8fafc"] .fw-semibold {
+    color: #f1f5f9 !important;
+}

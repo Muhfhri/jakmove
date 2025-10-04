@@ -8,11 +8,13 @@ import { LocationManager } from './modules/location-manager.js';
 import { UIManager } from './modules/ui-manager.js';
 import { SettingsManager } from './modules/settings-manager.js';
 import { JourneyPlanner } from './modules/journey-planner.js';
+import { TypedPlanner } from './modules/typed-planner.js';
 
 class TransJakartaApp {
     constructor() {
         this.modules = {};
         this._clockTimer = null;
+        this._activeRoutesTimer = null;
         this.init();
     }
 
@@ -33,6 +35,7 @@ class TransJakartaApp {
             this.modules.location = new LocationManager();
             this.modules.ui = new UIManager();
             this.modules.journey = new JourneyPlanner(this);
+            this.modules.typedPlanner = new TypedPlanner(this);
 
             // Step 1: Load GTFS data and basic settings
             const [gtfsData] = await Promise.all([
@@ -53,6 +56,7 @@ class TransJakartaApp {
             // Step 5: Setup basic event listeners and clock
             this.setupEventListeners();
             this.initLiveClock();
+            this.initActiveRoutesCounter();
             
             // Step 6: Wait for loading progress to finish and hide
             await this.waitForLoadingCompletion();
@@ -79,37 +83,39 @@ class TransJakartaApp {
         } catch (error) {
             console.error('Failed to initialize app:', error);
             
-            // Hide slide notification on error
-            this.hideSlideNotification();
+            // Hide loading screen on error
+            this.hideLoadingScreen();
             this.showError('Gagal memuat aplikasi: ' + (error.message || 'Unknown error'));
         }
     }
 
-    // Show initial slide notification
+    // Show initial loading screen
     showInitialLoading() {
-        const notification = document.getElementById('slideNotification');
-        if (notification) {
-            notification.style.display = 'block';
-            setTimeout(() => {
-                notification.classList.add('show');
-            }, 100);
+        const loadingScreen = document.getElementById('appLoadingScreen');
+        if (loadingScreen) {
+            loadingScreen.classList.add('active');
+            
+            // Lock body scroll completely
+            document.body.classList.add('loading');
+            document.documentElement.classList.add('loading-active');
+            document.documentElement.style.overflow = 'hidden';
             
             // Set initial values
-            const title = notification.querySelector('.slide-title');
-            const subtitle = notification.querySelector('.slide-subtitle');
-            const percentEl = notification.querySelector('.slide-percent');
-            const icon = notification.querySelector('.slide-icon');
+            const title = loadingScreen.querySelector('.loading-title');
+            const status = loadingScreen.querySelector('.loading-status');
+            const percentEl = loadingScreen.querySelector('.loading-percent');
+            const progressFill = loadingScreen.querySelector('.loading-progress-fill');
             
             if (title) title.textContent = 'Memuat JakMove';
-            if (subtitle) subtitle.textContent = '🚀 Memulai aplikasi...';
-            if (percentEl) percentEl.textContent = '1%';
-            if (icon) icon.innerHTML = '<i class="fas fa-rocket" style="color: #ec4899;"></i>';
+            if (status) status.textContent = 'Memulai aplikasi...';
+            if (percentEl) percentEl.textContent = '0%';
+            if (progressFill) progressFill.style.width = '0%';
         }
         
         // Update page title
-        document.title = '1% Loading - JakMove';
+        document.title = 'Memuat - JakMove';
         
-        console.log('📱 Initial slide notification activated');
+        console.log('📱 Loading screen activated');
     }
 
     // Ensure critical data structures are ready before UI rendering
@@ -132,8 +138,8 @@ class TransJakartaApp {
                 () => this.modules.routes && typeof this.modules.routes.buildClusterPlatformMap === 'function'
             ];
             
-            // Wait for essential checks with faster polling for quicker response
-            const timeout = 2000; // Reduced timeout for faster loading
+            // Wait for essential checks with very fast polling
+            const timeout = 1000; // Even faster timeout
             const startTime = Date.now();
             
             while (Date.now() - startTime < timeout) {
@@ -146,14 +152,13 @@ class TransJakartaApp {
                 });
                 
                 if (allReady) {
-                    console.log('✅ All critical data structures ready (fast)');
-                    // Minimal wait for faster loading
-                    await new Promise(resolve => setTimeout(resolve, 25));
+                    console.log('✅ All critical data structures ready');
+                    // No extra wait for instant loading
                     break;
                 }
                 
-                // Faster polling for quicker response
-                await new Promise(resolve => setTimeout(resolve, 25));
+                // Very fast polling for instant response
+                await new Promise(resolve => setTimeout(resolve, 10));
             }
             
             // Additional platform-specific initialization
@@ -172,7 +177,7 @@ class TransJakartaApp {
         console.log('⏳ Waiting for data loading completion...');
         
         // Wait for GTFS data to be marked as ready
-        const timeout = 10000; // 10 second timeout
+        const timeout = 5000; // 5 second timeout (faster)
         const startTime = Date.now();
         
         while (Date.now() - startTime < timeout) {
@@ -180,11 +185,11 @@ class TransJakartaApp {
                 console.log('✅ GTFS data marked as ready');
                 break;
             }
-            await new Promise(resolve => setTimeout(resolve, 50));
+            await new Promise(resolve => setTimeout(resolve, 20)); // Faster polling
         }
         
-        // Small wait to ensure slide notification had time to show completion
-        await new Promise(resolve => setTimeout(resolve, 200));
+        // Minimal wait for instant loading
+        await new Promise(resolve => setTimeout(resolve, 50));
         
         console.log('🎯 Data loading completion verified');
     }
@@ -196,6 +201,7 @@ class TransJakartaApp {
         const deferredTasks = [
             { name: 'UI Manager', task: () => this.modules.ui.init() },
             { name: 'Journey Planner', task: () => this.modules.journey.init() },
+            { name: 'Typed Planner', task: () => this.modules.typedPlanner.init() },
             { name: 'Saved State', task: () => this.loadSavedState() },
             { name: 'Map Stops', task: () => {
                 if (this.modules.map.loadStopsLazy) {
@@ -209,14 +215,9 @@ class TransJakartaApp {
             }}
         ];
 
-        // Execute all tasks and wait for completion
-        return new Promise((resolve) => {
-            let taskIndex = 0;
-            
-            const executeNextTask = () => {
-                if (taskIndex < deferredTasks.length) {
-                    const currentTask = deferredTasks[taskIndex];
-                    console.log(`🔧 Executing: ${currentTask.name}`);
+        // Execute all tasks rapidly for faster loading
+        for (const currentTask of deferredTasks) {
+            console.log(`🔧 Executing: ${currentTask.name}`);
                     
                     try {
                         currentTask.task();
@@ -224,35 +225,19 @@ class TransJakartaApp {
                         console.warn(`Deferred task failed (${currentTask.name}):`, e);
                     }
                     
-                    taskIndex++;
-                    
-                    // Schedule next task
-                    if (window.requestIdleCallback) {
-                        requestIdleCallback(executeNextTask, { timeout: 1000 });
-                    } else {
-                        setTimeout(executeNextTask, 16);
-                    }
-                } else {
+            // Minimal delay between tasks for smooth execution
+            await new Promise(resolve => setTimeout(resolve, 5));
+        }
+        
                     console.log('✅ All deferred UI tasks completed');
-                    resolve();
-                }
-            };
-
-            // Start executing deferred tasks
-            if (window.requestIdleCallback) {
-                requestIdleCallback(executeNextTask, { timeout: 1000 });
-            } else {
-                setTimeout(executeNextTask, 0);
-            }
-        });
     }
 
-    // Wait for complete UI readiness using enhanced slide notification
+    // Wait for complete UI readiness using loading screen
     async waitForCompleteUIReady() {
         console.log('⏳ Waiting for complete UI readiness...');
         
-        // Update slide notification to UI preparation mode
-        this.updateSlideNotificationForUI(0, 'Menyiapkan antarmuka...');
+        // Update loading screen to UI preparation mode (start from 45% smoothly after GTFS 40%)
+        this.updateLoadingScreen(45, 'Menyiapkan antarmuka...');
         
         // Wait for critical UI elements to be populated
         const uiReadyChecks = [
@@ -271,9 +256,9 @@ class TransJakartaApp {
             }}
         ];
         
-        const timeout = 5000;
+        const timeout = 3000; // Faster timeout
         const startTime = Date.now();
-        let progress = 0;
+        let progress = 45;
         
         while (Date.now() - startTime < timeout) {
             const readyStates = uiReadyChecks.map(item => {
@@ -285,35 +270,30 @@ class TransJakartaApp {
             });
             
             const readyCount = readyStates.filter(state => state).length;
-            progress = (readyCount / uiReadyChecks.length) * 100;
-            
-            // Update slide notification for UI phase
-            const readyNames = uiReadyChecks
-                .filter((item, index) => readyStates[index])
-                .map(item => item.name);
+            progress = 45 + ((readyCount / uiReadyChecks.length) * 55);
             
             const statusText = progress < 100 
-                ? `Memuat komponen... (${readyCount}/${uiReadyChecks.length})`
-                : 'Antarmuka siap!';
+                ? `Menyiapkan komponen...`
+                : 'Siap digunakan!';
                 
-            this.updateSlideNotificationForUI(progress, statusText);
+            this.updateLoadingScreen(progress, statusText);
             
             if (readyStates.every(state => state)) {
                 console.log('✅ Complete UI is ready');
                 break;
             }
             
-            await new Promise(resolve => setTimeout(resolve, 100));
+            await new Promise(resolve => setTimeout(resolve, 30)); // Faster polling
         }
         
         // Final completion
-        this.updateSlideNotificationForUI(100, 'Antarmuka siap!');
+        this.updateLoadingScreen(100, 'Siap digunakan!');
         
-        // Additional wait to ensure all rendering is complete
-        await new Promise(resolve => setTimeout(resolve, 300));
+        // Very short wait for smooth transition
+        await new Promise(resolve => setTimeout(resolve, 150));
         
-        // Hide slide notification
-        this.hideSlideNotification();
+        // Hide loading screen
+        this.hideLoadingScreen();
         
         console.log('🎯 UI readiness check completed');
     }
@@ -321,25 +301,6 @@ class TransJakartaApp {
     // Mark app as fully ready
     markAppAsReady() {
         console.log('🎉 App is fully ready!');
-        
-        // Final slide notification update before hiding
-        const notification = document.getElementById('slideNotification');
-        if (notification) {
-            const icon = notification.querySelector('.slide-icon');
-            const title = notification.querySelector('.slide-title');
-            const subtitle = notification.querySelector('.slide-subtitle');
-            const percentEl = notification.querySelector('.slide-percent');
-            
-            if (icon) icon.innerHTML = '<i class="fas fa-check-circle" style="color: #22c55e;"></i>';
-            if (title) title.textContent = 'Siap Digunakan!';
-            if (subtitle) subtitle.textContent = 'Aplikasi berhasil dimuat';
-            if (percentEl) percentEl.textContent = '100%';
-            
-            // Hide after showing completion
-            setTimeout(() => {
-                this.hideSlideNotification();
-            }, 1500);
-        }
         
         // Update page title
         document.title = 'JakMove - Transportasi Jakarta';
@@ -350,69 +311,51 @@ class TransJakartaApp {
         console.log('🚀 App completely initialized and ready for use!');
     }
 
-    // Show slide notification for UI preparation
-    showSlideNotification() {
-        const notification = document.getElementById('slideNotification');
-        if (notification) {
-            notification.style.display = 'block';
-            // Small delay for smooth animation
-            setTimeout(() => {
-                notification.classList.add('show');
-            }, 100);
-            console.log('📱 Slide notification shown');
-        }
-    }
-
-    // Update slide notification for UI preparation phase
-    updateSlideNotificationForUI(progress, statusText) {
-        const notification = document.getElementById('slideNotification');
-        if (!notification) return;
+    // Update loading screen with progress and status
+    updateLoadingScreen(progress, statusText) {
+        const loadingScreen = document.getElementById('appLoadingScreen');
+        if (!loadingScreen) return;
         
-        const progressBar = notification.querySelector('.slide-progress-bar');
-        const title = notification.querySelector('.slide-title');
-        const subtitle = notification.querySelector('.slide-subtitle');
-        const percentEl = notification.querySelector('.slide-percent');
-        const icon = notification.querySelector('.slide-icon');
+        const progressFill = loadingScreen.querySelector('.loading-progress-fill');
+        const status = loadingScreen.querySelector('.loading-status');
+        const percentEl = loadingScreen.querySelector('.loading-percent');
+        const title = loadingScreen.querySelector('.loading-title');
         
         // Update progress bar
-        if (progressBar) {
-            progressBar.style.width = `${progress}%`;
-            progressBar.style.animation = 'none'; // Remove auto animation
+        if (progressFill) {
+            progressFill.style.width = `${Math.min(progress, 100)}%`;
         }
         
         // Update percentage
         if (percentEl) {
-            percentEl.textContent = `${Math.round(progress)}%`;
+            percentEl.textContent = `${Math.round(Math.min(progress, 100))}%`;
         }
         
         // Update status text
-        if (subtitle) {
-            subtitle.textContent = statusText;
+        if (status) {
+            status.textContent = statusText;
         }
         
-        // Update icon and title for UI phase
-        if (icon && title) {
-            if (progress >= 100) {
-                icon.innerHTML = '<i class="fas fa-star" style="color: #fbbf24;"></i>';
+        // Update title for completion
+        if (title && progress >= 100) {
                 title.textContent = 'Siap Digunakan!';
-            } else {
-                icon.innerHTML = '<i class="fas fa-bolt" style="color: #3b82f6;"></i>';
-                title.textContent = 'Menyiapkan Antarmuka';
-            }
         }
         
-        console.log(`🔧 UI Preparation: ${Math.round(progress)}% - ${statusText}`);
+        console.log(`📊 Loading: ${Math.round(progress)}% - ${statusText}`);
     }
 
-    // Hide slide notification
-    hideSlideNotification() {
-        const notification = document.getElementById('slideNotification');
-        if (notification) {
-            notification.classList.remove('show');
-            setTimeout(() => {
-                notification.style.display = 'none';
-                console.log('📱 Slide notification hidden');
-            }, 500);
+    // Hide loading screen
+    hideLoadingScreen() {
+        const loadingScreen = document.getElementById('appLoadingScreen');
+        if (loadingScreen) {
+            loadingScreen.classList.remove('active');
+            
+            // Unlock body scroll completely
+            document.body.classList.remove('loading');
+            document.documentElement.classList.remove('loading-active');
+            document.documentElement.style.overflow = '';
+            
+            console.log('📱 Loading screen hidden');
         }
     }
 
@@ -475,6 +418,177 @@ class TransJakartaApp {
         };
         update();
         this._clockTimer = setInterval(update, 1000);
+    }
+
+    // Initialize active routes counter (real-time based on GTFS data)
+    initActiveRoutesCounter() {
+        const el = document.getElementById('activeRoutesCount');
+        if (!el) return;
+        
+        if (this._activeRoutesTimer) clearInterval(this._activeRoutesTimer);
+        
+        const update = () => {
+            try {
+                const count = this.countActiveRoutes();
+                el.textContent = count.toString();
+                el.title = `${count} layanan beroperasi saat ini`;
+                console.log(`🚌 Active routes count: ${count}`);
+            } catch (error) {
+                console.error('Error updating active routes count:', error);
+                el.textContent = '0';
+            }
+        };
+        
+        update();
+        // Update every minute
+        this._activeRoutesTimer = setInterval(update, 60000);
+    }
+
+    // Count how many routes are currently active based on GTFS data
+    countActiveRoutes() {
+        try {
+            const routes = this.modules.gtfs.getRoutes();
+            const trips = this.modules.gtfs.getTrips();
+            const calendar = this.modules.gtfs.getCalendar();
+            const stopTimes = this.modules.gtfs.getStopTimes();
+            
+            if (!routes || !trips || !calendar || !stopTimes) {
+                console.warn('GTFS data not available');
+                return 0;
+            }
+
+            const now = new Date();
+            const currentDay = now.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+            const currentTime = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+            const currentDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+            // Map day index to GTFS calendar field
+            const dayFields = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+            const todayField = dayFields[currentDay];
+
+            console.log(`📅 Checking active routes for ${dayFields[currentDay]} at ${now.toLocaleTimeString()}`);
+
+            // Build service ID to calendar entry map
+            const serviceMap = new Map();
+            calendar.forEach(cal => {
+                if (!serviceMap.has(cal.service_id)) {
+                    serviceMap.set(cal.service_id, []);
+                }
+                serviceMap.get(cal.service_id).push(cal);
+            });
+
+            // Helper to check if service is active today
+            const isServiceActiveToday = (serviceId) => {
+                const entries = serviceMap.get(serviceId) || [];
+                for (const cal of entries) {
+                    try {
+                        // Check if today's day of week is active
+                        if (cal[todayField] !== '1') continue;
+
+                        // Check date range
+                        const startDate = this.parseGTFSDate(cal.start_date);
+                        const endDate = this.parseGTFSDate(cal.end_date);
+                        
+                        if (startDate && endDate && currentDate >= startDate && currentDate <= endDate) {
+                            return true;
+                        }
+                    } catch (e) {
+                        // Ignore parse errors
+                    }
+                }
+                return false;
+            };
+
+            // Build trip to stop times map for faster lookup
+            const tripStopTimesMap = new Map();
+            stopTimes.forEach(st => {
+                if (!tripStopTimesMap.has(st.trip_id)) {
+                    tripStopTimesMap.set(st.trip_id, []);
+                }
+                tripStopTimesMap.get(st.trip_id).push(st);
+            });
+
+            // Helper to get first and last trip times for a route
+            const getRouteOperatingHours = (routeId) => {
+                const routeTrips = trips.filter(t => t.route_id === routeId);
+                if (routeTrips.length === 0) return null;
+
+                let firstTime = Infinity;
+                let lastTime = -Infinity;
+
+                routeTrips.forEach(trip => {
+                    const tripStopTimes = tripStopTimesMap.get(trip.trip_id) || [];
+                    
+                    tripStopTimes.forEach(st => {
+                        const arrivalTime = this.parseGTFSTime(st.arrival_time);
+                        const departureTime = this.parseGTFSTime(st.departure_time);
+                        
+                        if (arrivalTime !== null) {
+                            firstTime = Math.min(firstTime, arrivalTime);
+                            lastTime = Math.max(lastTime, arrivalTime);
+                        }
+                        if (departureTime !== null) {
+                            firstTime = Math.min(firstTime, departureTime);
+                            lastTime = Math.max(lastTime, departureTime);
+                        }
+                    });
+                });
+
+                return (firstTime !== Infinity && lastTime !== -Infinity) 
+                    ? { start: firstTime, end: lastTime } 
+                    : null;
+            };
+
+            // Use RouteManager logic to determine active routes
+            const routeManager = this.modules.routes;
+            let activeCount = 0;
+            for (const route of routes) {
+                try {
+                    if (routeManager && typeof routeManager.isRouteActiveNow === 'function') {
+                        if (routeManager.isRouteActiveNow(route.route_id)) {
+                            activeCount++;
+                        }
+                    }
+                } catch (_) { /* ignore */ }
+            }
+
+            return activeCount;
+        } catch (error) {
+            console.error('Error in countActiveRoutes:', error);
+            return 0;
+        }
+    }
+
+    // Parse GTFS date format (YYYYMMDD) to Date object
+    parseGTFSDate(dateStr) {
+        if (!dateStr || dateStr.length !== 8) return null;
+        try {
+            const year = parseInt(dateStr.substring(0, 4));
+            const month = parseInt(dateStr.substring(4, 6)) - 1; // JS months are 0-indexed
+            const day = parseInt(dateStr.substring(6, 8));
+            return new Date(year, month, day);
+        } catch (e) {
+            return null;
+        }
+    }
+
+    // Parse GTFS time format (HH:MM:SS) to seconds since midnight
+    parseGTFSTime(timeStr) {
+        if (!timeStr) return null;
+        try {
+            const parts = timeStr.split(':');
+            if (parts.length !== 3) return null;
+            
+            let hours = parseInt(parts[0]);
+            const minutes = parseInt(parts[1]);
+            const seconds = parseInt(parts[2]);
+            
+            // Don't modify hours for times >= 24:00:00 to maintain operating hours calculation
+            // Just keep the actual value to calculate duration
+            return hours * 3600 + minutes * 60 + seconds;
+        } catch (e) {
+            return null;
+        }
     }
 
     loadSavedState() {

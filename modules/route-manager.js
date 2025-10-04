@@ -134,11 +134,22 @@ export class RouteManager {
         if (!route) return;
 
         const title = document.getElementById('stopsTitle');
-        if (!title) return;
+        const subtitle = document.getElementById('stopsSubtitle');
+        const routeInfoContainer = document.getElementById('routeInfoContainer');
+        
+        if (!title || !routeInfoContainer) return;
 
+        // Update header
+        title.textContent = route.route_short_name + ' - ' + route.route_long_name;
+        title.className = 'card-title plus-jakarta-sans';
+        
+        if (subtitle) {
+            subtitle.textContent = 'Informasi lengkap tentang layanan ini';
+        }
+
+        // Insert route info into dedicated container
         const routeInfo = this.buildRouteInfoHTML(route);
-        title.innerHTML = routeInfo;
-        title.className = 'fs-3 fw-bold plus-jakarta-sans';
+        routeInfoContainer.innerHTML = routeInfo;
 
         // Setup variant dropdown if needed
         this.setupVariantDropdown(route);
@@ -2117,11 +2128,20 @@ Github: github.com/muhfhri/jakmove
     clearStopsList() {
         const ul = document.getElementById('stopsByRoute');
         const title = document.getElementById('stopsTitle');
+        const subtitle = document.getElementById('stopsSubtitle');
         const directionTabs = document.getElementById('directionTabs');
+        const routeInfoContainer = document.getElementById('routeInfoContainer');
         
         if (ul) ul.innerHTML = '';
-        if (title) title.textContent = '';
+        if (title) {
+            title.textContent = 'Informasi Layanan';
+            title.className = 'card-title plus-jakarta-sans';
+        }
+        if (subtitle) {
+            subtitle.textContent = 'Pilih layanan untuk melihat informasi rute';
+        }
         if (directionTabs) directionTabs.innerHTML = '';
+        if (routeInfoContainer) routeInfoContainer.innerHTML = '';
         
         // Remove variant dropdowns
         this.removeVariantDropdowns();
@@ -2274,9 +2294,20 @@ Github: github.com/muhfhri/jakmove
     // Clear route info
     clearRouteInfo() {
         const title = document.getElementById('stopsTitle');
+        const subtitle = document.getElementById('stopsSubtitle');
+        const routeInfoContainer = document.getElementById('routeInfoContainer');
+        
         if (title) {
-            title.textContent = 'Informasi layanan akan tampil di sini setelah anda memilihnya.';
-            title.className = 'fs-3 fw-bold plus-jakarta-sans';
+            title.textContent = 'Informasi Layanan';
+            title.className = 'card-title plus-jakarta-sans';
+        }
+        
+        if (subtitle) {
+            subtitle.textContent = 'Pilih layanan untuk melihat informasi rute';
+        }
+        
+        if (routeInfoContainer) {
+            routeInfoContainer.innerHTML = '';
         }
     }
 
@@ -2295,6 +2326,105 @@ Github: github.com/muhfhri/jakmove
         const [h, m, s] = time.split(':').map(Number);
         return h * 3600 + m * 60 + s;
     }
+
+	// Public: Determine if a route is operating at the current time (reuses countdown logic)
+	isRouteActiveNow(routeId) {
+		try {
+			const gtfs = window.transJakartaApp.modules.gtfs;
+			const tripsAll = gtfs.getTrips().filter(t => String(t.route_id) === String(routeId));
+			if (!tripsAll || tripsAll.length === 0) return false;
+
+			// Build calendar map and filter trips active today
+			const calendar = gtfs.getCalendar() || [];
+			const calendarDates = gtfs.getCalendarDates ? (gtfs.getCalendarDates() || []) : [];
+			const serviceMap = new Map();
+			for (const cal of calendar) {
+				if (!serviceMap.has(cal.service_id)) serviceMap.set(cal.service_id, []);
+				serviceMap.get(cal.service_id).push(cal);
+			}
+			const now = new Date();
+			const currentDay = now.getDay();
+			const dayFields = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+			const todayField = dayFields[currentDay];
+			const currentDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+			const parseDate = (yyyymmdd) => {
+				if (!yyyymmdd || String(yyyymmdd).length !== 8) return null;
+				const y = parseInt(String(yyyymmdd).slice(0,4));
+				const m = parseInt(String(yyyymmdd).slice(4,6)) - 1;
+				const d = parseInt(String(yyyymmdd).slice(6,8));
+				return new Date(y,m,d);
+			};
+			const isServiceActiveToday = (serviceId) => {
+				const entries = serviceMap.get(serviceId) || [];
+				for (const cal of entries) {
+					try {
+						if (String(cal[todayField]) !== '1') continue;
+						const sd = parseDate(cal.start_date);
+						const ed = parseDate(cal.end_date);
+						if (sd && ed && currentDate >= sd && currentDate <= ed) return true;
+					} catch(_) { /* ignore */ }
+				}
+				// Check calendar_dates exceptions
+				try {
+					const exceptions = calendarDates.filter(cd => String(cd.service_id) === String(serviceId));
+					if (exceptions && exceptions.length > 0) {
+						const ymd = `${currentDate.getFullYear()}${String(currentDate.getMonth()+1).padStart(2,'0')}${String(currentDate.getDate()).padStart(2,'0')}`;
+						for (const ex of exceptions) {
+							if (String(ex.date) === ymd) {
+								// exception_type: 1 = added service, 2 = removed service
+								if (String(ex.exception_type) === '1') return true;
+								if (String(ex.exception_type) === '2') return false;
+							}
+						}
+					}
+				} catch(_) {}
+				return false;
+			};
+
+			let trips = tripsAll;
+			// Prefer calendar filtering if it yields results; otherwise, fallback to all trips
+			const filteredByCalendar = tripsAll.filter(t => isServiceActiveToday(String(t.service_id || '')));
+			if (filteredByCalendar && filteredByCalendar.length > 0) {
+				trips = filteredByCalendar;
+			}
+
+			const frequencies = gtfs.getFrequencies();
+			const stopTimes = gtfs.getStopTimes();
+
+			const tripIds = trips.map(t => t.trip_id);
+			const freqsForRoute = (frequencies || []).filter(f => tripIds.includes(f.trip_id));
+
+			let startTimes = [], endTimes = [];
+			if (freqsForRoute.length > 0) {
+				freqsForRoute.forEach(f => {
+					if (f.start_time && f.end_time) {
+						startTimes.push(f.start_time);
+						endTimes.push(f.end_time);
+					}
+				});
+			}
+
+			if (startTimes.length === 0 || endTimes.length === 0) {
+				const sts = (stopTimes || []).filter(st => tripIds.includes(st.trip_id));
+				if (sts.length > 0) {
+					startTimes = sts.map(st => st.arrival_time).filter(Boolean);
+					endTimes = sts.map(st => st.departure_time).filter(Boolean);
+				}
+			}
+
+			if (startTimes.length === 0 || endTimes.length === 0) return false;
+
+			const minStart = startTimes.reduce((a, b) => this.timeToSeconds(a) < this.timeToSeconds(b) ? a : b);
+			const maxEnd = endTimes.reduce((a, b) => this.timeToSeconds(a) > this.timeToSeconds(b) ? a : b);
+
+			const serviceIds = Array.from(new Set(trips.map(t => t.service_id))).filter(Boolean);
+			const cd = this.getOperatingCountdown(minStart, maxEnd, serviceIds);
+			if (!cd || !cd.status) return false;
+			return cd.status === '24-hour' || cd.status.startsWith('running');
+		} catch (_) {
+			return false;
+		}
+	}
 
     // Get operating countdown info
     getOperatingCountdown(startTime, endTime, serviceIds = []) {

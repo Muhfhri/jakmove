@@ -1,8 +1,14 @@
 // Navbar Hamburger Animation
 document.addEventListener('DOMContentLoaded', function() {
-    const hamburgerBtn = document.querySelector('.custom-toggler');
+    const hamburgerBtn = document.querySelector('.custom-toggler') || document.querySelector('.modern-mobile-toggle');
     const hamburgerLines = document.querySelectorAll('.hamburger-line');
     const offcanvas = document.getElementById('navbarOffcanvas');
+    
+    // Exit early if elements don't exist (e.g., new navbar structure)
+    if (!hamburgerBtn) {
+        console.log('Navbar: Old hamburger button not found, using new navbar structure');
+        return;
+    }
     
     // Function to reset hamburger to 2 lines
     function resetHamburger() {

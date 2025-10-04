@@ -62,13 +62,60 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="preconnect" href="https://unpkg.com" crossorigin>
     
-    <!-- Inline Theme Script to Prevent FOUC -->
+    <!-- Inline Critical Theme Script to Prevent FOUC (must be before CSS) -->
     <script>
         (function() {
+            // Add preload class to prevent transition flash
+            document.documentElement.classList.add('preload');
+            
             const theme = localStorage.getItem('theme') || 'light';
             document.documentElement.setAttribute('data-theme', theme);
+            // Add class immediately to prevent flash
+            if (theme === 'dark') {
+                document.documentElement.classList.add('theme-dark');
+            }
+            
+            // Remove preload class after DOM is loaded to re-enable transitions
+            window.addEventListener('DOMContentLoaded', function() {
+                setTimeout(function() {
+                    document.documentElement.classList.remove('preload');
+                }, 50);
+            });
         })();
     </script>
+    
+    <!-- Inline Critical Dark Mode Base Styles to Prevent FOUC -->
+    <style>
+        /* Prevent transition on page load to avoid flash */
+        html.preload * {
+            transition: none !important;
+        }
+        
+        [data-theme="dark"] {
+            background-color: #0f172a !important;
+            color: #e2e8f0 !important;
+        }
+        [data-theme="dark"] body {
+            background-color: #0f172a !important;
+            color: #e2e8f0 !important;
+        }
+        [data-theme="dark"] html {
+            background-color: #0f172a !important;
+        }
+        
+        /* Specific elements that commonly flash */
+        [data-theme="dark"] .bg-light {
+            background-color: #283141 !important;
+        }
+        [data-theme="dark"] .card {
+            background-color: #1e293b !important;
+            color: #e2e8f0 !important;
+        }
+        [data-theme="dark"] .modal-content {
+            background-color: #1e293b !important;
+            color: #e2e8f0 !important;
+        }
+    </style>
     
     <!-- Bootstrap CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
@@ -99,41 +146,54 @@
 
 <body>
     <!-- Sticky Navigation Bar -->
-    <nav class="navbar navbar-expand-lg sticky-top bg-white shadow-sm border-bottom" style="top: 0; z-index: 1030;">
+    <!-- Modern Navigation Bar -->
+    <nav class="modern-navbar sticky-top" style="top: 0; z-index: 1030;">
         <div class="container-fluid px-4">
-            <span class="navbar-brand plus-jakarta-sans fw-bold text-primary">
+            <div class="modern-navbar-content">
+                <!-- Brand Logo -->
+                <div class="modern-navbar-brand">
+                    <a href="index.html">
                 <img class="brand-title" alt="JakMove">
-            </span>
+                    </a>
+                </div>
 
             <!-- Desktop Navigation -->
-            <div class="navbar-nav me-auto d-none d-lg-flex">
-                <a class="nav-link active d-flex align-items-center gap-2" href="index.html">
+                <div class="modern-nav-links d-none d-lg-flex">
+                    <a class="modern-nav-link active" href="index.html">
                     <iconify-icon icon="mdi:map-marker-multiple"></iconify-icon>
-                    <span>Peta Interaktif</span>
+                        <span>Peta</span>
                 </a>
-                <a class="nav-link d-flex align-items-center gap-2" href="bus-notes.html">
+                    <a class="modern-nav-link" href="bus-notes.html">
                     <iconify-icon icon="mdi:notebook"></iconify-icon>
-                    <span>Catatan Bus</span>
-                </a>
-                <a class="nav-link d-flex align-items-center gap-2" href="tj.html">
-                    <iconify-icon icon="mdi:bus-clock"></iconify-icon>
-                    <span>Halte TJ (Legacy)</span>
-                </a>
-                <a class="nav-link d-flex align-items-center gap-2" href="transportasi-jakarta.html">
+                        <span>Catatan</span>
+                    </a>
+                    <a class="modern-nav-link" href="transportasi-jakarta.html">
                     <iconify-icon icon="mdi:bus"></iconify-icon>
-                    <span>Transportasi Jakarta</span>
-                </a>
-                <a class="nav-link d-flex align-items-center gap-2" href="tentang-pembuat.html">
-                    <iconify-icon icon="mdi:account" inline></iconify-icon>
-                    <span>Tentang Pembuat</span>
+                        <span>Transportasi</span>
+                    </a>
+                    <a class="modern-nav-link" href="tentang-pembuat.html">
+                        <iconify-icon icon="mdi:account"></iconify-icon>
+                        <span>Tentang</span>
                 </a>
             </div>
 
+                <!-- Actions -->
+                <div class="modern-nav-actions d-none d-lg-flex">
+                    <!-- Dark Mode Toggle -->
+                    <button class="modern-theme-toggle" id="darkSwitch" type="button">
+                        <iconify-icon icon="mdi:theme-light-dark" class="theme-icon"></iconify-icon>
+                    </button>
+                    <!-- Settings Button -->
+                    <button class="modern-settings-btn" type="button" id="navbarSettingsBtn">
+                        <iconify-icon icon="mdi:cog-outline"></iconify-icon>
+                    </button>
+                </div>
+
             <!-- Mobile Toggle Button -->
-            <button class="navbar-toggler custom-toggler d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#navbarOffcanvas" aria-controls="navbarOffcanvas" aria-expanded="false" aria-label="Toggle navigation">
-                <div class="hamburger-line"></div>
-                <div class="hamburger-line"></div>
+                <button class="modern-mobile-toggle d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#navbarOffcanvas" aria-label="Toggle navigation">
+                    <iconify-icon icon="mdi:menu"></iconify-icon>
             </button>
+            </div>
         </div>
     </nav>
 
@@ -192,64 +252,88 @@
                         <div class="nav-menu-desc">Informasi developer website</div>
                     </div>
                 </a>
+                
+                <!-- Dark Mode Toggle in Mobile Menu -->
+                <div class="mobile-theme-toggle-wrapper">
+                    <button class="mobile-theme-toggle-btn" id="darkSwitchMobile" type="button">
+                        <iconify-icon icon="mdi:theme-light-dark"></iconify-icon>
+                        <span>Mode Gelap</span>
+                        <div class="toggle-indicator"></div>
+                    </button>
+                </div>
             </nav>
         </div>
     </div>
 
-    <!-- Modern Header -->
-    <div class="modern-header mb-4">
-        <div class="header-content container-fluid">
+    <!-- Hero Section -->
+    <div class="hero-section">
+        <div class="container-fluid px-4">
             <div class="row align-items-center">
-                <!-- Logo Section -->
-                <div class="col-12 col-lg-6 mb-3 mb-lg-0">
-                    <div class="logo-section d-flex align-items-center gap-3">
-                        <img src="image/tije.png" width="180" alt="Logo Transjakarta & JakLingko" class="logo-img">
-                        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/%2BJakarta_Logo_%28Indonesian_Language%29.svg/330px-%2BJakarta_Logo_%28Indonesian_Language%29.svg.png" width="120" alt="Logo Jakarta Kota Kolaborasi" class="jakarta-logo">
-                        <div class="brand-text">
-                            <img class="brand-title plus-jakarta-sans fw-bold mb-1">
-                            <p class="brand-subtitle plus-jakarta-sans mb-0">Smart Transit Experience</p>
+                <!-- Left: Main Title -->
+                <div class="col-lg-8 mb-3 mb-lg-0">
+                    <div class="hero-content">
+                        <div class="hero-badge">
+                            <iconify-icon icon="mdi:bus-multiple"></iconify-icon>
+                            <span>Transjakarta & JakLingko</span>
                         </div>
+                        
+                        <!-- Brand Logo & Slogan -->
+                        <div class="brand-promo">
+                            <div class="brand-logo-large">
+                                <img class="brand-title" alt="JakMove">
+                            </div>
+                            <div class="slogan-container">
+                                <h2 class="brand-slogan lingkar">Smart Transit Experience</h2>
+                                <div class="slogan-line-wrapper">
+                                    <div class="slogan-line-animated"></div>
+                                </div>
                     </div>
                 </div>
 
-                <!-- Header Info Section -->
-                <div class="col-12 col-lg-6">
-                    <div class="header-info d-flex flex-wrap justify-content-center justify-content-lg-end gap-2">
-                        <div class="live-clock-container d-flex align-items-center gap-2">
-                            <iconify-icon icon="mdi:clock-outline" class="clock-icon"></iconify-icon>
-                            <span id="liveClock" class="fw-bold plus-jakarta-sans"></span>
+                        <h1 class="hero-title plus-jakarta-sans">
+                            Jelajahi <span class="gradient-text text-rotator"></span> <span class="brand-accent">Transjakarta</span>
+                        </h1>
+                        <p class="hero-subtitle plus-jakarta-sans">
+                            Platform interaktif untuk merencanakan perjalanan Anda dengan transportasi umum Jakarta. Temukan rute tercepat, terhemat, dan paling efisien untuk perjalanan Anda.
+                        </p>
                         </div>
-                        <div class="weather-container d-flex align-items-center gap-2">
-                            <span id="weather-label" class="weather-icon">🌤️</span>
-                            <span id="weather-info" class="weather-info">Memuat cuaca...</span>
-                            <button id="refreshWeatherBtn" class="weather-refresh-btn" title="Perbarui cuaca">
+                        </div>
+                
+                <!-- Right: Info Cards -->
+                <div class="col-lg-4">
+                    <div class="info-cards">
+                        <div class="info-card">
+                            <div class="info-card-icon">
+                                <iconify-icon icon="mdi:clock-outline"></iconify-icon>
+                        </div>
+                            <div class="info-card-content">
+                                <span class="info-card-label">Waktu Saat Ini</span>
+                                <span id="liveClock" class="info-card-value plus-jakarta-sans"></span>
+                        </div>
+                    </div>
+                        
+                        <div class="info-card">
+                            <div class="info-card-icon weather-icon-card">
+                                <span id="weather-label">🌤️</span>
+                </div>
+                            <div class="info-card-content">
+                                <span class="info-card-label">Cuaca Jakarta</span>
+                                <span id="weather-info" class="info-card-value">Memuat...</span>
+                            </div>
+                            <button id="refreshWeatherBtn" class="info-card-refresh" title="Perbarui cuaca">
                                 <iconify-icon icon="mdi:refresh"></iconify-icon>
                             </button>
-                        </div>
-                        <div class="status-indicator d-flex align-items-center gap-2">
-                            <div class="status-dot"></div>
-                            <span class="status-text plus-jakarta-sans">Diperbarui</span>
-                        </div>
-                        <!-- Dark Mode Toggle -->
-                        <div class="theme-toggle-container">
-                            <input type="checkbox" class="btn-check" id="darkSwitch" checked autocomplete="off">
-                            <label class="theme-toggle-btn" for="darkSwitch">
-                                <iconify-icon icon="mdi:theme-light-dark" class="theme-icon"></iconify-icon>
-                                <span class="theme-text">Dark</span>
-                            </label>
-                        </div>
-                    </div>
-                </div>
             </div>
 
-            <!-- Announcement Bar -->
-            <div class="row mt-3">
-                <div class="col-12">
-                    <div class="announcement-bar d-flex align-items-center gap-2">
-                        <iconify-icon icon="mdi:information-outline" class="announcement-icon"></iconify-icon>
-                        <marquee class="announcement-text plus-jakarta-sans">
-                            GTFS Transjakarta ini dibuat untuk kalian yang penasaran berpergian menggunakan Layanan Transjakarta. Dibuat untuk edukasi dan Tidak berafiliasi dengan PT Transjakarta atau pihak manapun.
-                        </marquee>
+                        <div class="info-card status-card">
+                            <div class="status-indicator-modern">
+                                <div class="status-dot-pulse"></div>
+                                <div class="status-content-wrapper">
+                                    <span class="plus-jakarta-sans status-main-text" id="activeRoutesCount">Memuat...</span>
+                                    <span class="plus-jakarta-sans status-sub-text">Layanan Beroperasi</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -258,140 +342,328 @@
 
 
 
-    <!-- Enhanced Slide Notification System -->
-    <div id="slideNotification" class="slide-notification" style="display: none;">
-        <div class="slide-content">
-            <div class="slide-icon"><i class="fas fa-rocket" style="color: #ec4899;"></i></div>
-            <div class="slide-text">
-                <div class="slide-title">Memuat JakMove</div>
-                <div class="slide-subtitle">Menyiapkan aplikasi...</div>
+    <!-- Modern Loading Screen -->
+    <div id="appLoadingScreen" class="app-loading-screen active">
+        <div class="loading-backdrop"></div>
+        <div class="loading-content">
+            <div class="loading-logo">
+                <img src="css/image/jakmove.png" alt="JakMove" class="loading-logo-img">
             </div>
-            <div class="slide-progress">
-                <div class="slide-progress-bar"></div>
+            <div class="loading-spinner">
+                <div class="spinner-ring"></div>
+                <div class="spinner-ring"></div>
+                <div class="spinner-ring"></div>
             </div>
-            <div class="slide-percent">0%</div>
+            <div class="loading-text">
+                <h3 class="loading-title">Memuat JakMove</h3>
+                <p class="loading-status">Memulai aplikasi...</p>
+            </div>
+            <div class="loading-progress-wrapper">
+                <div class="loading-progress-bar">
+                    <div class="loading-progress-fill"></div>
+                </div>
+                <span class="loading-percent">0%</span>
+            </div>
         </div>
     </div>
 
-    <!-- CSS for Enhanced Slide Notification -->
+    <!-- CSS for Modern Loading Screen -->
     <style>
-        .slide-notification {
+        .app-loading-screen {
             position: fixed;
-            top: 20px;
-            right: -450px;
-            z-index: 9999;
-            transition: right 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-        }
-        
-        .slide-notification.show {
-            right: 20px;
-        }
-        
-        .slide-content {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 18px 22px;
-            border-radius: 14px;
-            box-shadow: 0 12px 40px rgba(0,0,0,0.4);
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            min-width: 380px;
-            backdrop-filter: blur(15px);
-            border: 1px solid rgba(255,255,255,0.2);
-        }
-        
-        .slide-icon {
-            font-size: 22px;
-            animation: pulse 2s infinite;
-            min-width: 26px;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 99999;
             display: flex;
             align-items: center;
             justify-content: center;
-        }
-        
-        .slide-icon i {
-            font-size: 20px;
-            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
-        }
-        
-        .slide-text {
-            flex: 1;
-            min-width: 0;
-        }
-        
-        .slide-title {
-            font-size: 15px;
-            font-weight: 700;
-            margin-bottom: 3px;
-            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
             overflow: hidden;
-            text-overflow: ellipsis;
+            overscroll-behavior: contain;
         }
         
-        .slide-subtitle {
-            font-size: 12px;
-            opacity: 0.9;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+        .app-loading-screen.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        body.loading {
+            overflow: hidden !important;
+            height: 100vh !important;
+            position: fixed !important;
+            width: 100% !important;
+            touch-action: none !important;
+        }
+        
+        body.loading * {
+            overscroll-behavior: none !important;
+        }
+        
+        html.loading-active {
+            overflow: hidden !important;
+        }
+        
+        .loading-backdrop {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(248, 250, 252, 0.85);
+            backdrop-filter: blur(40px) saturate(200%);
+            -webkit-backdrop-filter: blur(40px) saturate(200%);
+        }
+        
+        .loading-backdrop::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, 
+                rgba(37, 99, 235, 0.12) 0%, 
+                rgba(59, 130, 246, 0.08) 25%,
+                rgba(96, 165, 250, 0.12) 50%,
+                rgba(59, 130, 246, 0.08) 75%,
+                rgba(37, 99, 235, 0.12) 100%);
+            animation: gradientShift 8s ease-in-out infinite;
+            will-change: opacity, transform;
+        }
+        
+        [data-theme="dark"] .loading-backdrop {
+            background: rgba(15, 23, 42, 0.9);
+        }
+        
+        [data-theme="dark"] .loading-backdrop::before {
+            background: linear-gradient(135deg, 
+                rgba(59, 130, 246, 0.18) 0%, 
+                rgba(37, 99, 235, 0.12) 25%,
+                rgba(96, 165, 250, 0.18) 50%,
+                rgba(37, 99, 235, 0.12) 75%,
+                rgba(59, 130, 246, 0.18) 100%);
+            will-change: opacity, transform;
+        }
+        
+        .loading-content {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1.5rem;
+            text-align: center;
+        }
+        
+        .loading-logo {
+            width: 120px;
+            height: 120px;
             display: flex;
             align-items: center;
-            gap: 4px;
+            justify-content: center;
+            animation: fadeInScale 0.3s ease;
         }
         
-        .slide-subtitle i {
-            font-size: 10px;
-            flex-shrink: 0;
+        .loading-logo-img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            filter: drop-shadow(0 4px 12px rgba(37, 99, 235, 0.3));
         }
         
-        .slide-progress {
+        .loading-spinner {
+            position: relative;
             width: 80px;
-            height: 5px;
-            background: rgba(255,255,255,0.3);
+            height: 80px;
+        }
+        
+        .spinner-ring {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: 3px solid transparent;
+            border-top-color: #2563eb;
+            border-radius: 50%;
+            animation: spinRotate 0.8s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+        }
+        
+        .spinner-ring:nth-child(1) {
+            animation-delay: -0.3s;
+            border-top-color: #3b82f6;
+        }
+        
+        .spinner-ring:nth-child(2) {
+            animation-delay: -0.2s;
+            border-top-color: #60a5fa;
+        }
+        
+        .spinner-ring:nth-child(3) {
+            animation-delay: -0.1s;
+            border-top-color: #93c5fd;
+        }
+        
+        [data-theme="dark"] .spinner-ring {
+            border-top-color: #60a5fa;
+        }
+        
+        [data-theme="dark"] .spinner-ring:nth-child(1) {
+            border-top-color: #3b82f6;
+        }
+        
+        [data-theme="dark"] .spinner-ring:nth-child(2) {
+            border-top-color: #60a5fa;
+        }
+        
+        [data-theme="dark"] .spinner-ring:nth-child(3) {
+            border-top-color: #93c5fd;
+        }
+        
+        @keyframes spinRotate {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+        
+        @keyframes fadeInScale {
+            0% {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+        
+        .loading-text {
+            animation: fadeInUp 0.3s ease 0.1s both;
+        }
+        
+        .loading-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #0f172a;
+            margin: 0 0 0.5rem 0;
+        }
+        
+        [data-theme="dark"] .loading-title {
+            color: #f1f5f9;
+        }
+        
+        .loading-status {
+            font-size: 0.95rem;
+            color: #64748b;
+            margin: 0;
+            min-height: 24px;
+        }
+        
+        [data-theme="dark"] .loading-status {
+            color: #94a3b8;
+        }
+        
+        .loading-progress-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            width: 280px;
+            animation: fadeInUp 0.3s ease 0.2s both;
+        }
+        
+        .loading-progress-bar {
+            flex: 1;
+            height: 6px;
+            background: rgba(0, 0, 0, 0.1);
             border-radius: 3px;
             overflow: hidden;
         }
         
-        .slide-progress-bar {
-            height: 100%;
-            background: linear-gradient(90deg, #ffffff, #f0f9ff);
-            border-radius: 3px;
-            width: 0%;
-            transition: width 0.4s ease;
+        [data-theme="dark"] .loading-progress-bar {
+            background: rgba(255, 255, 255, 0.1);
         }
         
-        .slide-percent {
-            font-size: 13px;
-            font-weight: 700;
-            min-width: 35px;
+        .loading-progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #2563eb, #3b82f6);
+            border-radius: 3px;
+            transition: width 0.2s ease;
+        }
+        
+        [data-theme="dark"] .loading-progress-fill {
+            background: linear-gradient(90deg, #3b82f6, #60a5fa);
+        }
+        
+        .loading-percent {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #2563eb;
+            min-width: 45px;
             text-align: right;
         }
         
-        @keyframes pulse {
-            0%, 100% { 
-                transform: scale(1);
-                filter: brightness(1);
+        [data-theme="dark"] .loading-percent {
+            color: #60a5fa;
+        }
+        
+        @keyframes fadeInUp {
+            0% {
+                opacity: 0;
+                transform: translateY(20px);
             }
-            50% { 
-                transform: scale(1.1);
-                filter: brightness(1.2);
+            100% {
+                opacity: 1;
+                transform: translateY(0);
             }
         }
         
-        /* Responsive for mobile */
+        @keyframes gradientShift {
+            0% {
+                opacity: 0.8;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 1;
+                transform: scale(1.02);
+            }
+            100% {
+                opacity: 0.8;
+                transform: scale(1);
+            }
+        }
+        
+        /* Responsive */
         @media (max-width: 480px) {
-            .slide-content {
-                min-width: 320px;
-                padding: 16px 18px;
+            .loading-logo {
+                width: 100px;
+                height: 100px;
             }
             
-            .slide-notification {
-                right: -380px;
+            .loading-spinner {
+                width: 60px;
+                height: 60px;
             }
             
-            .slide-notification.show {
-                right: 10px;
+            .loading-title {
+                font-size: 1.25rem;
+            }
+            
+            .loading-status {
+                font-size: 0.85rem;
+            }
+            
+            .loading-progress-wrapper {
+                width: 240px;
             }
         }
         
@@ -434,75 +706,120 @@
     <!-- Main Content Area -->
     <div class="main-content container">
         <!-- Map Section -->
-        <div class="map-section mb-4">
-            <div class="section-header">
-                <h3 class="section-title plus-jakarta-sans fw-bold">
+        <div class="modern-card map-section mb-4">
+            <div class="modern-card-header">
+                <div class="card-header-content">
+                    <div class="card-icon-wrapper">
                     <iconify-icon icon="mdi:map"></iconify-icon>
-                    Peta Interaktif
-                </h3>
-                <div class="section-actions">
-                    <button id="liveLocationBtn" class="action-btn primary">
+                    </div>
+                    <div>
+                        <h3 class="card-title plus-jakarta-sans">Peta Interaktif</h3>
+                        <p class="card-subtitle">Jelajahi rute dan halte Transjakarta</p>
+                    </div>
+                </div>
+                <div class="card-actions">
+                    <button id="liveLocationBtn" class="modern-action-btn primary">
                         <iconify-icon icon="mdi:crosshairs-gps"></iconify-icon>
-                        <span>Live Location</span>
+                        <span>Lokasi Saya</span>
                     </button>
-                    <button id="resetRouteBtn" class="action-btn danger">
+                    <button id="resetRouteBtn" class="modern-action-btn danger">
                         <iconify-icon icon="mdi:refresh"></iconify-icon>
                         <span>Reset</span>
                     </button>
                 </div>
             </div>
-            <div class="map-container">
+            <div class="modern-card-body">
                 <div id="map" class="interactive-map"></div>
             </div>
         </div>
 
         <!-- Search & Selection Section -->
-        <div class="search-section mb-4">
-            <div class="search-container">
-                <div class="search-input-group">
-                    <iconify-icon icon="mdi:bus" class="search-icon"></iconify-icon>
-                    <select id="routesDropdown" class="form-select modern-select">
-                        <option value="">Pilih Rute TransJakarta...</option>
-                    </select>
-                </div>
-                <div class="search-input-group">
-                    <iconify-icon icon="mdi:magnify" class="search-icon"></iconify-icon>
-                    <input type="text" id="searchStop" class="form-control modern-input" placeholder="Cari halte, koridor, atau tempat (GBK, Monas, dll)...">
-                </div>
-                
-                <!-- Search Filter Tabs -->
-                <div class="search-filter-tabs mt-2" id="searchFilterTabs" style="display: none;">
-                    <div class="filter-buttons d-flex gap-1">
-                        <button type="button" class="filter-btn active" data-filter="all">
-                            <iconify-icon icon="mdi:view-list"></iconify-icon>
-                            <span>Semua</span>
-                        </button>
-                        <button type="button" class="filter-btn" data-filter="routes">
-                            <iconify-icon icon="mdi:bus"></iconify-icon>
-                            <span>Layanan</span>
-                        </button>
-                        <button type="button" class="filter-btn" data-filter="stops">
-                            <iconify-icon icon="mdi:bus-stop"></iconify-icon>
-                            <span>Halte</span>
-                        </button>
-                        <button type="button" class="filter-btn" data-filter="places">
-                            <iconify-icon icon="mdi:map-marker"></iconify-icon>
-                            <span>Tempat</span>
-                        </button>
+        <div class="modern-card search-section mb-4">
+            <div class="modern-card-header">
+                <div class="card-header-content">
+                    <div class="card-icon-wrapper">
+                        <iconify-icon icon="mdi:magnify"></iconify-icon>
+                    </div>
+                    <div>
+                        <h3 class="card-title plus-jakarta-sans">Pilih Layanan</h3>
+                        <p class="card-subtitle">Cari rute atau halte Transjakarta</p>
                     </div>
                 </div>
             </div>
-            <div id="searchResults" class="search-results"></div>
-
-            <!-- Settings Panel -->
-            <div class="mt-3" id="settingsPanel">
-                <div class="d-flex align-items-center justify-content-between">
-                    <div class="fw-bold plus-jakarta-sans">Pengaturan</div>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" id="toggleSettingsBtn">
+            <div class="modern-card-body p-3">
+            <div class="search-container">
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <div class="modern-search-wrapper">
+                                <iconify-icon icon="mdi:bus" class="modern-search-icon"></iconify-icon>
+                                <select id="routesDropdown" class="modern-search-select">
+                                    <option value="">Pilih Rute...</option>
+                    </select>
+                </div>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <div class="modern-search-wrapper">
+                                <iconify-icon icon="mdi:magnify" class="modern-search-icon"></iconify-icon>
+                                <input type="text" id="searchStop" class="modern-search-input" placeholder="Cari halte atau tempat...">
+                            </div>
+                        </div>
+                </div>
+                
+                <!-- Search Filter Tabs -->
+                    <div class="mt-3" id="searchFilterTabs" style="display: none;">
+                        <div class="row g-2">
+                            <div class="col-6 col-sm-3">
+                                <button type="button" class="modern-filter-btn w-100 active" data-filter="all">
+                                    <iconify-icon icon="mdi:view-list"></iconify-icon>
+                                    <span>Semua</span>
+                                </button>
+                            </div>
+                            <div class="col-6 col-sm-3">
+                                <button type="button" class="modern-filter-btn w-100" data-filter="routes">
+                                    <iconify-icon icon="mdi:bus"></iconify-icon>
+                                    <span>Layanan</span>
+                                </button>
+                            </div>
+                            <div class="col-6 col-sm-3">
+                                <button type="button" class="modern-filter-btn w-100" data-filter="stops">
+                                    <iconify-icon icon="mdi:bus-stop"></iconify-icon>
+                                    <span>Halte</span>
+                                </button>
+                            </div>
+                            <div class="col-6 col-sm-3">
+                                <button type="button" class="modern-filter-btn w-100" data-filter="places">
+                                    <iconify-icon icon="mdi:map-marker"></iconify-icon>
+                                    <span>Tempat</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="searchResults" class="modern-search-results mt-3">                </div>
+            </div>
+        </div>
+        
+        <!-- Settings Panel -->
+        <div id="settingsPanel">
+        <div class="modern-card mb-4">
+            <div class="modern-card-header">
+                <div class="card-header-content">
+                    <div class="card-icon-wrapper">
                         <iconify-icon icon="mdi:cog"></iconify-icon>
+                    </div>
+                    <div>
+                        <h3 class="card-title plus-jakarta-sans">Pengaturan</h3>
+                        <p class="card-subtitle">Sesuaikan tampilan dan fitur</p>
+                    </div>
+                </div>
+                <div class="card-actions">
+                    <button type="button" class="modern-action-btn primary" id="toggleSettingsBtn">
+                        <iconify-icon icon="mdi:chevron-down"></iconify-icon>
+                        <span>Buka</span>
                     </button>
                 </div>
-                <div id="settingsBody" class="mt-2" style="display:none;">
+            </div>
+            <div class="modern-card-body p-3" id="settingsBody" style="display:none;">
                     <div class="settings-grid">
                         <div class="setting-item" data-setting="showIntermodalIcons">
                             <div class="setting-text">
@@ -641,15 +958,132 @@
 
         <!-- Stops Section -->
         <div class="stops-section mb-4">
-            <div class="section-header">
-                <div id="stopsTitle" class="section-title plus-jakarta-sans fw-bold">
-                    Informasi layanan akan tampil di sini setelah anda memilihnya.
+            <div class="modern-card">
+                <div class="modern-card-header">
+                    <div class="card-header-content">
+                        <div class="card-icon-wrapper">
+                            <iconify-icon icon="mdi:information-outline"></iconify-icon>
+                        </div>
+                        <div>
+                            <h3 class="card-title plus-jakarta-sans" id="stopsTitle">Informasi Layanan</h3>
+                            <p class="card-subtitle" id="stopsSubtitle">Pilih layanan untuk melihat informasi rute</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modern-card-body">
+                    <!-- Route Info Container (will be populated by route-manager.js) -->
+                    <div id="routeInfoContainer"></div>
+                    
+                    <div id="directionTabs" class="direction-tabs"></div>
+                    <div class="stops-container">
+                        <ul id="stopsByRoute" class="stops-list"></ul>
+                    </div>
                 </div>
             </div>
-            <div class="stops-content">
-                <div id="directionTabs" class="direction-tabs"></div>
-                <div class="stops-container">
-                    <ul id="stopsByRoute" class="stops-list"></ul>
+        </div>
+
+        <!-- Route Planner Section (placed below Informasi Layanan results) -->
+        <div class="planner-section mb-4">
+            <div class="modern-card modern-planner-card">
+                <div class="modern-card-body p-4">
+                    <div class="planner-header-wrapper mb-4">
+                        <div class="card-header-content">
+                            <div class="card-icon-wrapper">
+                                <i class="fa-solid fa-city"></i>
+                            </div>
+                            <div>
+                                <h3 class="card-title plus-jakarta-sans">Perencanaan Rute</h3>
+                                <p class="card-subtitle">Temukan rute terbaik untuk perjalanan Anda</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="planner-form">
+                        <div class="row g-3 align-items-end">
+                            <div class="col-12 col-lg-5">
+                                <label for="jpFromInput" class="planner-label">Halte Keberangkatan</label>
+                                <div class="planner-input-wrapper">
+                                    <div class="planner-input-icon">
+                                        <iconify-icon icon="mdi:map-marker" class="text-success"></iconify-icon>
+                                    </div>
+                                    <input id="jpFromInput" class="planner-input" placeholder="Cari halte asal..." autocomplete="off">
+                                </div>
+                            </div>
+                            
+                            <div class="col-12 col-lg-1 d-flex justify-content-center">
+                                <button id="jpSwapBtn" type="button" class="planner-swap-btn" title="Tukar halte">
+                                    <iconify-icon icon="mdi:swap-vertical"></iconify-icon>
+                                </button>
+                            </div>
+                            
+                            <div class="col-12 col-lg-5">
+                                <label for="jpToInput" class="planner-label">Halte Tujuan</label>
+                                <div class="planner-input-wrapper">
+                                    <div class="planner-input-icon">
+                                        <iconify-icon icon="mdi:flag-checkered" class="text-danger"></iconify-icon>
+                                    </div>
+                                    <input id="jpToInput" class="planner-input" placeholder="Cari halte tujuan..." autocomplete="off">
+                                </div>
+                            </div>
+                            
+                            <div class="col-12 col-lg-1">
+                                <button id="jpPlanBtn" type="button" class="planner-search-btn w-100">
+                                    <iconify-icon icon="mdi:magnify"></iconify-icon>
+                                    <span>Cari Rute</span>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Departure Time -->
+                        <div class="mb-4">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                                <iconify-icon icon="mdi:clock-outline" class="text-muted"></iconify-icon>
+                                <span class="small text-muted fw-medium">Waktu Keberangkatan</span>
+                            </div>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <div class="planner-input-wrapper">
+                                        <div class="planner-input-icon">
+                                            <iconify-icon icon="mdi:calendar"></iconify-icon>
+                                        </div>
+                                        <input type="date" class="planner-input" id="jpDateInput" />
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="planner-input-wrapper">
+                                        <div class="planner-input-icon">
+                                            <iconify-icon icon="mdi:clock"></iconify-icon>
+                                        </div>
+                                        <input type="time" class="planner-input" id="jpTimeInput" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="planner-modes mt-4">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                                <iconify-icon icon="mdi:tune" class="text-muted"></iconify-icon>
+                                <span class="small text-muted fw-medium">Preferensi Rute</span>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2" id="jpModeGroup" role="group" aria-label="Mode Rute">
+                                <button type="button" class="planner-mode-btn active" data-mode="balanced">
+                                    <i class="fa-solid fa-scale-balanced"></i>
+                                    <span>Seimbang</span>
+                                </button>
+                                <button type="button" class="planner-mode-btn" data-mode="fastest">
+                                    <iconify-icon icon="mdi:speedometer"></iconify-icon>
+                                    <span>Tercepat</span>
+                                </button>
+                                <button type="button" class="planner-mode-btn" data-mode="cheapest">
+                                    <iconify-icon icon="mdi:currency-usd"></iconify-icon>
+                                    <span>Terhemat</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <datalist id="jpStopsList"></datalist>
+                    <div id="jpResults" class="planner-results mt-4"></div>
                 </div>
             </div>
         </div>
@@ -792,37 +1226,78 @@
         </div>
     </footer>
 
-    <!-- Modal Izin Lokasi -->
-    <div class="modal fade" id="locationPermissionModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="locationPermissionModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="locationPermissionModalLabel">
-                        <iconify-icon icon="mdi:map-marker-radius" inline></iconify-icon>
-                        Izin Akses Lokasi
-                    </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+    <!-- Modal Izin Lokasi (Modern Design) -->
+    <div id="locationPermissionModal" class="location-permission-modal">
+        <div class="location-permission-backdrop"></div>
+        <div class="location-permission-card">
+            <button type="button" class="location-close-btn" id="location-close-btn" aria-label="Close">
+                <iconify-icon icon="mdi:close"></iconify-icon>
+            </button>
+            
+            <div class="location-permission-header">
+                <div class="location-icon-wrapper">
+                    <div class="location-pulse"></div>
+                    <iconify-icon icon="mdi:map-marker-radius" class="location-icon"></iconify-icon>
                 </div>
-                <div class="modal-body">
-                    <div class="alert alert-info">
-                        <iconify-icon icon="mdi:information" inline></iconify-icon>
-                        <strong>Fitur Live Location:</strong> Aplikasi membutuhkan akses lokasi Anda untuk menampilkan halte terdekat dan informasi rute yang relevan.
+                <h3 class="location-title">Izinkan Akses Lokasi</h3>
+                <p class="location-subtitle">Dapatkan pengalaman terbaik dengan JakMove</p>
+            </div>
+            
+            <div class="location-permission-body">
+                <div class="location-features">
+                    <div class="location-feature-item">
+                        <div class="location-feature-icon" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                            <iconify-icon icon="mdi:map-marker-check"></iconify-icon>
+                        </div>
+                        <div class="location-feature-text">
+                            <div class="location-feature-title">Halte Terdekat</div>
+                            <div class="location-feature-desc">Temukan halte terdekat dari posisi Anda secara real-time</div>
+                        </div>
                     </div>
-                    <div class="alert alert-warning">
-                        <iconify-icon icon="mdi:information" inline></iconify-icon>
-                        <strong>Penting:</strong> Jika Anda tidak mengizinkan akses lokasi, beberapa fitur aplikasi mungkin tidak berfungsi optimal.
+                    
+                    <div class="location-feature-item">
+                        <div class="location-feature-icon" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);">
+                            <iconify-icon icon="mdi:routes"></iconify-icon>
+                        </div>
+                        <div class="location-feature-text">
+                            <div class="location-feature-title">Rute Optimal</div>
+                            <div class="location-feature-desc">Dapatkan rekomendasi rute terbaik dari lokasi Anda</div>
+                        </div>
+                    </div>
+                    
+                    <div class="location-feature-item">
+                        <div class="location-feature-icon" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);">
+                            <iconify-icon icon="mdi:navigation"></iconify-icon>
+                        </div>
+                        <div class="location-feature-text">
+                            <div class="location-feature-title">Navigasi Real-Time</div>
+                            <div class="location-feature-desc">Ikuti perjalanan Anda dengan navigasi langsung</div>
+                        </div>
+                    </div>
+                    
+                    <div class="location-feature-item">
+                        <div class="location-feature-icon" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+                            <iconify-icon icon="mdi:clock-fast"></iconify-icon>
+                        </div>
+                        <div class="location-feature-text">
+                            <div class="location-feature-title">Estimasi Akurat</div>
+                            <div class="location-feature-desc">Perkiraan waktu tempuh yang lebih presisi</div>
+                        </div>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" id="denyLocationBtn">
-                        <iconify-icon icon="mdi:close" inline></iconify-icon>
-                        Tidak Setuju
-                    </button>
-                    <button type="button" class="btn btn-primary" id="allowLocationBtn">
-                        <iconify-icon icon="mdi:check" inline></iconify-icon>
-                        Setuju & Lanjut
-                    </button>
+                
+                <div class="location-privacy-note">
+                    <iconify-icon icon="mdi:shield-check" class="me-2"></iconify-icon>
+                    <span>Lokasi Anda aman dan tidak akan dibagikan ke pihak ketiga</span>
                 </div>
+            </div>
+            
+            <div class="location-permission-footer">
+                <button type="button" class="location-allow-btn" id="allowLocationBtn">
+                    <iconify-icon icon="mdi:map-marker-check" class="me-2"></iconify-icon>
+                    <span>Izinkan Akses Lokasi</span>
+                </button>
+                <button type="button" class="location-deny-btn" id="denyLocationBtn">Nanti Saja</button>
             </div>
         </div>
     </div>
@@ -835,6 +1310,34 @@
 
     <!-- Main Application Script -->
     <script defer type="module" src="main.js"></script>
+    
+    <!-- Text Rotator Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const words = ['Rute', 'Halte', 'Layanan', 'Fasilitas', 'Integrasi'];
+            const rotator = document.querySelector('.text-rotator');
+            
+            if (!rotator || words.length === 0) return;
+            
+            let currentIndex = 0;
+            rotator.textContent = words[currentIndex];
+            
+            setInterval(() => {
+                // Swipe out (move up)
+                rotator.classList.remove('swipe-in');
+                rotator.classList.add('swipe-out');
+                
+                // After swipe out completes, change text and swipe in (from bottom)
+                setTimeout(() => {
+                    currentIndex = (currentIndex + 1) % words.length;
+                    rotator.textContent = words[currentIndex];
+                    rotator.classList.remove('swipe-out');
+                    void rotator.offsetWidth; // trigger reflow
+                    rotator.classList.add('swipe-in');
+                }, 500); // match animation duration
+            }, 3000);
+        });
+    </script>
 
     <script>
         // Enhanced Service Worker registration with update handling
@@ -878,41 +1381,102 @@
             }
         });
 
-        // Show PWA install prompt
+        // Show PWA install prompt (Modern Design)
         function showInstallPrompt() {
             if (!deferredPrompt || installPromptShown) return;
             
             installPromptShown = true;
             
-            // Create install prompt UI
-            const installBanner = document.createElement('div');
-            installBanner.id = 'pwa-install-banner';
-            installBanner.className = 'alert alert-info position-fixed bottom-0 start-50 translate-middle-x m-3';
-            installBanner.style.cssText = 'z-index: 9999; max-width: 400px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);';
-            installBanner.innerHTML = `
-                <div class="d-flex align-items-center justify-content-between">
-                    <div class="me-3">
-                        <div class="fw-bold mb-1">
-                            <iconify-icon icon="mdi:download" inline></iconify-icon>
-                            Install JakMove
+            // Create modern install prompt UI
+            const installModal = document.createElement('div');
+            installModal.id = 'pwa-install-modal';
+            installModal.className = 'pwa-install-modal';
+            installModal.innerHTML = `
+                <div class="pwa-install-backdrop"></div>
+                <div class="pwa-install-card">
+                    <button type="button" class="pwa-close-btn" id="pwa-install-close" aria-label="Close">
+                        <iconify-icon icon="mdi:close"></iconify-icon>
+                    </button>
+                    
+                    <div class="pwa-install-header">
+                        <div class="pwa-app-icon">
+                            <img src="image/jakmoveicon.png" alt="JakMove Icon">
                         </div>
-                        <div class="small">Akses cepat & gunakan offline di Android</div>
+                        <h3 class="pwa-app-title">Install JakMove</h3>
+                        <p class="pwa-app-subtitle">Smart Transit Experience</p>
                     </div>
-                    <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-primary btn-sm" id="pwa-install-btn">
-                            <iconify-icon icon="mdi:plus" inline></iconify-icon>
-                            Install
+                    
+                    <div class="pwa-install-body">
+                        <div class="pwa-features">
+                            <div class="pwa-feature-item">
+                                <div class="pwa-feature-icon" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                                    <iconify-icon icon="mdi:lightning-bolt"></iconify-icon>
+                                </div>
+                                <div class="pwa-feature-text">
+                                    <div class="pwa-feature-title">Akses Instan</div>
+                                    <div class="pwa-feature-desc">Buka aplikasi langsung dari layar utama</div>
+                                </div>
+                            </div>
+                            
+                            <div class="pwa-feature-item">
+                                <div class="pwa-feature-icon" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);">
+                                    <iconify-icon icon="mdi:wifi-off"></iconify-icon>
+                                </div>
+                                <div class="pwa-feature-text">
+                                    <div class="pwa-feature-title">Mode Offline</div>
+                                    <div class="pwa-feature-desc">Tetap bisa digunakan tanpa internet</div>
+                                </div>
+                            </div>
+                            
+                            <div class="pwa-feature-item">
+                                <div class="pwa-feature-icon" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);">
+                                    <iconify-icon icon="mdi:cellphone"></iconify-icon>
+                                </div>
+                                <div class="pwa-feature-text">
+                                    <div class="pwa-feature-title">Seperti Aplikasi Native</div>
+                                    <div class="pwa-feature-desc">Pengalaman layar penuh tanpa browser</div>
+                                </div>
+                            </div>
+                            
+                            <div class="pwa-feature-item">
+                                <div class="pwa-feature-icon" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+                                    <iconify-icon icon="mdi:update"></iconify-icon>
+                                </div>
+                                <div class="pwa-feature-text">
+                                    <div class="pwa-feature-title">Update Otomatis</div>
+                                    <div class="pwa-feature-desc">Selalu mendapat fitur terbaru</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="pwa-install-footer">
+                        <button type="button" class="pwa-install-btn" id="pwa-install-btn">
+                            <iconify-icon icon="mdi:download" class="me-2"></iconify-icon>
+                            <span>Install Sekarang</span>
                         </button>
-                        <button type="button" class="btn-close" id="pwa-install-close" aria-label="Close"></button>
+                        <button type="button" class="pwa-later-btn" id="pwa-later-btn">Nanti Saja</button>
+                        <p class="pwa-install-note">Gratis • Tidak perlu ke Play Store • Hemat ruang penyimpanan</p>
                     </div>
                 </div>
             `;
             
-            document.body.appendChild(installBanner);
+            document.body.appendChild(installModal);
+            
+            // Add animation class after a small delay
+            setTimeout(() => {
+                installModal.classList.add('active');
+            }, 10);
             
             // Handle install button click
             document.getElementById('pwa-install-btn').addEventListener('click', async () => {
                 if (!deferredPrompt) return;
+                
+                // Show loading state
+                const btn = document.getElementById('pwa-install-btn');
+                const originalHTML = btn.innerHTML;
+                btn.innerHTML = '<div class="spinner-border spinner-border-sm me-2"></div><span>Menginstall...</span>';
+                btn.disabled = true;
                 
                 // Show the install prompt
                 deferredPrompt.prompt();
@@ -922,28 +1486,45 @@
                 
                 if (outcome === 'accepted') {
                     console.log('User accepted the install prompt');
+                    installModal.classList.remove('active');
+                    setTimeout(() => installModal.remove(), 300);
                     showInstallSuccess();
                 } else {
                     console.log('User dismissed the install prompt');
+                    btn.innerHTML = originalHTML;
+                    btn.disabled = false;
                 }
                 
                 // We've used the prompt, and can't use it again, throw it away
                 deferredPrompt = null;
-                installBanner.remove();
             });
             
             // Handle close button
             document.getElementById('pwa-install-close').addEventListener('click', () => {
                 localStorage.setItem('pwa-install-dismissed', 'true');
-                installBanner.remove();
+                installModal.classList.remove('active');
+                setTimeout(() => installModal.remove(), 300);
             });
             
-            // Auto-hide after 10 seconds
+            // Handle later button
+            document.getElementById('pwa-later-btn').addEventListener('click', () => {
+                installModal.classList.remove('active');
+                setTimeout(() => installModal.remove(), 300);
+            });
+            
+            // Handle backdrop click
+            installModal.querySelector('.pwa-install-backdrop').addEventListener('click', () => {
+                installModal.classList.remove('active');
+                setTimeout(() => installModal.remove(), 300);
+            });
+            
+            // Auto-hide after 15 seconds
             setTimeout(() => {
-                if (document.body.contains(installBanner)) {
-                    installBanner.remove();
+                if (document.body.contains(installModal)) {
+                    installModal.classList.remove('active');
+                    setTimeout(() => installModal.remove(), 300);
                 }
-            }, 10000);
+            }, 15000);
         }
 
         // Show install success message
@@ -1133,35 +1714,76 @@
     <script src="js/intermodal.js" defer></script>
 
     <script>
-        // Modal Izin Lokasi dengan persistensi pilihan
+        // Modern Location Permission Modal Handler
         document.addEventListener('DOMContentLoaded', function() {
             const locationModalEl = document.getElementById('locationPermissionModal');
-            const locationModal = new bootstrap.Modal(locationModalEl);
             const allowBtn = document.getElementById('allowLocationBtn');
             const denyBtn = document.getElementById('denyLocationBtn');
+            const closeBtn = document.getElementById('location-close-btn');
+            const backdrop = locationModalEl ? locationModalEl.querySelector('.location-permission-backdrop') : null;
 
             const key = 'locationPermission';
             const saved = localStorage.getItem(key);
 
-            // Tampilkan modal hanya jika belum pernah memilih
-            if (!saved) {
-                setTimeout(() => {
-                    locationModal.show();
-                }, 1200);
+            // Function to show modal
+            function showLocationModal() {
+                if (locationModalEl) {
+                    locationModalEl.classList.add('show');
+                    document.body.style.overflow = 'hidden';
+                }
             }
 
-            allowBtn.addEventListener('click', function() {
-                localStorage.setItem(key, 'granted');
-                locationModal.hide();
-                // Opsional: otomatis aktifkan live location
-                const liveLocationBtn = document.getElementById('liveLocationBtn');
-                if (liveLocationBtn) liveLocationBtn.click();
-            });
+            // Function to hide modal
+            function hideLocationModal() {
+                if (locationModalEl) {
+                    locationModalEl.classList.remove('show');
+                    document.body.style.overflow = '';
+                }
+            }
 
-            denyBtn.addEventListener('click', function() {
-                localStorage.setItem(key, 'denied');
-                locationModal.hide();
-            });
+            // Show modal only if user hasn't made a choice before
+            if (!saved) {
+                setTimeout(() => {
+                    showLocationModal();
+                }, 1500);
+            }
+
+            // Handle allow button
+            if (allowBtn) {
+                allowBtn.addEventListener('click', function() {
+                    localStorage.setItem(key, 'granted');
+                    hideLocationModal();
+                    
+                    // Optional: automatically enable live location
+                    setTimeout(() => {
+                        const liveLocationBtn = document.getElementById('liveLocationBtn');
+                        if (liveLocationBtn) liveLocationBtn.click();
+                    }, 300);
+                });
+            }
+
+            // Handle deny button
+            if (denyBtn) {
+                denyBtn.addEventListener('click', function() {
+                    localStorage.setItem(key, 'denied');
+                    hideLocationModal();
+                });
+            }
+
+            // Handle close button
+            if (closeBtn) {
+                closeBtn.addEventListener('click', function() {
+                    localStorage.setItem(key, 'denied');
+                    hideLocationModal();
+                });
+            }
+
+            // Handle backdrop click
+            if (backdrop) {
+                backdrop.addEventListener('click', function() {
+                    hideLocationModal();
+                });
+            }
         });
 
         // Settings UI wiring
@@ -1177,6 +1799,17 @@
             const body = document.getElementById('settingsBody');
             const panel = document.getElementById('settingsPanel');
             const darkSwitch = document.getElementById('darkSwitch');
+            const navbarSettingsBtn = document.getElementById('navbarSettingsBtn');
+
+            // Settings button from navbar
+            if (navbarSettingsBtn && panel) {
+                navbarSettingsBtn.addEventListener('click', () => {
+                    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    if (body && body.style.display === 'none') {
+                        toggleBtn.click();
+                    }
+                });
+            }
 
             if (toggleBtn && body) {
                 toggleBtn.addEventListener('click', () => {

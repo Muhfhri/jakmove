@@ -1933,15 +1933,15 @@ export class LocationManager {
         if (!btn) return;
 
         if (active) {
-            btn.classList.remove('btn-outline-primary');
-            btn.classList.add('btn-primary');
+            btn.classList.remove('modern-action-btn', 'primary');
+            btn.classList.add('modern-action-btn', 'success');
             btn.setAttribute('data-active', 'on');
-            btn.innerHTML = '<span id="liveLocationIcon" class="bi bi-geo-alt-fill"></span> Live Location: ON';
+            btn.innerHTML = '<iconify-icon icon="mdi:crosshairs-gps"></iconify-icon><span>Lokasi Saya</span>';
         } else {
-            btn.classList.remove('btn-primary');
-            btn.classList.add('btn-outline-primary');
+            btn.classList.remove('modern-action-btn', 'success');
+            btn.classList.add('modern-action-btn', 'primary');
             btn.setAttribute('data-active', 'off');
-            btn.innerHTML = '<span id="liveLocationIcon" class="bi bi-geo-alt"></span> Live Location: OFF';
+            btn.innerHTML = '<iconify-icon icon="mdi:crosshairs-gps"></iconify-icon><span>Lokasi Saya Nonaktif</span>';
         }
     }
 

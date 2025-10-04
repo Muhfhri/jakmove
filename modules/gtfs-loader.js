@@ -788,6 +788,7 @@ export class GTFSLoader {
     getFareAttributes() { return this.data.fare_attributes || []; }
     getTransfers() { return this.data.transfers || []; }
     getCalendar() { return this.data.calendar || []; }
+    getCalendarDates() { return this.data.calendar_dates || []; }
     getAgency() { return this.data.agency || []; }
 
     // Enhanced natural sort function for route sorting - NUMBERS FIRST, then LETTERS
@@ -856,91 +857,69 @@ export class GTFSLoader {
     // ======================================
     
     showSlideNotification() {
-        const notification = document.getElementById('slideNotification');
-        if (notification) {
-            notification.style.display = 'block';
-            setTimeout(() => {
-                notification.classList.add('show');
-            }, 100);
-            console.log('📱 Slide notification shown');
-        } else {
-            console.warn('⚠️ Slide notification element not found!');
-        }
+        // Now handled by main app's loading screen
+        console.log('📱 Loading screen already active');
     }
 
-
     hideSlideNotification() {
-        const notification = document.getElementById('slideNotification');
-        if (notification) {
-            notification.classList.remove('show');
-            setTimeout(() => {
-                notification.style.display = 'none';
-                console.log('📱 Slide notification hidden');
-            }, 500);
-        }
+        // Now handled by main app
+        console.log('📱 Loading screen will be hidden by main app');
     }
 
     updateSlideNotification(percent, status) {
-        const notification = document.getElementById('slideNotification');
-        if (!notification) return;
+        const loadingScreen = document.getElementById('appLoadingScreen');
+        if (!loadingScreen) return;
         
-        const progressBar = notification.querySelector('.slide-progress-bar');
-        const title = notification.querySelector('.slide-title');
-        const subtitle = notification.querySelector('.slide-subtitle');
-        const percentEl = notification.querySelector('.slide-percent');
-        const icon = notification.querySelector('.slide-icon');
+        const progressFill = loadingScreen.querySelector('.loading-progress-fill');
+        const statusEl = loadingScreen.querySelector('.loading-status');
+        const percentEl = loadingScreen.querySelector('.loading-percent');
+        const title = loadingScreen.querySelector('.loading-title');
         
-        // Update progress bar
-        if (progressBar) {
-            progressBar.style.width = `${percent}%`;
+        // Strip HTML tags from status for clean text
+        const cleanStatus = status.replace(/<[^>]*>/g, '').trim();
+        
+        // Update progress bar (scale to 0-40% for GTFS loading, save 40-100% for UI)
+        if (progressFill) {
+            const scaledProgress = Math.min(percent * 0.4, 40);
+            progressFill.style.width = `${scaledProgress}%`;
         }
         
         // Update percentage
         if (percentEl) {
-            percentEl.textContent = `${Math.round(percent)}%`;
+            const scaledPercent = Math.min(Math.round(percent * 0.4), 40);
+            percentEl.textContent = `${scaledPercent}%`;
         }
         
-        // Update status text (support HTML icons)
-        if (subtitle) {
-            if (status.includes('<i class=')) {
-                subtitle.innerHTML = status;
-            } else {
-                subtitle.textContent = status;
-            }
+        // Update status text
+        if (statusEl) {
+            statusEl.textContent = cleanStatus;
         }
         
-        // Update icon and title based on progress
-        if (icon && title) {
-            if (percent >= 100) {
-                icon.innerHTML = '<i class="fas fa-check-circle" style="color: #22c55e;"></i>';
-                title.textContent = 'Selesai!';
-            } else if (percent >= 95) {
-                icon.innerHTML = '<i class="fas fa-gift" style="color: #f59e0b;"></i>';
-                title.textContent = 'Finalisasi...';
+        // Update title based on progress - avoid "Data Siap" to prevent confusion
+        if (title) {
+            if (percent >= 95) {
+                title.textContent = 'Menyiapkan...';
             } else if (percent >= 85) {
-                icon.innerHTML = '<i class="fas fa-cogs" style="color: #3b82f6;"></i>';
                 title.textContent = 'Memproses...';
             } else if (percent >= 50) {
-                icon.innerHTML = '<i class="fas fa-box" style="color: #6366f1;"></i>';
                 title.textContent = 'Memuat Data...';
             } else if (percent >= 10) {
-                icon.innerHTML = '<i class="fas fa-folder-open" style="color: #8b5cf6;"></i>';
                 title.textContent = 'Mengunduh...';
             } else {
-                icon.innerHTML = '<i class="fas fa-rocket" style="color: #ec4899;"></i>';
                 title.textContent = 'Memuat JakMove';
             }
         }
         
         // Enhanced console logging
         const timestamp = new Date().toLocaleTimeString();
-        console.log(`📱 [${timestamp}] ${percent}% - ${status}`);
+        console.log(`📱 [${timestamp}] ${percent}% - ${cleanStatus}`);
         
         // Update page title
+        const scaledPercent = Math.min(Math.round(percent * 0.4), 40);
         if (percent < 100) {
-            document.title = `${Math.round(percent)}% Loading - JakMove`;
+            document.title = `${scaledPercent}% Memuat - JakMove`;
         } else {
-            document.title = 'JakMove - Transportasi Jakarta';
+            document.title = 'Memuat - JakMove';
         }
     }
 

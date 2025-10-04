@@ -15,7 +15,7 @@ export class SearchManager {
     initFilterTabs() {
         // Initialize filter UI after DOM is ready
         setTimeout(() => {
-            const filterButtons = document.querySelectorAll('.filter-btn');
+            const filterButtons = document.querySelectorAll('.modern-filter-btn');
             filterButtons.forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     const filter = e.currentTarget.dataset.filter;
@@ -30,7 +30,7 @@ export class SearchManager {
         this._activeFilter = filter;
         
         // Update UI
-        const filterButtons = document.querySelectorAll('.filter-btn');
+        const filterButtons = document.querySelectorAll('.modern-filter-btn');
         filterButtons.forEach(btn => {
             btn.classList.toggle('active', btn.dataset.filter === filter);
         });
@@ -152,13 +152,14 @@ export class SearchManager {
         
         // Add searching indicator
         const searchingItem = document.createElement('li');
-        searchingItem.className = 'list-group-item text-center py-3 searching-indicator';
+        searchingItem.className = 'search-result-loading';
         searchingItem.innerHTML = `
-            <div class="d-flex align-items-center justify-content-center gap-2">
-                <div class="spinner-border spinner-border-sm text-primary" role="status">
-                    <span class="visually-hidden">Loading...</span>
+            <div class="loading-content">
+                <div class="loading-spinner">
+                    <div class="spinner-ring-small"></div>
+                    <div class="spinner-ring-small"></div>
                 </div>
-                <span class="text-muted">Mencari "${query}"...</span>
+                <span>Mencari "${query}"...</span>
             </div>
         `;
         
@@ -735,17 +736,18 @@ export class SearchManager {
     // Create results list
     createResultsList() {
         const ul = document.createElement('ul');
-        ul.className = 'list-group mt-3 mb-3';
-        ul.style.maxHeight = '250px';
-        ul.style.overflowY = 'auto';
+        ul.className = 'search-results-list';
         return ul;
     }
 
     // Add routes results
     addRoutesResults(foundRoutes, ul) {
         const routesHeader = document.createElement('li');
-        routesHeader.className = 'list-group-item fw-bold bg-light';
-        routesHeader.textContent = 'Layanan';
+        routesHeader.className = 'search-result-header';
+        routesHeader.innerHTML = `
+            <iconify-icon icon="mdi:bus" class="me-2"></iconify-icon>
+            <span>Layanan</span>
+        `;
         ul.appendChild(routesHeader);
 
         foundRoutes.forEach(route => {
@@ -757,8 +759,11 @@ export class SearchManager {
     // Add stops results
     addStopsResults(foundStops, stopToRoutes, routes, ul) {
         const stopsHeader = document.createElement('li');
-        stopsHeader.className = 'list-group-item fw-bold bg-light text-primary';
-        stopsHeader.textContent = 'Halte';
+        stopsHeader.className = 'search-result-header';
+        stopsHeader.innerHTML = `
+            <iconify-icon icon="mdi:bus-stop" class="me-2"></iconify-icon>
+            <span>Halte</span>
+        `;
         ul.appendChild(stopsHeader);
 
         // Remove duplicates based on name and coordinates
@@ -807,22 +812,21 @@ export class SearchManager {
     // Create route result item
     createRouteResultItem(route) {
         const li = document.createElement('li');
-        li.className = 'list-group-item d-flex align-items-center gap-2 py-3 lazy-animate';
+        li.className = 'search-result-item';
         
         const badgeColor = route.route_color ? ('#' + route.route_color) : '#6c757d';
         li.innerHTML = `
-            <span class='badge badge-koridor-interaktif rounded-pill' 
-                  style='background:${badgeColor};color:#fff;font-weight:bold;font-size:1.1em;padding:0.6em 1.2em;'>
-                ${route.route_short_name}
-            </span>
-            <span class='fw-bold plus-jakarta-sans' style='font-size:1.1em;'>
-                ${route.route_long_name || ''}
-            </span>
+            <div class="search-result-content">
+                <span class='route-badge' style='background:${badgeColor};'>
+                    ${route.route_short_name}
+                </span>
+                <span class='route-name plus-jakarta-sans'>
+                    ${route.route_long_name || ''}
+                </span>
+            </div>
+            <iconify-icon icon="mdi:chevron-right" class="search-result-arrow"></iconify-icon>
         `;
         
-        li.style.cursor = 'pointer';
-        li.onmouseenter = () => li.style.background = '#f1f5f9';
-        li.onmouseleave = () => li.style.background = '';
         li.onclick = () => {
             window.transJakartaApp.modules.routes.selectRoute(route.route_id);
             this.clearSearchResults();
@@ -834,7 +838,7 @@ export class SearchManager {
     // Create stop result item
     createStopResultItem(stop, stopToRoutes, routes) {
         const li = document.createElement('li');
-        li.className = 'list-group-item lazy-animate';
+        li.className = 'search-result-item stop-result-item';
         
         // Add data attributes for caching support
         li.setAttribute('data-stop-id', stop.stop_id || '');
@@ -991,7 +995,7 @@ export class SearchManager {
         if (filterTabs) filterTabs.style.display = 'none';
         
         // Reset filter buttons
-        const filterButtons = document.querySelectorAll('.filter-btn');
+        const filterButtons = document.querySelectorAll('.modern-filter-btn');
         filterButtons.forEach(btn => {
             btn.classList.toggle('active', btn.dataset.filter === 'all');
         });
@@ -1260,15 +1264,13 @@ export class SearchManager {
     // Add no results message
     addNoResultsMessage(ul, query) {
         const li = document.createElement('li');
-        li.className = 'list-group-item text-center text-muted py-4';
+        li.className = 'search-result-empty';
         li.innerHTML = `
-            <div class="d-flex flex-column align-items-center gap-2">
-                <iconify-icon icon="mdi:magnify-remove-outline" style="font-size: 2rem; opacity: 0.6;"></iconify-icon>
-                <div>
-                    <div class="fw-bold">Tidak ada hasil ditemukan</div>
-                    <div class="small">untuk pencarian "<span class="fw-semibold">${this.escapeHtml(query)}</span>"</div>
-                    <div class="small mt-2 text-muted">Coba kata kunci yang berbeda atau periksa ejaan</div>
-                </div>
+            <div class="empty-state">
+                <iconify-icon icon="mdi:magnify-remove-outline" class="empty-icon"></iconify-icon>
+                <div class="empty-title">Tidak ada hasil ditemukan</div>
+                <div class="empty-subtitle">untuk pencarian "<span class="fw-semibold">${this.escapeHtml(query)}</span>"</div>
+                <div class="empty-hint">Coba kata kunci yang berbeda atau periksa ejaan</div>
             </div>
         `;
         ul.appendChild(li);
@@ -1277,12 +1279,10 @@ export class SearchManager {
     // Add suggestion message
     addSuggestionMessage(ul, suggestion) {
         const li = document.createElement('li');
-        li.className = 'list-group-item bg-light border-0';
+        li.className = 'search-result-suggestion';
         li.innerHTML = `
-            <div class="d-flex align-items-center gap-2 text-primary">
-                <iconify-icon icon="mdi:lightbulb-outline" style="font-size: 1.2rem;"></iconify-icon>
-                <small class="fw-semibold">${suggestion}</small>
-            </div>
+            <iconify-icon icon="mdi:lightbulb-outline"></iconify-icon>
+            <span>${suggestion}</span>
         `;
         ul.insertBefore(li, ul.firstChild);
     }
@@ -1362,7 +1362,7 @@ export class SearchManager {
     // Add places results to the UI
     addPlacesResults(places, resultsDiv) {
         // Check if we already have results, if so append places section
-        let ul = resultsDiv.querySelector('ul.list-group');
+        let ul = resultsDiv.querySelector('ul.search-results-list');
         if (!ul) {
             ul = this.createResultsList();
             resultsDiv.appendChild(ul);
@@ -1370,10 +1370,10 @@ export class SearchManager {
         
         // Add places header
         const placesHeader = document.createElement('li');
-        placesHeader.className = 'list-group-item fw-bold bg-light text-success';
+        placesHeader.className = 'search-result-header';
         placesHeader.innerHTML = `
             <iconify-icon icon="mdi:map-marker" class="me-2"></iconify-icon>
-            Tempat
+            <span>Tempat</span>
         `;
         ul.appendChild(placesHeader);
         
@@ -1387,24 +1387,24 @@ export class SearchManager {
     // Create place result item
     createPlaceResultItem(place) {
         const li = document.createElement('li');
-        li.className = 'list-group-item lazy-animate place-result';
-        li.style.cursor = 'pointer';
+        li.className = 'search-result-item place-result-item';
         
         const displayName = this.formatPlaceName(place.display_name);
         const type = this.getPlaceType(place);
         
         li.innerHTML = `
-            <div class="d-flex align-items-start gap-2">
-                <iconify-icon icon="mdi:map-marker" class="text-success mt-1" style="font-size: 1.2em;"></iconify-icon>
-                <div class="flex-grow-1">
-                    <div class="fw-semibold text-dark">${this.highlight(displayName)}</div>
-                    <div class="small text-muted">${type}</div>
+            <div class="search-result-content">
+                <div class="place-icon-wrapper">
+                    <iconify-icon icon="mdi:map-marker"></iconify-icon>
+                </div>
+                <div class="place-info">
+                    <div class="place-name">${this.highlight(displayName)}</div>
+                    <div class="place-type">${type}</div>
                 </div>
             </div>
+            <iconify-icon icon="mdi:chevron-right" class="search-result-arrow"></iconify-icon>
         `;
         
-        li.onmouseenter = () => li.style.background = '#f1f5f9';
-        li.onmouseleave = () => li.style.background = '';
         li.onclick = () => {
             this.showPlaceOnMap(place);
             this.clearSearchResults();
