@@ -194,108 +194,112 @@ class TransJakartaApp {
         console.log('🎯 Data loading completion verified');
     }
 
-    // Deferred initialization for heavy UI components - now async to wait for completion
+    // Deferred initialization for heavy UI components - parallel execution for speed
     async deferredUIInit() {
-        console.log('🔄 Starting deferred UI initialization...');
+        console.log('🔄 Starting deferred UI initialization (parallel mode)...');
         
-        const deferredTasks = [
-            { name: 'UI Manager', task: () => this.modules.ui.init() },
-            { name: 'Journey Planner', task: () => this.modules.journey.init() },
-            { name: 'Typed Planner', task: () => this.modules.typedPlanner.init() },
-            { name: 'Saved State', task: () => this.loadSavedState() },
-            { name: 'Map Stops', task: () => {
-                if (this.modules.map.loadStopsLazy) {
-                    this.modules.map.loadStopsLazy();
-                }
-            }},
-            { name: 'Route Dropdowns', task: () => {
-                if (this.modules.ui.populateDropdownsLazy) {
-                    this.modules.ui.populateDropdownsLazy();
-                }
-            }}
+        // Execute ONLY critical tasks in parallel, defer rest to background
+        const criticalTasks = [
+            (async () => { 
+                try { this.modules.ui.init(); } 
+                catch (e) { console.warn('UI Manager init failed:', e); }
+            })(),
+            (async () => { 
+                try { this.modules.journey.init(); } 
+                catch (e) { console.warn('Journey Planner init failed:', e); }
+            })(),
+            (async () => { 
+                try { this.modules.typedPlanner.init(); } 
+                catch (e) { console.warn('Typed Planner init failed:', e); }
+            })()
         ];
-
-        // Execute all tasks rapidly for faster loading
-        for (const currentTask of deferredTasks) {
-            console.log(`🔧 Executing: ${currentTask.name}`);
-                    
-                    try {
-                        currentTask.task();
-                    } catch (e) {
-                        console.warn(`Deferred task failed (${currentTask.name}):`, e);
-                    }
-                    
-            // Minimal delay between tasks for smooth execution
-            await new Promise(resolve => setTimeout(resolve, 5));
-        }
         
-                    console.log('✅ All deferred UI tasks completed');
+        // Non-critical tasks - defer to background using requestIdleCallback
+        const deferToBackground = () => {
+            const callback = window.requestIdleCallback || ((cb) => setTimeout(cb, 100));
+            
+            callback(() => {
+                try { this.loadSavedState(); } catch(e) {}
+            }, { timeout: 500 });
+            
+            callback(() => {
+                try { 
+                    if (this.modules.map.loadStopsLazy) {
+                        this.modules.map.loadStopsLazy();
+                    }
+                } catch(e) {}
+            }, { timeout: 1000 });
+            
+            callback(() => {
+                try { 
+                    if (this.modules.ui.populateDropdownsLazy) {
+                        this.modules.ui.populateDropdownsLazy();
+                    }
+                } catch(e) {}
+            }, { timeout: 1500 });
+        };
+        
+        // Start background tasks immediately (non-blocking)
+        deferToBackground();
+        
+        const tasks = criticalTasks;
+
+        // Wait for all tasks to complete in parallel (much faster!)
+        await Promise.all(tasks);
+        
+        console.log('⚡ All deferred UI tasks completed in parallel');
     }
 
-    // Wait for complete UI readiness using loading screen
+    // Wait for complete UI readiness using loading screen - ultra-fast mode
     async waitForCompleteUIReady() {
-        console.log('⏳ Waiting for complete UI readiness...');
+        console.log('⏳ Waiting for complete UI readiness (ultra-fast)...');
         
-        // Update loading screen to UI preparation mode (start from 45% smoothly after GTFS 40%)
-        this.updateLoadingScreen(45, 'Menyiapkan antarmuka...');
+        // Update loading screen - start at higher percentage since we're already fast
+        this.updateLoadingScreen(60, 'Menyiapkan komponen...');
         
-        // Wait for critical UI elements to be populated
-        const uiReadyChecks = [
-            { name: 'Route Dropdown', check: () => {
-                const dropdown = document.getElementById('routesDropdown');
-                return dropdown && dropdown.options.length > 1;
-            }},
-            { name: 'Map Route Dropdown', check: () => {
-                const mapDropdown = document.querySelector('#mapRouteDropdown select');
-                return mapDropdown && mapDropdown.options.length > 1;
-            }},
-            { name: 'GTFS Data Ready', check: () => window.gtfsDataReady === true },
-            { name: 'Map Initialized', check: () => {
-                const mapManager = this.modules.map;
-                return mapManager && mapManager.isInitialized;
-            }}
+        // Reduced checks - only essential ones
+        const essentialChecks = [
+            () => window.gtfsDataReady === true,
+            () => this.modules.map && this.modules.map.isInitialized
         ];
         
-        const timeout = 3000; // Faster timeout
+        const timeout = 1000; // Much faster timeout
         const startTime = Date.now();
-        let progress = 45;
         
+        // Ultra-fast polling with exponential backoff
+        let pollDelay = 5; // Start with 5ms
         while (Date.now() - startTime < timeout) {
-            const readyStates = uiReadyChecks.map(item => {
+            const allReady = essentialChecks.every(check => {
                 try {
-                    return item.check();
+                    return check();
                 } catch (e) {
                     return false;
                 }
             });
             
-            const readyCount = readyStates.filter(state => state).length;
-            progress = 45 + ((readyCount / uiReadyChecks.length) * 55);
-            
-            const statusText = progress < 100 
-                ? `Menyiapkan komponen...`
-                : 'Siap digunakan!';
-                
-            this.updateLoadingScreen(progress, statusText);
-            
-            if (readyStates.every(state => state)) {
-                console.log('✅ Complete UI is ready');
+            if (allReady) {
+                console.log('✅ Essential UI components ready');
                 break;
             }
             
-            await new Promise(resolve => setTimeout(resolve, 30)); // Faster polling
+            await new Promise(resolve => setTimeout(resolve, pollDelay));
+            pollDelay = Math.min(pollDelay * 1.5, 30); // Exponential backoff up to 30ms
         }
         
-        // Final completion
-        this.updateLoadingScreen(100, 'Siap digunakan!');
+        // Update progress smoothly to 90%
+        this.updateLoadingScreen(90, 'Menyelesaikan...');
+        await new Promise(resolve => setTimeout(resolve, 50));
         
-        // Very short wait for smooth transition
-        await new Promise(resolve => setTimeout(resolve, 150));
+        // Final completion
+        this.updateLoadingScreen(100, 'Siap!');
+        
+        // Minimal wait for smooth transition
+        await new Promise(resolve => setTimeout(resolve, 100));
         
         // Hide loading screen
         this.hideLoadingScreen();
         
-        console.log('🎯 UI readiness check completed');
+        console.log('⚡ UI readiness check completed (ultra-fast)');
     }
 
     // Mark app as fully ready
@@ -659,9 +663,179 @@ class TransJakartaApp {
         
         setTimeout(() => errorDiv.remove(), 5000);
     }
+
+    // Show active routes modal
+    showActiveRoutesModal() {
+        const modal = document.getElementById('activeRoutesModal');
+        const modalBody = document.getElementById('activeRoutesModalBody');
+        
+        if (!modal) return;
+        
+        // Show modal
+        modal.classList.add('show');
+        document.body.style.overflow = 'hidden';
+        
+        // Load active routes
+        this.loadActiveRoutesIntoModal(modalBody);
+    }
+
+    hideActiveRoutesModal() {
+        const modal = document.getElementById('activeRoutesModal');
+        if (!modal) return;
+        
+        modal.classList.remove('show');
+        document.body.style.overflow = '';
+    }
+
+    loadActiveRoutesIntoModal(modalBody) {
+        try {
+            const routes = this.modules.gtfs.getRoutes();
+            const routeManager = this.modules.routes;
+            
+            if (!routes || !routeManager) {
+                modalBody.innerHTML = '<div class="no-active-routes"><iconify-icon icon="mdi:alert-circle"></iconify-icon><p>Data tidak tersedia</p></div>';
+                return;
+            }
+
+            // Get active routes
+            const activeRoutes = routes.filter(route => {
+                try {
+                    return routeManager.isRouteActiveNow(route.route_id);
+                } catch (e) {
+                    return false;
+                }
+            });
+
+            if (activeRoutes.length === 0) {
+                modalBody.innerHTML = '<div class="no-active-routes"><iconify-icon icon="mdi:bus-clock"></iconify-icon><p>Tidak ada layanan yang beroperasi saat ini</p></div>';
+                return;
+            }
+
+            // Sort routes naturally
+            activeRoutes.sort((a, b) => this.modules.gtfs.naturalSort(a, b));
+
+            // Build routes list
+            const routesList = document.createElement('div');
+            routesList.className = 'active-routes-list';
+
+            activeRoutes.forEach(route => {
+                const routeItem = this.createActiveRouteItem(route);
+                routesList.appendChild(routeItem);
+            });
+
+            modalBody.innerHTML = '';
+            modalBody.appendChild(routesList);
+
+        } catch (error) {
+            console.error('Error loading active routes:', error);
+            modalBody.innerHTML = '<div class="no-active-routes"><iconify-icon icon="mdi:alert-circle"></iconify-icon><p>Gagal memuat data layanan</p></div>';
+        }
+    }
+
+    createActiveRouteItem(route) {
+        const item = document.createElement('div');
+        item.className = 'active-route-item';
+        
+        const routeShortName = route.route_short_name || route.route_id;
+        const routeLongName = route.route_long_name || '';
+        const routeColor = route.route_color ? `#${route.route_color}` : '#3b82f6';
+        
+        // Get operating hours
+        const hours = this.getRouteOperatingHours(route.route_id);
+        const hoursText = hours ? `${hours.start} - ${hours.end}` : 'Waktu operasional tidak tersedia';
+        
+        item.innerHTML = `
+            <div class="active-route-badge" style="background: ${routeColor};">
+                ${routeShortName}
+            </div>
+            <div class="active-route-info">
+                <div class="active-route-name" title="${routeLongName}">
+                    ${routeLongName || routeShortName}
+                </div>
+                <div class="active-route-time">
+                    <iconify-icon icon="mdi:clock-outline"></iconify-icon>
+                    ${hoursText}
+                </div>
+                <div class="active-route-status">
+                    <iconify-icon icon="mdi:check-circle"></iconify-icon>
+                    Beroperasi
+                </div>
+            </div>
+        `;
+        
+        // Click to select route
+        item.addEventListener('click', () => {
+            this.hideActiveRoutesModal();
+            if (this.modules.routes) {
+                this.modules.routes.selectRoute(route.route_id);
+            }
+        });
+        
+        return item;
+    }
+
+    getRouteOperatingHours(routeId) {
+        try {
+            const trips = this.modules.gtfs.getTrips().filter(t => t.route_id === routeId);
+            if (trips.length === 0) return null;
+
+            const stopTimes = this.modules.gtfs.getStopTimes();
+            let minTime = Infinity;
+            let maxTime = -Infinity;
+
+            trips.forEach(trip => {
+                const tripStopTimes = stopTimes.filter(st => st.trip_id === trip.trip_id);
+                tripStopTimes.forEach(st => {
+                    const time = this.parseGTFSTime(st.departure_time || st.arrival_time);
+                    if (time !== null) {
+                        minTime = Math.min(minTime, time);
+                        maxTime = Math.max(maxTime, time);
+                    }
+                });
+            });
+
+            if (minTime === Infinity || maxTime === -Infinity) return null;
+
+            return {
+                start: this.formatTime(minTime),
+                end: this.formatTime(maxTime)
+            };
+        } catch (e) {
+            return null;
+        }
+    }
+
+    formatTime(seconds) {
+        const hours = Math.floor(seconds / 3600) % 24;
+        const minutes = Math.floor((seconds % 3600) / 60);
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+    }
 }
 
 // Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     window.transJakartaApp = new TransJakartaApp();
+    
+    // Setup active routes modal
+    const activeRoutesCard = document.getElementById('activeRoutesCard');
+    const closeModalBtn = document.getElementById('closeActiveRoutesModal');
+    const modalBackdrop = document.querySelector('.active-routes-modal-backdrop');
+    
+    if (activeRoutesCard) {
+        activeRoutesCard.addEventListener('click', () => {
+            window.transJakartaApp.showActiveRoutesModal();
+        });
+    }
+    
+    if (closeModalBtn) {
+        closeModalBtn.addEventListener('click', () => {
+            window.transJakartaApp.hideActiveRoutesModal();
+        });
+    }
+    
+    if (modalBackdrop) {
+        modalBackdrop.addEventListener('click', () => {
+            window.transJakartaApp.hideActiveRoutesModal();
+        });
+    }
 }); 

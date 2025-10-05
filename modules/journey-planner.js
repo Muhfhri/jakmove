@@ -40,17 +40,76 @@ export class JourneyPlanner {
     }
 
     init() {
-        // Prewarm graph asynchronously to avoid first-click lag
+        console.log('🚀 JourneyPlanner init starting...');
+        const startTime = performance.now();
+        
+        // Try to load pre-built graph from cache FIRST (instant!)
+        const cached = this._loadGraphFromCache();
+        if (cached) {
+            console.log(`⚡ Graph loaded from cache in ${(performance.now() - startTime).toFixed(2)}ms`);
+            this._graphBuilt = true;
+        } else {
+            // Build graph in background only if not cached
         if (!this._graphBuilt && !this._graphBuilding) {
             this._graphBuilding = true;
+                console.log('🔧 Building graph in background (not cached)...');
             const schedule = (cb) => { try { (window.requestIdleCallback||window.setTimeout)(cb, 0); } catch(_) { setTimeout(cb,0); } };
             schedule(() => {
-                try { this._buildGraph(); } catch(e) {}
+                    try { 
+                        this._buildGraph();
+                        this._saveGraphToCache(); // Save for next time
+                    } catch(e) {
+                        console.error('Graph build failed:', e);
+                    }
                 this._graphBuilding = false;
             });
         }
+        }
+        
         // Load saved optimization mode
         try { const saved = localStorage.getItem('jp_mode'); if (saved) this.setOptimizationMode(saved); } catch(e) {}
+        
+        console.log(`✅ JourneyPlanner init completed in ${(performance.now() - startTime).toFixed(2)}ms`);
+    }
+    
+    _loadGraphFromCache() {
+        try {
+            const cached = localStorage.getItem('jp_graph_cache_v2');
+            if (!cached) return false;
+            
+            const data = JSON.parse(cached);
+            
+            // Restore Map structures
+            this._adj = new Map(Object.entries(data.adj || {}).map(([k, v]) => [k, v]));
+            this._routesAtStop = new Map(Object.entries(data.routesAtStop || {}).map(([k, v]) => [k, new Set(v)]));
+            this._validStops = new Set(data.validStops || []);
+            this._parentToChildren = new Map(Object.entries(data.parentToChildren || {}).map(([k, v]) => [k, v]));
+            
+            console.log(`📦 Graph cache restored: ${this._validStops.size} stops, ${this._adj.size} adjacencies`);
+            return true;
+        } catch (e) {
+            console.warn('Failed to load graph cache:', e);
+            return false;
+        }
+    }
+    
+    _saveGraphToCache() {
+        try {
+            const data = {
+                adj: Object.fromEntries(this._adj),
+                routesAtStop: Object.fromEntries(
+                    Array.from(this._routesAtStop.entries()).map(([k, v]) => [k, Array.from(v)])
+                ),
+                validStops: Array.from(this._validStops),
+                parentToChildren: Object.fromEntries(this._parentToChildren),
+                timestamp: Date.now()
+            };
+            
+            localStorage.setItem('jp_graph_cache_v2', JSON.stringify(data));
+            console.log('💾 Graph cached for instant loading next time');
+        } catch (e) {
+            console.warn('Failed to save graph cache:', e);
+        }
     }
 
     enable() {
@@ -306,46 +365,51 @@ export class JourneyPlanner {
         }
         const gtfs = this.app.modules.gtfs;
         const stops = gtfs.getStops() || [];
-        // Robust nearest-stop fallback distances
-        const radii = [300, 450, 650, 900];
-        let start = null, goal = null;
-        for (const r of radii) { if (!start) start = this._nearestValidStop(this.origin.lat, this.origin.lon, stops, r); else break; }
-        for (const r of radii) { if (!goal) goal = this._nearestValidStop(this.destination.lat, this.destination.lon, stops, r); else break; }
-        if (!start || !goal) { this._setStatus('Gagal menemukan halte/platform terdekat'); return; }
-        let path = this._findPath(String(start.stop_id), String(goal.stop_id));
-        
-        // If no path found, try with expanded walking connections
-        if (!path || path.length === 0) {
-            try { this._addFallbackWalkEdges(1); } catch(_) {}
-            path = this._findPath(String(start.stop_id), String(goal.stop_id));
-        }
-        
-        // If still no path and not in balanced mode, fallback to balanced
-        if ((!path || path.length === 0) && this._mode !== 'balanced') {
-            console.warn(`Journey Planner: ${this._mode} mode failed, falling back to balanced mode`);
-            const originalMode = this._mode;
-            this._mode = 'balanced';
-            path = this._findPath(String(start.stop_id), String(goal.stop_id));
-            this._mode = originalMode; // Restore for UI consistency
+		// Evaluate multiple nearby start/goal candidates to avoid far-away starts
+		const startCandidates = this._nearestValidStops(this.origin.lat, this.origin.lon, stops, [200, 300, 450, 650], 5, 700);
+		const goalCandidates = this._nearestValidStops(this.destination.lat, this.destination.lon, stops, [200, 300, 450, 650], 5, 700);
+		if (!startCandidates.length || !goalCandidates.length) { this._setStatus('Gagal menemukan halte/platform terdekat'); return; }
+
+		const chooseBestPlan = () => {
+			let best = null;
+			for (const s of startCandidates) {
+				for (const g of goalCandidates) {
+					let path = this._findPath(String(s.stop_id), String(g.stop_id));
+					if (!path || path.length === 0) continue;
+					const legs = this._groupByRoute(path);
+					const d1 = this._haversine(this.origin.lat, this.origin.lon, parseFloat(s.stop_lat), parseFloat(s.stop_lon));
+					const d2 = this._haversine(parseFloat(g.stop_lat), parseFloat(g.stop_lon), this.destination.lat, this.destination.lon);
+					const dur = this._estimateJourneyDuration(s, g, legs, d1, d2);
+					if (!best || dur.totalSec < best.dur.totalSec) {
+						best = { start: s, goal: g, legs, dur };
+					}
+				}
+			}
+			return best;
+		};
+
+		// First attempt with current graph and mode
+		let bestPlan = chooseBestPlan();
+
+		// If none, try adding modest walking edges
+		if (!bestPlan) { try { this._addFallbackWalkEdges(1); } catch(_) {} bestPlan = chooseBestPlan(); }
+
+		// If still none and not in balanced mode, try balanced mode
+		if (!bestPlan && this._mode !== 'balanced') {
+			const originalMode = this._mode; this._mode = 'balanced';
+			bestPlan = chooseBestPlan();
+			this._mode = originalMode;
         }
         
         // Final attempt with more walking edges
-        if (!path || path.length === 0) {
-            try { this._addFallbackWalkEdges(2); } catch(_) {}
-            path = this._findPath(String(start.stop_id), String(goal.stop_id));
-        }
+		if (!bestPlan) { try { this._addFallbackWalkEdges(2); } catch(_) {} bestPlan = chooseBestPlan(); }
         
-        if (!path || path.length === 0) { 
+		if (!bestPlan) {
             const mapMod = this.app.modules.map;
             this._setStatus('Tidak ditemukan jalur layanan. Geser titik awal/tujuan untuk mencoba lagi.');
             try {
                 const html = `
-                    <div class="stop-popup plus-jakarta-sans" style="min-width: 220px; max-width: 330px; padding: 10px 12px;">
-                        <div style="color:#b91c1c; font-weight:700;">Rencana tidak ditemukan</div>
-                        <div class="small" style="color:#6b7280; margin-top:6px;">Geser marker titik awal atau tujuan agar lebih dekat ke koridor/halte.</div>
-                        <div class="small" style="color:#6b7280; margin-top:6px;">Tips: dekatkan ke jalan utama atau halte besar.</div>
-                    </div>`;
-                // Tampilkan di tengah antara origin/destination kalau keduanya ada
+					<div class=\"stop-popup plus-jakarta-sans\" style=\"min-width: 220px; max-width: 330px; padding: 10px 12px;\">\n\t\t\t\t\t<div style=\"color:#b91c1c; font-weight:700;\">Rencana tidak ditemukan</div>\n\t\t\t\t\t<div class=\"small\" style=\"color:#6b7280; margin-top:6px;\">Geser marker titik awal atau tujuan agar lebih dekat ke koridor/halte.</div>\n\t\t\t\t\t<div class=\"small\" style=\"color:#6b7280; margin-top:6px;\">Tips: dekatkan ke jalan utama atau halte besar.</div>\n\t\t\t\t</div>`;
                 if (this.origin && this.destination) {
                     const midLat = (this.origin.lat + this.destination.lat) / 2;
                     const midLon = (this.origin.lon + this.destination.lon) / 2;
@@ -355,7 +419,10 @@ export class JourneyPlanner {
             } catch (_) {}
             return; 
         }
-        const grouped = this._groupByRoute(path);
+
+		const start = bestPlan.start;
+		const goal = bestPlan.goal;
+		const grouped = bestPlan.legs;
         // Hindari efek kedip saat drag: render hanya ketika tidak sedang drag
         if (!this._isDragging) {
             // Pass steps from _lastPlan if available
@@ -409,8 +476,8 @@ export class JourneyPlanner {
             const gtfs = this.app.modules.gtfs;
             const stops = gtfs.getStops() || [];
             const valids = stops.filter(s => s && this._validStops.has(String(s.stop_id||'')));
-            const R = level === 1 ? 250 : 400; // meters - further reduced for shorter walks
-            const TOPK = level === 1 ? 5 : 8; // increased connectivity to compensate for shorter radius
+			const R = level === 1 ? 200 : 300; // meters - tighter to avoid long walk bridges
+			const TOPK = level === 1 ? 5 : 6; // slightly fewer to reduce zig-zag options
             const cell = 0.006; // slightly larger grid for fallback
             const keyOf = (lat, lon) => `${Math.floor(lat/cell)}|${Math.floor(lon/cell)}`;
             const grid = new Map();
@@ -477,15 +544,52 @@ export class JourneyPlanner {
         return candidates.length > 0 ? candidates[0].stop : null;
     }
 
+	// Get up to topK nearest VALID stops within the first radius bucket that yields results,
+	// applying a hard distance cap to avoid suggesting very long initial/final walks.
+	_nearestValidStops(lat, lon, stops, radii = [200, 300, 450, 650], topK = 5, hardCap = 700) {
+		try {
+			const results = [];
+			let chosenRadius = null;
+			for (const r of radii) {
+				const bucket = [];
+				for (const s of stops) {
+					if (!s || !s.stop_lat || !s.stop_lon) continue;
+					const sid = String(s.stop_id || '');
+					if (!this._validStops.has(sid)) continue;
+					const d = this._haversine(lat, lon, parseFloat(s.stop_lat), parseFloat(s.stop_lon));
+					if (d <= r) bucket.push({ stop: s, distance: d });
+				}
+				if (bucket.length) {
+					chosenRadius = r;
+					bucket.sort((a, b) => a.distance - b.distance);
+					for (const item of bucket) {
+						if (item.distance <= hardCap) results.push(item);
+						if (results.length >= topK) break;
+					}
+					break;
+				}
+			}
+			return results.map(it => it.stop);
+		} catch (_) { return []; }
+    }
+
     _findPath(startId, goalId) {
         // A*-like: minimize weighted distance + transfer penalties with heuristic guidance
         const mode = this._mode || 'balanced';
         const BIG = mode === 'fastest' ? 50000 : (mode === 'cheapest' ? 80000 : 65000); // Reduced BIG values for all modes
-        const MAX_TRANSFERS = mode === 'cheapest' ? 2 : (mode === 'fastest' ? 4 : 3); // Adjusted for each mode
+        const MAX_TRANSFERS = mode === 'cheapest' ? 4 : (mode === 'fastest' ? 6 : 5); // Increased to allow complex multi-transfer routes
         const TRANSIT_WEIGHT = mode === 'fastest' ? 0.15 : (mode === 'cheapest' ? 0.30 : 0.22); // Fine-tuned weights
         const WALK_WEIGHT = mode === 'fastest' ? 2.0 : (mode === 'cheapest' ? 3.0 : 2.5); // Increased to heavily discourage long walks
         const ALIGHT_WALK_PENALTY = mode === 'fastest' ? Math.round(BIG * 0.3) : (mode === 'cheapest' ? Math.round(BIG * 0.8) : Math.round(BIG * 0.5));
         const MAX_WALK_DISTANCE = 300; // Reduced maximum walking distance for transit
+        // Progressive transfer penalty: each additional transfer gets more expensive
+        const getTransferPenalty = (transferCount) => {
+            if (transferCount === 0) return 0;
+            if (transferCount === 1) return BIG * 1.0; // First transfer
+            if (transferCount === 2) return BIG * 1.3; // Second transfer - heavier
+            if (transferCount === 3) return BIG * 1.7; // Third transfer - much heavier
+            return BIG * 2.0; // 4+ transfers - very heavy
+        };
         // Fare-aware preferences (only used in 'cheapest')
         let priceByRoute = new Map();
         let fareIdByRoute = new Map();
@@ -509,6 +613,7 @@ export class JourneyPlanner {
         // Service-type-aware grouping (BRT vs Integrasi) to bias CHEAPEST mode
         const routesList = (this.app.modules.gtfs.getRoutes() || []);
         const routeDescById = new Map(routesList.map(r => [String(r.route_id||''), String(r.route_desc||'')]));
+        const routeShortNameById = new Map(routesList.map(r => [String(r.route_id||''), String(r.route_short_name||'')]));
         const groupPriceByKey = new Map([['BRT', 3500], ['INTEGRASI', 5000], ['OTHER', 4000]]);
         const serviceGroupForRoute = (rid) => {
             try {
@@ -518,6 +623,16 @@ export class JourneyPlanner {
                 return 'BRT';
             } catch(_) { return 'BRT'; }
         };
+        // Helper to detect JAK routes (typically Mikrotrans with poor frequency)
+        const isJAKRoute = (rid) => {
+            try {
+                const shortName = (routeShortNameById.get(String(rid)) || '').toUpperCase();
+                // JAK routes typically have names like JAK01, JAK02, or just "JAK"
+                return shortName.includes('JAK') || shortName.match(/^[A-Z]+\d+$/);
+            } catch(_) { return false; }
+        };
+        // JAK penalty: discourage but don't block (applies to all modes)
+        const JAK_PENALTY = Math.round(BIG * 0.4); // 40% of BIG constant
         if (mode === 'fastest') {
             try {
                 const gtfs = this.app.modules.gtfs;
@@ -591,7 +706,7 @@ export class JourneyPlanner {
         tryRelax(startId, '', 0, 0, null, '');
 
         let iterations = 0;
-        const MAX_ITERATIONS = 50000; // Safety limit to prevent infinite loops
+        const MAX_ITERATIONS = 100000; // Increased limit for complex multi-transfer routes
 
         while (pq.length && iterations < MAX_ITERATIONS) {
             iterations++;
@@ -620,8 +735,8 @@ export class JourneyPlanner {
                         const gLat = parseFloat(g.stop_lat), gLon = parseFloat(g.stop_lon);
                         const distToGoal = this._haversine(sLat, sLon, gLat, gLon);
                         const distToGoalNext = this._haversine(tLat, tLon, gLat, gLon);
-                        // Relax this constraint for different modes
-                        const allowedDetour = mode === 'fastest' ? 200 : (mode === 'cheapest' ? 300 : 250);
+                        // More relaxed detour allowance for complex routes
+                        const allowedDetour = mode === 'fastest' ? 400 : (mode === 'cheapest' ? 500 : 450);
                         if (distToGoalNext > distToGoal + allowedDetour) {
                             // Penalize moving away from goal significantly
                             continue;
@@ -640,6 +755,10 @@ export class JourneyPlanner {
                     distComponent = stepDist * TRANSIT_WEIGHT;
                     if (!cur.rid) {
                         nextRid = edgeRid; // boarding, no transfer penalty
+                        // JAK route penalty: discourage JAK routes unless they're clearly best
+                        if (isJAKRoute(edgeRid)) {
+                            edgePenalty += JAK_PENALTY;
+                        }
                         // fare-aware: pay fare only if not already on same fare product
                         if (mode === 'cheapest') {
                             const grp = serviceGroupForRoute(edgeRid);
@@ -657,16 +776,23 @@ export class JourneyPlanner {
                     } else if (edgeRid !== cur.rid) {
                         nextRid = edgeRid;
                         nextTransfers = cur.transfers + 1;
-                        // transfer penalty when switching routes; heavily discourage unnecessary transfers
+                        // JAK route penalty: discourage transferring to JAK routes
+                        if (isJAKRoute(edgeRid)) {
+                            edgePenalty += JAK_PENALTY;
+                        }
+                        // Progressive transfer penalty: more transfers = exponentially higher cost
+                        const baseTransferPenalty = getTransferPenalty(nextTransfers);
+                        // Adjust base penalty by mode and service type
                         if (mode === 'cheapest') {
                             const fromGrp = serviceGroupForRoute(cur.rid);
                             const toGrp = serviceGroupForRoute(edgeRid);
-                            // Strong penalty for integrasi transfers, lighter for BRT platform changes
-                            edgePenalty += Math.round(BIG * ((fromGrp === 'BRT' && toGrp === 'BRT') ? 0.3 : 1.2));
+                            // Lighter penalty for BRT-to-BRT (free fare), heavier for cross-system
+                            const multiplier = (fromGrp === 'BRT' && toGrp === 'BRT') ? 0.5 : 1.3;
+                            edgePenalty += Math.round(baseTransferPenalty * multiplier);
                         } else if (mode === 'fastest') {
-                            edgePenalty += Math.round(BIG * 0.8); // Increased penalty to reduce transfers
+                            edgePenalty += Math.round(baseTransferPenalty * 0.9); // Slightly lighter for fastest
                         } else {
-                            edgePenalty += Math.round(BIG * 1.0); // Full penalty for balanced mode
+                            edgePenalty += Math.round(baseTransferPenalty); // Full progressive penalty for balanced
                         }
                         // fare-aware: charge only when switching to different fare product
                         if (mode === 'cheapest') {
@@ -726,6 +852,10 @@ export class JourneyPlanner {
                         // first boarding, include fare-aware penalty in 'cheapest'
                         let cost2 = cur.cost;
                         let nextFareUsed = cur.fareUsed || '';
+                        // JAK route penalty for initial boarding
+                        if (isJAKRoute(String(r))) {
+                            cost2 += JAK_PENALTY;
+                        }
                         if (mode === 'cheapest') {
                             const grp = serviceGroupForRoute(String(r));
                             nextFareUsed = grp;
@@ -740,20 +870,29 @@ export class JourneyPlanner {
                         }
                         tryRelax(cur.sid, r, cur.transfers, cost2, key(cur.sid, cur.rid, cur.fareUsed || ''), nextFareUsed);
                     } else if (r !== cur.rid) {
-                        // transfer penalty per mode with service-type awareness
+                        // Progressive transfer penalty for in-place transfers
+                        const nextTransfers = cur.transfers + 1;
+                        const baseTransferPenalty = getTransferPenalty(nextTransfers);
+                        
                         let basePen;
                         if (mode === 'cheapest') {
                             const fromGrp = serviceGroupForRoute(cur.rid);
                             const toGrp = serviceGroupForRoute(String(r));
-                            // Strong penalty for integrasi transfers, lighter for BRT platform changes
-                            basePen = Math.round(BIG * ((fromGrp === 'BRT' && toGrp === 'BRT') ? 0.3 : 1.2));
+                            // Lighter for BRT-to-BRT, heavier for cross-system
+                            const multiplier = (fromGrp === 'BRT' && toGrp === 'BRT') ? 0.5 : 1.3;
+                            basePen = Math.round(baseTransferPenalty * multiplier);
                         } else if (mode === 'fastest') {
-                            basePen = Math.round(BIG * 0.8); // Increased penalty to reduce transfers
+                            basePen = Math.round(baseTransferPenalty * 0.9);
                         } else {
-                            basePen = Math.round(BIG * 1.0); // Full penalty for balanced mode
+                            basePen = Math.round(baseTransferPenalty);
                         }
+                        
                         let cost2 = cur.cost + basePen;
                         let nextFareUsed = cur.fareUsed || '';
+                        // JAK route penalty for transfers
+                        if (isJAKRoute(String(r))) {
+                            cost2 += JAK_PENALTY;
+                        }
                         if (mode === 'cheapest') {
                             const grp = serviceGroupForRoute(String(r));
                             nextFareUsed = grp;
@@ -1116,35 +1255,85 @@ export class JourneyPlanner {
     _estimateFare(legs) {
         try {
             const gtfs = this.app.modules.gtfs;
-            const fareRules = gtfs.getFareRules ? (gtfs.getFareRules() || []) : [];
-            const fareAttrs = gtfs.getFareAttributes ? (gtfs.getFareAttributes() || []) : [];
-            if (!fareRules.length || !fareAttrs.length || !legs || !legs.length) return null;
-            const attrsById = new Map(fareAttrs.map(a => [String(a.fare_id||''), a]));
-            // Map route_id -> first fare_id found
-            const fareIdByRoute = new Map();
-            for (const fr of fareRules) {
-                const rid = String(fr.route_id||'');
-                const fid = String(fr.fare_id||'');
-                if (rid && fid && !fareIdByRoute.has(rid)) fareIdByRoute.set(rid, fid);
-            }
-            const usedFareIds = new Set();
+            const routes = gtfs.getRoutes() || [];
+            const stops = gtfs.getStops() || [];
+            const stopsById = new Map(stops.map(s => [String(s.stop_id||''), s]));
+            
+            if (!legs || !legs.length) return null;
+            
+            // Helper to check if stop is at BRT halte (NOT Pengumpan/Feeder halte)
+            const isAtBRTHalte = (stopId) => {
+                const sid = String(stopId || '');
+                // BRT halte: stop_id does NOT start with 'B'
+                // Pengumpan halte: stop_id starts with 'B'
+                return !sid.startsWith('B');
+            };
+            
             let total = 0;
             const breakdown = [];
-            for (const leg of legs) {
+            let paidBRTIntegration = false; // Track if we've entered BRT system (paid once)
+            
+            for (let i = 0; i < legs.length; i++) {
+                const leg = legs[i];
                 const rid = String(leg.routeId||'');
-                const fid = fareIdByRoute.get(rid);
-                if (!fid || usedFareIds.has(fid)) continue; // de-dup same fare product (integrasi)
-                const attr = attrsById.get(fid);
-                if (!attr) continue;
-                const price = parseInt(attr.price, 10);
-                if (isFinite(price)) {
-                    total += price;
-                    usedFareIds.add(fid);
-                    breakdown.push({ fare_id: fid, price, currency: attr.currency_type || '' });
+                const firstStopId = String(leg.stops[0] || '');
+                const lastStopId = String(leg.stops[leg.stops.length - 1] || '');
+                
+                const startAtBRT = isAtBRTHalte(firstStopId);
+                const endAtBRT = isAtBRTHalte(lastStopId);
+                
+                let fare = 0;
+                
+                if (i === 0) {
+                    // First leg: check where it starts
+                    if (startAtBRT) {
+                        // Starting at BRT halte: pay BRT integration
+                        fare = 3500;
+                        paidBRTIntegration = true;
+                    } else {
+                        // Starting at Pengumpan halte: pay feeder fare
+                        fare = 3500;
+                        paidBRTIntegration = false;
+                    }
+                } else {
+                    // Subsequent legs: check if we're still in BRT system
+                    if (startAtBRT) {
+                        // Transit at BRT halte
+                        if (paidBRTIntegration) {
+                            // Already paid BRT integration: FREE
+                            fare = 0;
+                        } else {
+                            // Coming from Pengumpan, now at BRT halte: pay BRT
+                            fare = 3500;
+                            paidBRTIntegration = true;
+                        }
+                    } else {
+                        // Transit at Pengumpan halte (B-prefix)
+                        // Always pay when going to/from Pengumpan halte
+                        fare = 3500;
+                        paidBRTIntegration = false;
+                    }
+                }
+                
+                if (fare > 0) {
+                    total += fare;
+                    const stopName = stopsById.get(firstStopId)?.stop_name || firstStopId;
+                    breakdown.push({ 
+                        route_id: rid,
+                        stop_name: stopName,
+                        price: fare, 
+                        currency: 'IDR',
+                        type: startAtBRT ? 'BRT/Integrated' : 'Pengumpan',
+                        reason: i === 0 ? 'Initial boarding' : (startAtBRT && paidBRTIntegration ? 'BRT integration (free)' : 'New payment required')
+                    });
                 }
             }
+            
             return { total, breakdown };
-        } catch (e) { return null; }
+        } catch (e) { 
+            console.error('Error estimating fare:', e);
+            return null; 
+        }
     }
 
     _drawWalk(lat1, lon1, lat2, lon2, meta = {}) {

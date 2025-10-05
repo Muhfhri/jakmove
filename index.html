@@ -283,9 +283,18 @@
                                 <img class="brand-title" alt="JakMove">
                             </div>
                             <div class="slogan-container">
-                                <h2 class="brand-slogan lingkar">Smart Transit Experience</h2>
-                                <div class="slogan-line-wrapper">
-                                    <div class="slogan-line-animated"></div>
+                                <h2 class="brand-slogan slogan-rotator" data-slogans='["Smart Transit Experience", "Perjalanan Jadi Mudah", "Transportasi Modern", "Keliling Jakarte nyok", "Orang Jakarte naek Transum", "by Muhfhri"]'>
+                                    <span class="slogan-text lingkar">Smart Transit Experience</span>
+                                </h2>
+                                <div class="slogan-underline-wrapper">
+                                    <svg class="slogan-underline-svg" viewBox="0 0 300 20" preserveAspectRatio="none">
+                                        <path class="slogan-underline-path" d="M5,12 Q30,8 50,10 T100,12 Q130,10 160,12 T210,10 Q240,12 270,10 T295,12" 
+                                              fill="none" 
+                                              stroke="currentColor" 
+                                              stroke-width="3" 
+                                              stroke-linecap="round"
+                                              stroke-linejoin="round"/>
+                                    </svg>
                                 </div>
                     </div>
                 </div>
@@ -325,7 +334,7 @@
                             </button>
             </div>
 
-                        <div class="info-card status-card">
+                        <div class="info-card status-card" id="activeRoutesCard" style="cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;">
                             <div class="status-indicator-modern">
                                 <div class="status-dot-pulse"></div>
                                 <div class="status-content-wrapper">
@@ -921,37 +930,60 @@
             </div>
         </div>
 
-        <!-- Weather Detail Modal -->
-        <div class="modal fade" id="weatherDetailModal" tabindex="-1" aria-labelledby="weatherDetailLabel" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="weatherDetailLabel">Cuaca Lengkap</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <!-- Modern Weather Detail Modal -->
+        <div id="weatherDetailModal" class="modern-weather-modal">
+            <div class="modern-weather-modal-backdrop"></div>
+            <div class="modern-weather-modal-content">
+                <div class="modern-weather-modal-header">
+                    <div class="modern-weather-modal-title">
+                        <iconify-icon icon="mdi:weather-partly-cloudy" style="font-size: 24px; color: #3b82f6;"></iconify-icon>
+                        <h3>Informasi Cuaca</h3>
                     </div>
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="radio" name="weatherSource" id="weatherSrcCurrent" value="current" checked>
-                                <label class="form-check-label" for="weatherSrcCurrent">Lokasi saya</label>
+                    <button class="modern-weather-modal-close" id="closeWeatherModal">
+                        <iconify-icon icon="mdi:close"></iconify-icon>
+                    </button>
                             </div>
-                            <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="radio" name="weatherSource" id="weatherSrcCustom" value="custom">
-                                <label class="form-check-label" for="weatherSrcCustom">Kustom</label>
-                            </div>
-                        </div>
-                        <div id="weatherCustomRow" class="d-flex gap-2 align-items-center mb-3" style="display:none;">
-                            <input type="text" class="form-control" id="weatherCustomQuery" placeholder="Ketik kota/alamat (mis. Lebak Bulus)">
-                            <button class="btn btn-outline-primary" id="weatherCustomSearchBtn"><i class="fa-solid fa-magnifying-glass"></i></button>
-                        </div>
-                        <div id="weatherDetailContent" class="small"></div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Tutup</button>
-                        <button type="button" class="btn btn-primary" id="weatherDetailRefreshBtn">
-                            <i class="fa-solid fa-rotate"></i> Perbarui
+                
+                <div class="modern-weather-modal-body">
+                    <!-- Source Selector -->
+                    <div class="weather-source-selector">
+                        <button class="weather-source-btn active" id="weatherSrcCurrent" data-source="current">
+                            <iconify-icon icon="mdi:crosshairs-gps"></iconify-icon>
+                            <span>Lokasi Saya</span>
                         </button>
+                        <button class="weather-source-btn" id="weatherSrcCustom" data-source="custom">
+                            <iconify-icon icon="mdi:map-marker"></iconify-icon>
+                            <span>Lokasi Lain</span>
+                        </button>
+                            </div>
+
+                    <!-- Custom Location Search -->
+                    <div id="weatherCustomRow" class="weather-custom-search" style="display: none;">
+                        <div class="weather-search-input-group">
+                            <iconify-icon icon="mdi:magnify" class="search-icon"></iconify-icon>
+                            <input type="text" id="weatherCustomQuery" placeholder="Cari lokasi (mis. Monas, Jakarta)">
+                            <button id="weatherCustomSearchBtn" class="search-btn">
+                                <iconify-icon icon="mdi:arrow-right"></iconify-icon>
+                            </button>
+                        </div>
+                        </div>
+
+                    <!-- Weather Content -->
+                    <div id="weatherDetailContent" class="weather-detail-content">
+                        <div class="weather-loading-state">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
                     </div>
+                            <p>Memuat data cuaca...</p>
+                    </div>
+                    </div>
+                </div>
+
+                <div class="modern-weather-modal-footer">
+                    <button type="button" class="weather-refresh-btn" id="weatherDetailRefreshBtn">
+                        <iconify-icon icon="mdi:refresh"></iconify-icon>
+                        <span>Perbarui Data</span>
+                    </button>
                 </div>
             </div>
         </div>
@@ -1336,6 +1368,55 @@
                     rotator.classList.add('swipe-in');
                 }, 500); // match animation duration
             }, 3000);
+        });
+    </script>
+
+    <!-- Slogan Rotator Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const sloganRotator = document.querySelector('.slogan-rotator');
+            if (!sloganRotator) return;
+            
+            const slogansData = sloganRotator.getAttribute('data-slogans');
+            const slogans = JSON.parse(slogansData);
+            const fontClasses = ['lingkar', 'lancip', 'lingkar', 'lancip', 'lingkar']; // Alternate between fonts
+            
+            if (slogans.length === 0) return;
+            
+            let currentIndex = 0;
+            const sloganText = sloganRotator.querySelector('.slogan-text');
+            
+            function updateSlogan() {
+                // Fade out
+                sloganText.style.opacity = '0';
+                sloganText.style.transform = 'translateY(10px)';
+                
+                setTimeout(() => {
+                    // Update text and font class
+                    currentIndex = (currentIndex + 1) % slogans.length;
+                    sloganText.textContent = slogans[currentIndex];
+                    
+                    // Remove all font classes and add new one
+                    sloganText.classList.remove('lingkar', 'lancip');
+                    sloganText.classList.add(fontClasses[currentIndex % fontClasses.length]);
+                    
+                    // Trigger reflow
+                    void sloganText.offsetWidth;
+                    
+                    // Fade in with animation
+                    sloganText.style.opacity = '1';
+                    sloganText.style.transform = 'translateY(0)';
+                    
+                    // Re-trigger animation
+                    sloganText.style.animation = 'none';
+                    setTimeout(() => {
+                        sloganText.style.animation = 'sloganFadeIn 0.6s ease-in-out';
+                    }, 10);
+                }, 400);
+            }
+            
+            // Change slogan every 4 seconds
+            setInterval(updateSlogan, 4000);
         });
     </script>
 
@@ -2157,11 +2238,12 @@
                     }
                 } catch (e) {}
 
-                // Weather detail modal logic
+                // Modern Weather Modal Logic
                 try {
                     const refreshBtn = document.getElementById('refreshWeatherBtn');
                     const modalEl = document.getElementById('weatherDetailModal');
-                    const modal = modalEl ? new bootstrap.Modal(modalEl) : null;
+                    const closeModalBtn = document.getElementById('closeWeatherModal');
+                    const modalBackdrop = document.querySelector('.modern-weather-modal-backdrop');
                     const content = document.getElementById('weatherDetailContent');
                     const srcCurrent = document.getElementById('weatherSrcCurrent');
                     const srcCustom = document.getElementById('weatherSrcCustom');
@@ -2170,13 +2252,50 @@
                     const customBtn = document.getElementById('weatherCustomSearchBtn');
                     const detailRefresh = document.getElementById('weatherDetailRefreshBtn');
                     const infoSpan = document.getElementById('weather-info');
+                    const weatherCard = document.querySelector('.info-card:has(#weather-info)');
 
+                    // Modal controls
+                    const showModal = () => {
+                        if (modalEl) {
+                            modalEl.classList.add('show');
+                            document.body.style.overflow = 'hidden';
+                        }
+                    };
+
+                    const hideModal = () => {
+                        if (modalEl) {
+                            modalEl.classList.remove('show');
+                            document.body.style.overflow = '';
+                        }
+                    };
+
+                    // Close modal handlers
+                    if (closeModalBtn) closeModalBtn.addEventListener('click', hideModal);
+                    if (modalBackdrop) modalBackdrop.addEventListener('click', hideModal);
+
+                    // Source selector buttons
                     function setCustomVisible() {
                         if (!customRow) return;
-                        customRow.style.display = srcCustom && srcCustom.checked ? 'flex' : 'none';
+                        const isCustom = srcCustom && srcCustom.classList.contains('active');
+                        customRow.style.display = isCustom ? 'block' : 'none';
                     }
-                    if (srcCurrent) srcCurrent.addEventListener('change', setCustomVisible);
-                    if (srcCustom) srcCustom.addEventListener('change', setCustomVisible);
+
+                    if (srcCurrent) {
+                        srcCurrent.addEventListener('click', () => {
+                            srcCurrent.classList.add('active');
+                            srcCustom.classList.remove('active');
+                            setCustomVisible();
+                            loadDetailFromCurrent();
+                        });
+                    }
+
+                    if (srcCustom) {
+                        srcCustom.addEventListener('click', () => {
+                            srcCustom.classList.add('active');
+                            srcCurrent.classList.remove('active');
+                            setCustomVisible();
+                        });
+                    }
 
                     async function geocodeQuery(q) {
                         // Simple Nominatim geocoding (no key)
@@ -2205,37 +2324,63 @@
                             const icon = (window.weatherIcons && window.weatherIcons[w.icon]) || '🌤️';
                             const loc = locationLabel || (data.name ? `${data.name}${sys.country ? ', ' + sys.country : ''}` : 'Lokasi');
                             const alerts = (data.alerts && data.alerts.length) ? data.alerts : [];
+                            
                             content.innerHTML = `
-                                <div class="d-flex align-items-center gap-2 mb-2">
-                                    <div style="font-size:1.4rem">${icon}</div>
+                                <div style="text-align: center; margin-bottom: 24px;">
+                                    <div style="font-size: 4rem; margin-bottom: 12px;">${icon}</div>
+                                    <h4 style="margin: 0 0 4px 0; font-weight: 700; color: #111827;">${loc}</h4>
+                                    <p style="margin: 0; color: #6b7280; text-transform: capitalize; font-size: 0.95rem;">${w.description||''}</p>
+                                </div>
+                                
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+                                    <div class="weather-stat-card" style="background: white; padding: 20px; border-radius: 12px; text-align: center; border: 1px solid #e5e7eb;">
+                                        <iconify-icon icon="mdi:thermometer" style="font-size: 32px; color: #ef4444; margin-bottom: 8px;"></iconify-icon>
+                                        <div class="weather-stat-value" style="font-size: 2rem; font-weight: 700; color: #111827; margin-bottom: 4px;">${Math.round(main.temp)}°C</div>
+                                        <div class="weather-stat-label" style="font-size: 0.85rem; color: #6b7280;">Terasa ${Math.round(main.feels_like||main.temp)}°C</div>
+                                    </div>
+                                    
+                                    <div class="weather-stat-card" style="background: white; padding: 20px; border-radius: 12px; text-align: center; border: 1px solid #e5e7eb;">
+                                        <iconify-icon icon="mdi:water-percent" style="font-size: 32px; color: #3b82f6; margin-bottom: 8px;"></iconify-icon>
+                                        <div class="weather-stat-value" style="font-size: 2rem; font-weight: 700; color: #111827; margin-bottom: 4px;">${main.humidity||0}%</div>
+                                        <div class="weather-stat-label" style="font-size: 0.85rem; color: #6b7280;">Kelembaban</div>
+                                    </div>
+                                </div>
+                                
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                                    <div class="weather-stat-card" style="background: white; padding: 16px; border-radius: 12px; border: 1px solid #e5e7eb; display: flex; align-items: center; gap: 12px;">
+                                        <iconify-icon icon="mdi:gauge" style="font-size: 28px; color: #8b5cf6;"></iconify-icon>
                                     <div>
-                                        <div class="fw-bold">${loc}</div>
-                                        <div class="text-muted" style="font-size:0.9em">${(w.description||'').toUpperCase()}</div>
+                                            <div class="weather-stat-label" style="font-size: 0.8rem; color: #6b7280; margin-bottom: 2px;">Tekanan</div>
+                                            <div class="weather-stat-value" style="font-size: 1.1rem; font-weight: 700; color: #111827;">${main.pressure||0} hPa</div>
                                     </div>
                                 </div>
-                                <div class="row g-2">
-                                    <div class="col-6">
-                                        <div class="p-2 border rounded" style="background:#f8fafc"><span class="fw-semibold">Suhu:</span> ${Math.round(main.temp)}°C (feels ${Math.round(main.feels_like||main.temp)}°C)</div>
+                                    
+                                    <div class="weather-stat-card" style="background: white; padding: 16px; border-radius: 12px; border: 1px solid #e5e7eb; display: flex; align-items: center; gap: 12px;">
+                                        <iconify-icon icon="mdi:weather-windy" style="font-size: 28px; color: #10b981;"></iconify-icon>
+                                        <div>
+                                            <div class="weather-stat-label" style="font-size: 0.8rem; color: #6b7280; margin-bottom: 2px;">Angin</div>
+                                            <div class="weather-stat-value" style="font-size: 1.1rem; font-weight: 700; color: #111827;">${(wind.speed||0)} m/s</div>
                                     </div>
-                                    <div class="col-6">
-                                        <div class="p-2 border rounded" style="background:#f8fafc"><span class="fw-semibold">Kelembaban:</span> ${main.humidity||0}%</div>
                                     </div>
-                                    <div class="col-6">
-                                        <div class="p-2 border rounded" style="background:#f8fafc"><span class="fw-semibold">Tekanan:</span> ${main.pressure||0} hPa</div>
                                     </div>
-                                    <div class="col-6">
-                                        <div class="p-2 border rounded" style="background:#f8fafc"><span class="fw-semibold">Angin:</span> ${(wind.speed||0)} m/s</div>
+                                
+                                ${alerts.length ? `
+                                    <div style="margin-top: 16px; background: #fef3c7; border: 1px solid #fbbf24; padding: 16px; border-radius: 12px;">
+                                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                                            <iconify-icon icon="mdi:alert" style="font-size: 20px; color: #f59e0b;"></iconify-icon>
+                                            <div style="font-weight: 700; color: #92400e;">Peringatan Cuaca</div>
                                     </div>
+                                        ${alerts.map(a=>`<div style="color: #78350f; font-size: 0.9rem;">${a.event||'Alert'}</div>`).join('')}
                                 </div>
-                                ${alerts.length ? `<div class="mt-2 alert alert-warning p-2"><div class="fw-semibold mb-1">Peringatan Cuaca</div>${alerts.map(a=>`<div>${a.event||'Alert'}</div>`).join('')}</div>`:''}
+                                ` : ''}
                             `;
                         } catch (e) {
-                            content.innerHTML = '<div class="text-danger">Gagal merender detail cuaca.</div>';
+                            content.innerHTML = '<div style="text-align: center; color: #ef4444; padding: 40px 20px;"><iconify-icon icon="mdi:alert-circle" style="font-size: 48px; margin-bottom: 12px;"></iconify-icon><p>Gagal memuat detail cuaca</p></div>';
                         }
                     }
 
                     async function loadDetailFromCurrent() {
-                        content.innerHTML = '<div class="text-muted">Memuat cuaca lokasi saat ini...</div>';
+                        content.innerHTML = '<div class="weather-loading-state"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div><p>Memuat cuaca lokasi saat ini...</p></div>';
                         try {
                             // gunakan app location jika ada, fallback ke pusat peta
                             const mapMgr = app.modules.map;
@@ -2252,42 +2397,92 @@
                             const data = await fetchOWMByLatLon(lat, lon);
                             renderDetail(data);
                         } catch (e) {
-                            content.innerHTML = '<div class="text-danger">Tidak bisa memuat cuaca lokasi saat ini.</div>';
+                            content.innerHTML = '<div style="text-align: center; color: #ef4444; padding: 40px 20px;"><iconify-icon icon="mdi:alert-circle" style="font-size: 48px; margin-bottom: 12px;"></iconify-icon><p>Tidak bisa memuat cuaca lokasi saat ini</p></div>';
                         }
                     }
 
                     async function loadDetailFromCustom() {
                         const q = (customInput && customInput.value || '').trim();
-                        if (!q) { content.innerHTML = '<div class="text-muted">Masukkan nama lokasi terlebih dahulu.</div>'; return; }
-                        content.innerHTML = '<div class="text-muted">Mencari lokasi...</div>';
+                        if (!q) { 
+                            content.innerHTML = '<div style="text-align: center; color: #6b7280; padding: 40px 20px;"><iconify-icon icon="mdi:map-search" style="font-size: 48px; margin-bottom: 12px; opacity: 0.5;"></iconify-icon><p>Masukkan nama lokasi terlebih dahulu</p></div>'; 
+                            return; 
+                        }
+                        content.innerHTML = '<div class="weather-loading-state"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div><p>Mencari lokasi...</p></div>';
                         try {
                             const loc = await geocodeQuery(q);
                             const data = await fetchOWMByLatLon(loc.lat, loc.lon);
                             renderDetail(data, loc.display || q);
                         } catch (e) {
-                            content.innerHTML = '<div class="text-danger">Pencarian lokasi gagal.</div>';
+                            content.innerHTML = '<div style="text-align: center; color: #ef4444; padding: 40px 20px;"><iconify-icon icon="mdi:map-marker-off" style="font-size: 48px; margin-bottom: 12px;"></iconify-icon><p>Lokasi tidak ditemukan. Coba kata kunci lain.</p></div>';
                         }
                     }
 
                     if (customBtn) customBtn.addEventListener('click', loadDetailFromCustom);
-                    if (detailRefresh) detailRefresh.addEventListener('click', () => {
-                        if (srcCustom && srcCustom.checked) loadDetailFromCustom(); else loadDetailFromCurrent();
-                    });
-                    // Open detail from weather description (not refresh button)
-                    if (infoSpan && modal) {
-                        infoSpan.style.cursor = 'pointer';
-                        infoSpan.title = 'Detail cuaca';
-                        infoSpan.addEventListener('click', async () => {
-                            if (srcCurrent) srcCurrent.checked = true;
-                            setCustomVisible();
-                            await loadDetailFromCurrent();
-                            modal.show();
+                    if (customInput) {
+                        customInput.addEventListener('keypress', (e) => {
+                            if (e.key === 'Enter') loadDetailFromCustom();
                         });
                     }
-                } catch (e) {}
+                    if (detailRefresh) detailRefresh.addEventListener('click', () => {
+                        if (srcCustom && srcCustom.classList.contains('active')) loadDetailFromCustom(); 
+                        else loadDetailFromCurrent();
+                    });
+
+                    // Open modal from weather info span or card
+                    const openWeatherModal = async () => {
+                        if (srcCurrent) {
+                            srcCurrent.classList.add('active');
+                            srcCustom.classList.remove('active');
+                        }
+                            setCustomVisible();
+                        showModal();
+                            await loadDetailFromCurrent();
+                    };
+
+                    if (infoSpan) {
+                        infoSpan.style.cursor = 'pointer';
+                        infoSpan.title = 'Klik untuk detail cuaca';
+                        infoSpan.addEventListener('click', openWeatherModal);
+                    }
+
+                    if (weatherCard) {
+                        weatherCard.addEventListener('click', (e) => {
+                            // Don't trigger if clicking refresh button
+                            if (!e.target.closest('#refreshWeatherBtn')) {
+                                openWeatherModal();
+                            }
+                        });
+                    }
+                } catch (e) {
+                    console.error('Weather modal setup error:', e);
+                }
             })();
         });
     </script>
+
+    <!-- Active Routes Modal -->
+    <div id="activeRoutesModal" class="active-routes-modal">
+        <div class="active-routes-modal-backdrop"></div>
+        <div class="active-routes-modal-content">
+            <div class="active-routes-modal-header">
+                <div class="active-routes-modal-title">
+                    <div class="status-dot-pulse" style="width: 10px; height: 10px; margin-right: 8px;"></div>
+                    <h3>Layanan Aktif Saat Ini</h3>
+                </div>
+                <button class="active-routes-modal-close" id="closeActiveRoutesModal">
+                    <iconify-icon icon="mdi:close"></iconify-icon>
+                </button>
+            </div>
+            <div class="active-routes-modal-body" id="activeRoutesModalBody">
+                <div class="active-routes-loading">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p>Memuat layanan aktif...</p>
+                </div>
+            </div>
+        </div>
+    </div>
     
     <!-- Scroll Performance Optimization -->
     <script src="js/scroll-performance.js"></script>

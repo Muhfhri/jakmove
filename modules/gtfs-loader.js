@@ -73,28 +73,46 @@ export class GTFSLoader {
     }
 
     async processCachedData(cachedData) {
-        console.log('📦 Processing cached GTFS data (optimized)');
+        console.log('📦 Processing cached GTFS data (ultra-fast mode)');
         this.updateSlideNotification(15, '<i class="fas fa-bolt" style="color: #3b82f6;"></i> Memuat data dari cache...');
         
-        // Assign data quickly
+        // Assign data instantly - no processing needed
         Object.assign(this.data, cachedData);
         this.stopToRoutes = cachedData.stopToRoutes || {};
         
-        this.updateSlideNotification(85, '<i class="fas fa-wrench" style="color: #10b981;"></i> Menyiapkan data cache...');
-        console.log(`📋 Cache loaded: ${Object.keys(this.stopToRoutes).length} stop mappings`);
-        
-        // Ensure critical structures exist even when coming from cache
-        try {
-            this.validateData();
-        } catch (e) {
-            console.warn('Cached data validation triggered rebuild:', e?.message || e);
+        // Restore pre-built structures if available
+        if (cachedData.tripSequenceCache) {
+            this.tripSequenceCache = new Map(Object.entries(cachedData.tripSequenceCache));
         }
-        // Build essential structures that UI expects (cheap and fast)
-        try { this.buildTripSequenceCache(); } catch(_) {}
-        try { this.buildPlatformLookup(); } catch(_) {}
+        if (cachedData.platformLookup) {
+            this.platformLookup = new Map(Object.entries(cachedData.platformLookup));
+        }
+        if (cachedData.nextStopCache) {
+            this.nextStopCache = new Map(Object.entries(cachedData.nextStopCache));
+        }
         
-        // Process with cache flag (skip heavy work but keep consistency)
-        await this.unifiedDataProcessing('cache');
+        this.updateSlideNotification(95, '<i class="fas fa-check" style="color: #10b981;"></i> Cache siap digunakan!');
+        console.log(`⚡ Ultra-fast cache restored: ${Object.keys(this.stopToRoutes).length} stop mappings`);
+        
+        // Skip all validation and processing - cache is trusted
+        // Build structures lazily in background if missing
+        if (!cachedData.tripSequenceCache || !cachedData.platformLookup) {
+            this.scheduleBackgroundRebuild();
+        }
+    }
+    
+    scheduleBackgroundRebuild() {
+        // Use requestIdleCallback for non-blocking background work
+        const callback = window.requestIdleCallback || window.setTimeout;
+        callback(() => {
+            console.log('🔧 Building missing structures in background...');
+            try {
+                if (this.tripSequenceCache.size === 0) this.buildTripSequenceCache();
+                if (this.platformLookup.size === 0) this.buildPlatformLookup();
+            } catch (e) {
+                console.warn('Background rebuild failed:', e);
+            }
+        }, { timeout: 2000 });
     }
 
     // ======================================
@@ -224,19 +242,15 @@ export class GTFSLoader {
     // ======================================
     
     async unifiedDataProcessing(source) {
-        console.log(`🔄 Starting optimized processing for ${source} data`);
+        console.log(`🔄 Starting processing for ${source} data`);
         
         if (source === 'cache') {
-            // Fast track for cached data - minimal processing
-            this.updateSlideNotification(90, '<i class="fas fa-shield-alt" style="color: #10b981;"></i> Memvalidasi data cache...');
-            this.validateData();
-            
-            this.updateSlideNotification(95, '<i class="fas fa-bullseye" style="color: #f59e0b;"></i> Menyelesaikan cache...');
-            // Skip heavy processing for cache - data should already be good
-            this.performCrossValidation();
+            // Ultra-fast track: cache is pre-validated and pre-built, skip ALL processing
+            console.log('⚡ Cache loaded - skipping all processing (instant mode)');
+            // No validation, no building, nothing - data is ready to use immediately
             
         } else {
-            // Full processing for network data
+            // Full processing for network data only
             this.updateSlideNotification(90, '<i class="fas fa-search" style="color: #3b82f6;"></i> Memvalidasi data...');
             this.validateData();
             
@@ -247,7 +261,7 @@ export class GTFSLoader {
             await this.finalProcessing();
         }
         
-        console.log(`✅ Optimized processing completed for ${source}`);
+        console.log(`✅ Processing completed for ${source}`);
     }
 
     validateData() {
@@ -656,6 +670,10 @@ export class GTFSLoader {
     }
 
     compressDataForCache() {
+        // Build structures if not already built
+        if (this.tripSequenceCache.size === 0) this.buildTripSequenceCache();
+        if (this.platformLookup.size === 0) this.buildPlatformLookup();
+        
         return {
             stops: this.data.stops.map(s => ({
                 stop_id: s.stop_id,
@@ -689,7 +707,12 @@ export class GTFSLoader {
             frequencies: this.data.frequencies, fare_rules: this.data.fare_rules,
             fare_attributes: this.data.fare_attributes, transfers: this.data.transfers,
             calendar: this.data.calendar, agency: this.data.agency,
-            stopToRoutes: this.stopToRoutes, timestamp: Date.now()
+            stopToRoutes: this.stopToRoutes,
+            // Cache pre-built structures for instant loading
+            tripSequenceCache: Object.fromEntries(this.tripSequenceCache),
+            platformLookup: Object.fromEntries(this.platformLookup),
+            nextStopCache: Object.fromEntries(this.nextStopCache),
+            timestamp: Date.now()
         };
     }
 
@@ -758,6 +781,10 @@ export class GTFSLoader {
         localStorage.removeItem('jakmove_gtfs_last_modified');
         localStorage.removeItem('jakmove_gtfs_latest_file');
         localStorage.removeItem('jakmove_gtfs_etag');
+        
+        // Clear journey planner graph cache too
+        localStorage.removeItem('jp_graph_cache_v2');
+        console.log('🗑️ Cleared all caches including journey planner graph');
         
         try {
             const request = indexedDB.deleteDatabase('jakmove_cache');
