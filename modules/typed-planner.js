@@ -723,7 +723,34 @@ export class TypedPlanner {
             const mode = String(plan.mode || 'balanced');
             const modeLabel = mode === 'fastest' ? 'Tercepat' : (mode === 'cheapest' ? 'Terhemat' : 'Seimbang');
             const modeIcon = mode === 'fastest' ? 'mdi:speedometer' : (mode === 'cheapest' ? 'mdi:currency-usd' : 'fa-solid fa-scale-balanced');
-            const fareText = (() => { const f = plan.fare; if (f && isFinite(f.total)) { const rp = new Intl.NumberFormat('id-ID').format(f.total); return `Rp${rp}`; } return '-'; })();
+            const fareText = (() => { 
+                const f = plan.fare; 
+                if (f && isFinite(f.total)) { 
+                    const rp = new Intl.NumberFormat('id-ID').format(f.total); 
+                    
+                    // JakLingko savings display
+                    if (f.paymentMethod === 'jaklingko' && f.originalTotal && f.savings > 0) {
+                        const rpOriginal = new Intl.NumberFormat('id-ID').format(f.originalTotal);
+                        const rpSavings = new Intl.NumberFormat('id-ID').format(f.savings);
+                        return `
+                            <div style="display:flex;flex-direction:column;gap:4px;">
+                                <div style="font-size:0.75rem;color:#9ca3af;text-decoration:line-through;">
+                                    Rp${rpOriginal}
+                                </div>
+                                <div style="font-size:1rem;font-weight:700;color:#065f46;">
+                                    Rp${rp}
+                                </div>
+                                <div style="background:#10b981;color:white;font-size:0.7rem;padding:2px 6px;border-radius:4px;display:inline-block;width:fit-content;">
+                                    💰 -Rp${rpSavings}
+                                </div>
+                            </div>
+                        `;
+                    }
+                    
+                    return `Rp${rp}`; 
+                } 
+                return '-'; 
+            })();
             const durLabel = this.formatDuration(plan && plan.duration ? plan.duration.totalSec : 0);
             
             // Calculate ETA based on selected departure time

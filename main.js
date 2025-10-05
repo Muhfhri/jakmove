@@ -224,17 +224,17 @@ class TransJakartaApp {
             
             callback(() => {
                 try { 
-                    if (this.modules.map.loadStopsLazy) {
-                        this.modules.map.loadStopsLazy();
-                    }
+                if (this.modules.map.loadStopsLazy) {
+                    this.modules.map.loadStopsLazy();
+                }
                 } catch(e) {}
             }, { timeout: 1000 });
             
             callback(() => {
                 try { 
-                    if (this.modules.ui.populateDropdownsLazy) {
-                        this.modules.ui.populateDropdownsLazy();
-                    }
+                if (this.modules.ui.populateDropdownsLazy) {
+                    this.modules.ui.populateDropdownsLazy();
+                }
                 } catch(e) {}
             }, { timeout: 1500 });
         };

@@ -1024,28 +1024,66 @@ export class JourneyPlanner {
                 try { const [eLat, eLon] = segment[segment.length - 1]; this._addTextAt(eLat, eLon, `Turun di ${toStop?.stop_name || ''}`, color); } catch(e){}
                 // NO GAP BRIDGING - shapes should be accurate enough, and we don't want to add walks not in steps
             } else {
-                // Fallback: render stop-by-stop using shapes when possible
+                // Fallback: stitch per-stop segments into a single polyline (avoid label spam)
+                const firstStop = stopsById.get(String(leg.stops[0]));
+                const lastStop = stopsById.get(String(leg.stops[leg.stops.length - 1]));
+                const merged = [];
+
                 for (let i = 0; i < leg.stops.length - 1; i++) {
                     const a = stopsById.get(String(leg.stops[i]));
                     const b = stopsById.get(String(leg.stops[i+1]));
                     if (!a || !b) continue;
+
                     // Try to get shape segment for this stop pair
                     const tmpLeg = { routeId: leg.routeId, stops: [String(a.stop_id), String(b.stop_id)] };
                     const seg = this._computeShapeSegmentForLeg(tmpLeg, stopsById);
-                    const coords = (seg && seg.length >= 2) ? seg : [[parseFloat(a.stop_lat), parseFloat(a.stop_lon)], [parseFloat(b.stop_lat), parseFloat(b.stop_lon)]];
-                    this._drawPolyline(coords, color, 4.5, 0.9, null, { type: 'transit', routeId: String(leg.routeId), fromStopName: a?.stop_name, toStopName: b?.stop_name });
-                    try { if (!legEndpoints[index]) legEndpoints[index] = { start: coords[0], end: coords[coords.length-1], fromId: String(leg.stops[0]), toId: String(leg.stops[leg.stops.length-1]) }; else legEndpoints[index].end = coords[coords.length-1]; } catch(_) {}
-                    this._addLineLabel(coords, `Naik ${this._routeLabel(leg.routeId)}`, color);
+                    const coords = (seg && seg.length >= 2)
+                        ? seg
+                        : [[parseFloat(a.stop_lat), parseFloat(a.stop_lon)], [parseFloat(b.stop_lat), parseFloat(b.stop_lon)]];
+
+                    if (merged.length > 0 && coords.length > 0) {
+                        const last = merged[merged.length - 1];
+                        const first = coords[0];
+                        if (Math.abs(last[0] - first[0]) < 1e-6 && Math.abs(last[1] - first[1]) < 1e-6) {
+                            merged.push(...coords.slice(1));
+                        } else {
+                            merged.push(...coords);
+                        }
+                    } else {
+                        merged.push(...coords);
+                    }
+                }
+
+                if (merged.length >= 2) {
+                    this._drawPolyline(merged, color, 4.5, 0.9, null, {
+                        type: 'transit',
+                        routeId: String(leg.routeId),
+                        fromStopName: firstStop?.stop_name,
+                        toStopName: lastStop?.stop_name
+                    });
+
                     try {
-                        const [sLat, sLon] = coords[0];
-                        const plat = (a && String(a.platform_code || '').trim()) || '';
-                        if (i === 0) this._addTextAt(sLat, sLon, `Naik ${this._routeLabel(leg.routeId)} di ${a?.stop_name || ''}${plat ? ' (Platform ' + plat + ')' : ''}`, color);
-                    } catch(e){}
-                    try { 
-                        const [eLat, eLon] = coords[coords.length - 1]; 
-                        if (i === leg.stops.length - 2) this._addTextAt(eLat, eLon, `Turun di ${b?.stop_name || ''}`, color); 
-                    } catch(e){}
-                    // NO GAP BRIDGING in fallback mode either
+                        legEndpoints[index] = {
+                            start: merged[0],
+                            end: merged[merged.length - 1],
+                            fromId: String(leg.stops[0]),
+                            toId: String(leg.stops[leg.stops.length - 1])
+                        };
+                    } catch (_) {}
+
+                    // One label for entire leg
+                    this._addLineLabel(merged, `Naik ${this._routeLabel(leg.routeId)}`, color);
+
+                    // Start/end text once
+                    try {
+                        const [sLat, sLon] = merged[0];
+                        const plat = (firstStop && String(firstStop.platform_code || '').trim()) || '';
+                        this._addTextAt(sLat, sLon, `Naik ${this._routeLabel(leg.routeId)} di ${firstStop?.stop_name || ''}${plat ? ' (Platform ' + plat + ')' : ''}`, color);
+                    } catch (e) {}
+                    try {
+                        const [eLat, eLon] = merged[merged.length - 1];
+                        this._addTextAt(eLat, eLon, `Turun di ${lastStop?.stop_name || ''}`, color);
+                    } catch (e) {}
                 }
             }
             // Mark transfer at start of each subsequent leg
@@ -1262,6 +1300,11 @@ export class JourneyPlanner {
             const stopsById = new Map(stops.map(s => [String(s.stop_id||''), s]));
             const routesById = new Map(routes.map(r => [String(r.route_id||''), r]));
             
+            // Get payment method from UI
+            const paymentMethodEl = document.getElementById('jpPaymentMethod');
+            const paymentMethod = paymentMethodEl ? paymentMethodEl.value : 'jaklingko';
+            const useJakLingko = paymentMethod === 'jaklingko'; // JakLingko integration
+            
             // Build fare map: route_id -> fare
             const fareMap = new Map();
             fareRules.forEach(rule => {
@@ -1306,53 +1349,170 @@ export class JourneyPlanner {
                 const routeFare = getRouteFare(rid); // Get actual fare from GTFS
                 
                 let fare = 0;
+                let reason = '';
                 
-                if (i === 0) {
-                    // First leg: check where it starts
-                    if (startAtBRT) {
-                        // Starting at BRT halte: pay BRT integration (use route fare)
+                if (useJakLingko) {
+                    // ========================================
+                    // JAKLINGKO INTEGRATION MODE
+                    // ========================================
+                    // Logika:
+                    // 1. Rute GRATIS (fare = 0) tetap GRATIS
+                    // 2. BRT ke BRT = bayar normal (3500)
+                    // 3. BRT ke Pengumpan / Pengumpan ke BRT = integrasi max 5000 total
+                    // 4. Pengumpan ke Pengumpan = bayar normal per rute
+                    
+                    if (routeFare === 0) {
+                        // Rute GRATIS (BW9, JakLingko gratis, dll) - TETAP GRATIS!
+                        fare = 0;
+                        reason = 'Layanan Gratis';
+                    } else if (i === 0) {
+                        // First leg: bayar tarif normal
                         fare = routeFare;
-                        paidBRTIntegration = routeFare > 0; // Only mark as paid if fare > 0
+                        paidBRTIntegration = startAtBRT && routeFare > 0;
+                        reason = 'Boarding pertama';
                     } else {
-                        // Starting at Pengumpan halte: pay feeder fare (use route fare)
-                        fare = routeFare;
-                        paidBRTIntegration = false;
+                        // Transit
+                        const prevLeg = legs[i - 1];
+                        const prevLastStopId = String(prevLeg.stops[prevLeg.stops.length - 1] || '');
+                        const prevEndAtBRT = isAtBRTHalte(prevLastStopId);
+                        
+                        // Cek tipe transit
+                        const isBRTtoBRT = prevEndAtBRT && startAtBRT;
+                        const isPengumpanToPengumpan = !prevEndAtBRT && !startAtBRT;
+                        
+                        if (isBRTtoBRT && paidBRTIntegration) {
+                            // BRT ke BRT dengan integrasi yang sudah dibayar = GRATIS
+                            fare = 0;
+                            reason = 'Transit BRT (Integrasi)';
+                        } else {
+                            // Semua transit lainnya (BRT↔Pengumpan, Pengumpan↔Pengumpan)
+                            // Cek apakah total sudah mencapai 5000
+                            if (total >= 5000) {
+                                fare = 0;
+                                reason = 'Integrasi JakLingko (Max 5000 tercapai)';
+                            } else {
+                                const remaining = 5000 - total;
+                                fare = Math.min(routeFare, remaining);
+                                
+                                if (isPengumpanToPengumpan) {
+                                    reason = 'Transit Pengumpan (Integrasi JakLingko)';
+                                } else {
+                                    reason = 'Transit antar tipe halte (Integrasi JakLingko)';
+                                }
+                            }
+                            
+                            // Update BRT integration status
+                            if (startAtBRT) {
+                                paidBRTIntegration = true;
+                            } else {
+                                paidBRTIntegration = false;
+                            }
+                        }
+                    }
+                    
+                    if (fare > 0 || routeFare === 0) {
+                        total += fare;
+                        const stopName = stopsById.get(firstStopId)?.stop_name || firstStopId;
+                        breakdown.push({ 
+                            route_id: rid,
+                            stop_name: stopName,
+                            price: fare, 
+                            currency: 'IDR',
+                            type: routeFare === 0 ? 'Gratis' : (startAtBRT ? 'BRT' : 'Pengumpan'),
+                            reason: reason
+                        });
                     }
                 } else {
-                    // Subsequent legs: check if we're still in BRT system
-                    if (startAtBRT) {
-                        // Transit at BRT halte
-                        if (paidBRTIntegration) {
-                            // Already paid BRT integration: FREE
-                            fare = 0;
-                        } else {
-                            // Coming from Pengumpan, now at BRT halte: pay BRT (use route fare)
+                    // ========================================
+                    // REGULAR CARD MODE (Kartu Elektronik Biasa)
+                    // ========================================
+                    // Bayar penuh untuk setiap rute
+                    if (i === 0) {
+                        // First leg: check where it starts
+                        if (startAtBRT) {
+                            // Starting at BRT halte: pay BRT integration (use route fare)
                             fare = routeFare;
-                            paidBRTIntegration = routeFare > 0;
+                            paidBRTIntegration = routeFare > 0; // Only mark as paid if fare > 0
+                        } else {
+                            // Starting at Pengumpan halte: pay feeder fare (use route fare)
+                            fare = routeFare;
+                            paidBRTIntegration = false;
                         }
                     } else {
-                        // Transit at Pengumpan halte (B-prefix)
-                        // Always pay when going to/from Pengumpan halte (use route fare)
-                        fare = routeFare;
-                        paidBRTIntegration = false;
+                        // Subsequent legs: check if we're still in BRT system
+                        if (startAtBRT) {
+                            // Transit at BRT halte
+                            if (paidBRTIntegration) {
+                                // Already paid BRT integration: FREE
+                                fare = 0;
+                            } else {
+                                // Coming from Pengumpan, now at BRT halte: pay BRT (use route fare)
+                                fare = routeFare;
+                                paidBRTIntegration = routeFare > 0;
+                            }
+                        } else {
+                            // Transit at Pengumpan halte (B-prefix)
+                            // Always pay when going to/from Pengumpan halte (use route fare)
+                            fare = routeFare;
+                            paidBRTIntegration = false;
+                        }
                     }
-                }
-                
-                if (fare > 0) {
-                    total += fare;
-                    const stopName = stopsById.get(firstStopId)?.stop_name || firstStopId;
-                    breakdown.push({ 
-                        route_id: rid,
-                        stop_name: stopName,
-                        price: fare, 
-                        currency: 'IDR',
-                        type: startAtBRT ? 'BRT/Integrated' : 'Pengumpan',
-                        reason: i === 0 ? 'Initial boarding' : (startAtBRT && paidBRTIntegration ? 'BRT integration (free)' : 'New payment required')
-                    });
+                    
+                    // Cash mode fare tracking
+                    if (fare > 0) {
+                        total += fare;
+                        const stopName = stopsById.get(firstStopId)?.stop_name || firstStopId;
+                        breakdown.push({ 
+                            route_id: rid,
+                            stop_name: stopName,
+                            price: fare, 
+                            currency: 'IDR',
+                            type: startAtBRT ? 'BRT/Integrated' : 'Pengumpan',
+                            reason: i === 0 ? 'Initial boarding' : (startAtBRT && paidBRTIntegration ? 'BRT integration (free)' : 'New payment required')
+                        });
+                    }
                 }
             }
             
-            return { total, breakdown };
+            // Calculate original fare (without JakLingko) for comparison
+            let originalTotal = 0;
+            if (useJakLingko) {
+                for (let i = 0; i < legs.length; i++) {
+                    const leg = legs[i];
+                    const rid = String(leg.routeId||'');
+                    const routeFare = getRouteFare(rid);
+                    
+                    if (routeFare > 0) { // Skip free routes
+                        const firstStopId = String(leg.stops[0] || '');
+                        const startAtBRT = isAtBRTHalte(firstStopId);
+                        
+                        if (i === 0) {
+                            originalTotal += routeFare;
+                        } else {
+                            // Check if would get free BRT integration in regular mode
+                            const prevLeg = legs[i - 1];
+                            const prevLastStopId = String(prevLeg.stops[prevLeg.stops.length - 1] || '');
+                            const prevEndAtBRT = isAtBRTHalte(prevLastStopId);
+                            const isBRTtoBRT = prevEndAtBRT && startAtBRT;
+                            
+                            // In regular card mode, BRT to BRT is free if already paid BRT
+                            if (!(isBRTtoBRT && prevEndAtBRT)) {
+                                originalTotal += routeFare;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            const savings = useJakLingko ? (originalTotal - total) : 0;
+            
+            return { 
+                total, 
+                breakdown,
+                originalTotal: useJakLingko ? originalTotal : null,
+                savings: useJakLingko ? savings : null,
+                paymentMethod: paymentMethod
+            };
         } catch (e) { 
             console.error('Error estimating fare:', e);
             return null; 
@@ -1699,20 +1859,189 @@ export class JourneyPlanner {
     _computeShapeSegmentForLeg(leg, stopsById) {
         try {
             const rid = String(leg.routeId || '');
-            if (!rid) return null;
+            if (!rid) {
+                console.warn('⚠️ No route ID for leg');
+                return null;
+            }
             const gtfs = this.app.modules.gtfs;
             const routeMgr = this.app.modules.routes;
             const trips = (gtfs.getTrips() || []).filter(t => String(t.route_id || '') === rid);
-            if (!trips || trips.length === 0 || !routeMgr || typeof routeMgr.getShapesForTrips !== 'function') return null;
+            if (!trips || trips.length === 0) {
+                console.warn(`⚠️ No trips found for route ${rid}`);
+                return null;
+            }
+            if (!routeMgr || typeof routeMgr.getShapesForTrips !== 'function') {
+                console.warn('⚠️ RouteManager or getShapesForTrips not available');
+                return null;
+            }
             const shapes = routeMgr.getShapesForTrips(trips) || [];
+            if (shapes.length === 0) {
+                console.warn(`⚠️ No shapes found for route ${rid}`);
+                return null;
+            }
+            
             const firstStop = stopsById.get(String(leg.stops[0]));
             const lastStop = stopsById.get(String(leg.stops[leg.stops.length - 1]));
-            if (!firstStop || !lastStop) return null;
+            if (!firstStop || !lastStop) {
+                console.warn('⚠️ Cannot find first or last stop');
+                return null;
+            }
             const aLat = parseFloat(firstStop.stop_lat), aLon = parseFloat(firstStop.stop_lon);
             const bLat = parseFloat(lastStop.stop_lat), bLon = parseFloat(lastStop.stop_lon);
+            
+            console.log(`🔍 Finding shape for ${rid}: ${firstStop.stop_name} → ${lastStop.stop_name} (${leg.stops.length} stops, ${shapes.length} shapes available)`);
+
+            // Helper: project a point onto a polyline (sequence of {lat,lng})
+            const projectOnPolyline = (poly, lat, lon) => {
+                let best = { segIndex: -1, t: 0, lat: poly[0]?.lat, lon: poly[0]?.lng, d2: Infinity, measure: 0 };
+                for (let i = 1; i < poly.length; i++) {
+                    const ax = poly[i - 1].lng, ay = poly[i - 1].lat;
+                    const bx = poly[i].lng, by = poly[i].lat;
+                    const px = lon, py = lat;
+                    const abx = bx - ax, aby = by - ay;
+                    const apx = px - ax, apy = py - ay;
+                    const ab2 = abx * abx + aby * aby;
+                    let t = ab2 > 0 ? (apx * abx + apy * aby) / ab2 : 0;
+                    t = Math.max(0, Math.min(1, t));
+                    const qx = ax + abx * t;
+                    const qy = ay + aby * t;
+                    const dx = px - qx, dy = py - qy;
+                    const d2 = dx * dx + dy * dy;
+                    if (d2 < best.d2) {
+                        // Interpolate measure if available on poly
+                        let m = 0;
+                        if (typeof poly[i - 1]?.dist === 'number' && typeof poly[i]?.dist === 'number') {
+                            m = poly[i - 1].dist + t * (poly[i].dist - poly[i - 1].dist);
+                        } else {
+                            // Approximate by adding projected segment length to previous vertex
+                            const segLen = this._haversine(ay, ax, qy, qx);
+                            // Fallback without absolute baseline; keep 0
+                            m = segLen;
+                        }
+                        best = { segIndex: i, t, lat: qy, lon: qx, d2, measure: m };
+                    }
+                }
+                return best;
+            };
+
+            // Helper: slice polyline between two projections (inclusive)
+            const sliceByProjections = (poly, projA, projB) => {
+                if (!poly || poly.length < 2 || projA.segIndex < 1 || projB.segIndex < 1) return [];
+                // Ensure order along polyline
+                let aSeg = projA.segIndex, bSeg = projB.segIndex;
+                let aT = projA.t, bT = projB.t;
+                if (aSeg > bSeg || (aSeg === bSeg && aT > bT)) {
+                    [aSeg, bSeg] = [bSeg, aSeg];
+                    [aT, bT] = [bT, aT];
+                    [projA, projB] = [projB, projA];
+                }
+                const out = [];
+                // Start with projected A
+                out.push([projA.lat, projA.lon]);
+                // Add intermediate vertices from aSeg to bSeg-1
+                for (let i = aSeg; i < bSeg; i++) {
+                    out.push([poly[i].lat, poly[i].lng]);
+                }
+                // End with projected B
+                out.push([projB.lat, projB.lon]);
+                return out;
+            };
 
             let bestSeg = null;
             let bestScore = Infinity;
+
+            // ==========================================================
+            // Trip-aware segment extraction using stop_times + shapes
+            // Prefer a trip that contains BOTH first and last stops in order.
+            // If shapes carry shape_dist_traveled, slice by distance; else by index.
+            // ==========================================================
+            try {
+                const stopTimesAll = (gtfs.getStopTimes && gtfs.getStopTimes()) || [];
+                const shapesRaw = (gtfs.getShapes && gtfs.getShapes()) || [];
+
+                const stopTimesByTrip = new Map();
+                for (const st of stopTimesAll) {
+                    const tid = String(st.trip_id || '');
+                    if (!tid) continue;
+                    if (!stopTimesByTrip.has(tid)) stopTimesByTrip.set(tid, []);
+                    stopTimesByTrip.get(tid).push(st);
+                }
+
+                const shapePointsById = new Map();
+                const getShapePoints = (shapeId) => {
+                    if (!shapeId) return [];
+                    if (shapePointsById.has(shapeId)) return shapePointsById.get(shapeId);
+                    const rows = shapesRaw
+                        .filter(s => String(s.shape_id || '') === String(shapeId))
+                        .sort((a,b) => parseInt(a.shape_pt_sequence||'0') - parseInt(b.shape_pt_sequence||'0'));
+                    // Build points with cumulative distance
+                    const pts = [];
+                    let cum = 0;
+                    for (let i = 0; i < rows.length; i++) {
+                        const lat = parseFloat(rows[i].shape_pt_lat);
+                        const lng = parseFloat(rows[i].shape_pt_lon);
+                        let dist = rows[i].shape_dist_traveled != null ? parseFloat(rows[i].shape_dist_traveled) : NaN;
+                        if (!isFinite(dist)) {
+                            if (i === 0) cum = 0; else cum += this._haversine(rows[i-1].shape_pt_lat, rows[i-1].shape_pt_lon, lat, lng);
+                            dist = cum;
+                        }
+                        pts.push({ lat, lng, dist });
+                    }
+                    shapePointsById.set(shapeId, pts);
+                    return pts;
+                };
+
+                const firstStopId = String(leg.stops[0]);
+                const lastStopId = String(leg.stops[leg.stops.length - 1]);
+
+                for (const trip of trips) {
+                    const tid = String(trip.trip_id || '');
+                    const arr = (stopTimesByTrip.get(tid) || [])
+                        .sort((a,b) => parseInt(a.stop_sequence||'0') - parseInt(b.stop_sequence||'0'));
+                    if (arr.length === 0) continue;
+
+                    let idxFirst = -1, idxLast = -1;
+                    for (let i = 0; i < arr.length; i++) {
+                        const sid = String(arr[i].stop_id || '');
+                        if (sid === firstStopId && idxFirst === -1) idxFirst = i;
+                        if (sid === lastStopId) idxLast = i; // last occurrence for robustness
+                    }
+                    if (idxFirst === -1 || idxLast === -1 || idxLast <= idxFirst) continue;
+
+                    const shpPts = getShapePoints(trip.shape_id);
+                    if (!shpPts || shpPts.length < 2) continue;
+
+                    // Use precise projection to prevent overshoot beyond the stop
+                    const projA = projectOnPolyline(shpPts, aLat, aLon);
+                    const projB = projectOnPolyline(shpPts, bLat, bLon);
+                    if (projA.segIndex < 1 || projB.segIndex < 1) continue;
+
+                    // Enforce forward travel along shape in line with stop order
+                    if (projB.measure <= projA.measure + 1) {
+                        console.log(`  ⛔ Trip ${tid} direction opposite (measure ${projA.measure.toFixed(1)} → ${projB.measure.toFixed(1)}), skipping`);
+                        continue;
+                    }
+
+                    const seg = sliceByProjections(shpPts, projA, projB);
+                    if (seg.length < 2) continue;
+
+                    const dStart = this._haversine(aLat, aLon, seg[0][0], seg[0][1]);
+                    const dEnd = this._haversine(bLat, bLon, seg[seg.length - 1][0], seg[seg.length - 1][1]);
+                    const score = (dStart + dEnd) * 50 + (seg.length < 6 ? (6 - seg.length) * 1e-6 : 0);
+
+                    if (score < bestScore) {
+                        bestScore = score;
+                        bestSeg = seg;
+                        console.log(`  🚆 Trip-aware match via trip ${tid}: cut=${seg.length} pts, score=${score.toFixed(4)}`);
+                    }
+                }
+            } catch (e) {
+                console.warn('Trip-aware selection error:', e);
+            }
+
+            if (bestSeg && bestSeg.length >= 2) {
+                return bestSeg;
+            }
             // Limit work to avoid freezes
             const MAX_SHAPES = 60;
             let checked = 0;
@@ -1725,58 +2054,81 @@ export class JourneyPlanner {
                 // Ensure proper direction based on stop sequence
                 let i0 = idxA, i1 = idxB;
                 
-                // Check if we need to reverse based on actual route direction
-                // by looking at a few intermediate stops if available
-                if (leg.stops.length > 2) {
-                    const midStopId = leg.stops[Math.floor(leg.stops.length / 2)];
-                    const midStop = stopsById.get(String(midStopId));
-                    if (midStop) {
-                        const midLat = parseFloat(midStop.stop_lat);
-                        const midLon = parseFloat(midStop.stop_lon);
-                        const idxMid = this._nearestIdx(shp, midLat, midLon);
-                        
-                        // If middle stop suggests order, use it to determine direction
-                        if (idxMid >= 0) {
-                            // Check if midpoint is between start and end in shape
-                            const isForward = (idxA < idxMid && idxMid < idxB);
-                            const isBackward = (idxB < idxMid && idxMid < idxA);
-                            
-                            if (isForward) {
-                                // Normal forward order (A -> Mid -> B)
+                // Determine correct direction by checking multiple intermediate stops
+                let directionScore = 0;
+                let checkedStops = 0;
+                
+                // Check ALL intermediate stops to determine direction confidence
+                for (let stopIdx = 1; stopIdx < leg.stops.length - 1; stopIdx++) {
+                    const checkStopId = leg.stops[stopIdx];
+                    const checkStop = stopsById.get(String(checkStopId));
+                    if (!checkStop) continue;
+                    
+                    const checkLat = parseFloat(checkStop.stop_lat);
+                    const checkLon = parseFloat(checkStop.stop_lon);
+                    const idxCheck = this._nearestIdx(shp, checkLat, checkLon);
+                    
+                    if (idxCheck >= 0) {
+                        checkedStops++;
+                        // Check if this stop is between A and B in forward direction
+                        if (idxA < idxCheck && idxCheck < idxB) {
+                            directionScore++; // Vote for forward
+                        } else if (idxB < idxCheck && idxCheck < idxA) {
+                            directionScore--; // Vote for backward
+                        }
+                    }
+                }
+                
+                // Decide direction based on votes
+                if (checkedStops > 0) {
+                    console.log(`  📊 Direction votes: ${directionScore} from ${checkedStops} stops (idxA=${idxA}, idxB=${idxB})`);
+                    if (directionScore > 0) {
+                        // Majority votes forward: A -> B
                                 i0 = idxA;
                                 i1 = idxB;
-                            } else if (isBackward) {
-                                // Reversed order (B -> Mid -> A), swap them
+                        console.log(`  ➡️ Direction: FORWARD (${i0} → ${i1})`);
+                    } else if (directionScore < 0) {
+                        // Majority votes backward: B -> A
                                 i0 = idxB;
                                 i1 = idxA;
+                        console.log(`  ⬅️ Direction: BACKWARD (${i0} → ${i1})`);
                             } else {
-                                // Ambiguous case: use shortest path between A and B
-                                // ALWAYS prefer shorter segment over full shape
-                                if (i0 > i1) { const tmp = i0; i0 = i1; i1 = tmp; }
-                            }
+                        // Tie or no clear direction: use shortest path
+                        if (idxA < idxB) {
+                            i0 = idxA;
+                            i1 = idxB;
                         } else {
-                            // No midpoint found, ensure forward direction
-                            if (i0 > i1) { const tmp = i0; i0 = i1; i1 = tmp; }
+                            i0 = idxB;
+                            i1 = idxA;
                         }
-                    } else {
-                        // No midpoint available, ensure forward direction
-                        if (i0 > i1) { const tmp = i0; i0 = i1; i1 = tmp; }
+                        console.log(`  ↔️ Direction: TIE, using shortest (${i0} → ${i1})`);
                     }
                 } else {
-                    // For 2-stop segments, ensure forward direction
-                    if (i0 > i1) { const tmp = i0; i0 = i1; i1 = tmp; }
+                    // No intermediate stops checked: use shortest path
+                    if (idxA < idxB) {
+                        i0 = idxA;
+                        i1 = idxB;
+                    } else {
+                        i0 = idxB;
+                        i1 = idxA;
+                    }
+                    console.log(`  ⚠️ No intermediate stops, using shortest path (${i0} → ${i1})`);
                 }
                 
                 // Check distance from start/end halte to nearest shape points BEFORE expansion
                 const distToStart = this._haversine(aLat, aLon, shp[i0].lat, shp[i0].lng);
                 const distToEnd = this._haversine(bLat, bLon, shp[i1].lat, shp[i1].lng);
                 
-                // CRITICAL: Reject if shape points are too far from actual halte
-                // This prevents using wrong segments (e.g., starting from Lapangan Banteng instead of Jembatan Merah)
-                if (distToStart > 100 || distToEnd > 100) {
-                    console.warn(`⚠️ Rejecting segment: too far from halte (start: ${distToStart.toFixed(0)}m, end: ${distToEnd.toFixed(0)}m)`);
+                console.log(`  📏 Distance check: start=${distToStart.toFixed(0)}m, end=${distToEnd.toFixed(0)}m`);
+                
+                // VERY lenient distance check (500m) for debugging
+                // We want to see shapes even if slightly misaligned
+                if (distToStart > 500 || distToEnd > 500) {
+                    console.warn(`  ❌ Rejecting segment: too far from halte (start: ${distToStart.toFixed(0)}m, end: ${distToEnd.toFixed(0)}m)`);
                     continue;
                 }
+                
+                console.log(`  ✅ Distance check passed!`);
                 
                 // Minimal expansion - only extend if very close to halte
                 let expansion = 0;
@@ -1785,14 +2137,19 @@ export class JourneyPlanner {
                 i0 = Math.max(0, i0 - expansion);
                 i1 = Math.min(shp.length - 1, i1 + expansion);
                 
-                // Validate segment length - reject if too long (likely wrong segment)
+                // Validate segment length - reject if unreasonably long
                 const segmentLength = Math.abs(i1 - i0);
-                const maxReasonableLength = Math.floor(shp.length * 0.7); // Max 70% of total shape
+                const maxReasonableLength = Math.floor(shp.length * 0.90); // Max 90% of total shape (VERY lenient for debug)
                 
-                if (segmentLength > maxReasonableLength) {
-                    console.warn(`⚠️ Rejecting segment: too long (${segmentLength}/${shp.length} points, ${Math.round(segmentLength/shp.length*100)}%)`);
+                console.log(`  📐 Segment length: ${segmentLength}/${shp.length} points (${Math.round(segmentLength/shp.length*100)}%)`);
+                
+                // Only reject if segment is suspiciously long AND endpoints are far
+                if (segmentLength > maxReasonableLength && (distToStart > 150 || distToEnd > 150)) {
+                    console.warn(`  ❌ Rejecting segment: too long AND far from haltes (${segmentLength}/${shp.length} points)`);
                     continue; // Skip this shape, try next one
                 }
+                
+                console.log(`  ✅ Segment length acceptable!`);
                 
                 const pts = shp.slice(i0, i1 + 1);
                 if (pts.length < 2) continue;
@@ -1813,8 +2170,13 @@ export class JourneyPlanner {
                 if (score < bestScore) {
                     bestScore = score;
                     bestSeg = pts.map(p => [p.lat, p.lng]);
-                    console.log(`✅ Found segment: ${segLen} points (${Math.round(segLen/shp.length*100)}% of shape), score: ${score.toFixed(6)}, distStart: ${distToStart.toFixed(0)}m, distEnd: ${distToEnd.toFixed(0)}m`);
-                    if (bestScore < 0.001) break; // good enough (very close match)
+                    console.log(`  🎯 NEW BEST: ${segLen} points (${Math.round(segLen/shp.length*100)}% of shape), score: ${score.toFixed(6)}, distStart: ${distToStart.toFixed(0)}m, distEnd: ${distToEnd.toFixed(0)}m`);
+                    if (bestScore < 0.001) {
+                        console.log(`  ⚡ Perfect match found, stopping search!`);
+                        break; // good enough (very close match)
+                    }
+                } else {
+                    console.log(`  ⏭️ Score ${score.toFixed(6)} not better than best ${bestScore.toFixed(6)}, skipping`);
                 }
             }
             
@@ -1823,12 +2185,13 @@ export class JourneyPlanner {
                 const segEnd = bestSeg[bestSeg.length - 1];
                 const finalDistStart = this._haversine(aLat, aLon, segStart[0], segStart[1]);
                 const finalDistEnd = this._haversine(bLat, bLon, segEnd[0], segEnd[1]);
-                console.log(`🎯 Using best segment for ${this._routeLabel(rid)}: ${bestSeg.length} points`);
+                console.log(`✅ SUCCESS! Using segment for ${this._routeLabel(rid)}: ${bestSeg.length} points`);
                 console.log(`   From: ${firstStop.stop_name} (offset: ${finalDistStart.toFixed(0)}m)`);
                 console.log(`   To: ${lastStop.stop_name} (offset: ${finalDistEnd.toFixed(0)}m)`);
                 console.log(`   Best score: ${bestScore.toFixed(6)}`);
             } else {
-                console.warn(`⚠️ No valid segment found for ${this._routeLabel(rid)} (${firstStop.stop_name} → ${lastStop.stop_name})`);
+                console.error(`❌ FAILED! No valid segment found for ${this._routeLabel(rid)} (${firstStop.stop_name} → ${lastStop.stop_name})`);
+                console.error(`   Checked ${Math.min(checked, shapes.length)} shapes, all were rejected!`);
             }
             
             return bestSeg;
@@ -1925,7 +2288,31 @@ export class JourneyPlanner {
             const fare = this._lastPlan && this._lastPlan.fare;
             if (fare && isFinite(fare.total)) {
                 const rp = new Intl.NumberFormat('id-ID').format(fare.total);
+                
+                // JakLingko savings display
+                if (fare.paymentMethod === 'jaklingko' && fare.originalTotal && fare.savings > 0) {
+                    const rpOriginal = new Intl.NumberFormat('id-ID').format(fare.originalTotal);
+                    const rpSavings = new Intl.NumberFormat('id-ID').format(fare.savings);
+                    fareHtml = `
+                        <div style="background:linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);border:1px solid #a7f3d0;border-radius:10px;padding:10px;margin:6px 0 8px 0;">
+                            <div class="small" style="color:#065f46;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+                                <iconify-icon icon="mdi:ticket-percent" style="font-size:18px;color:#10b981;"></iconify-icon>
+                                <span>Hemat dengan JakLingko</span>
+                            </div>
+                            <div class="small" style="color:#374151;margin-bottom:4px;">
+                                <span style="text-decoration:line-through;color:#9ca3af;">Tarif Asli: Rp${rpOriginal}</span>
+                            </div>
+                            <div class="small" style="color:#065f46;font-weight:700;font-size:0.95rem;margin-bottom:4px;">
+                                Tarif JakLingko: Rp${rp}
+                            </div>
+                            <div class="small" style="background:#10b981;color:white;display:inline-block;padding:3px 8px;border-radius:6px;font-weight:600;">
+                                💰 Hemat Rp${rpSavings}
+                            </div>
+                        </div>
+                    `;
+                } else {
                 fareHtml = `<div class="small" style="color:#111827;margin:6px 0 8px 0;"><b>Perkiraan tarif:</b> Rp${rp}</div>`;
+                }
             }
         } catch (_) {}
         const mode = this._mode || 'balanced';

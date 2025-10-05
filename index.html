@@ -797,6 +797,24 @@
                             </div>
                         </div>
                         
+                        <!-- Payment Method -->
+                        <div class="mb-4">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                                <iconify-icon icon="mdi:credit-card-outline" class="text-muted"></iconify-icon>
+                                <span class="small text-muted fw-medium">Metode Pembayaran</span>
+                            </div>
+                            <div class="planner-payment-selector">
+                                <select id="jpPaymentMethod" class="planner-payment-select">
+                                    <option value="regular">Kartu Elektronik Biasa</option>
+                                    <option value="jaklingko" selected>Kartu Elektronik JakLingko</option>
+                                </select>
+                                <div class="payment-info">
+                                    <iconify-icon icon="mdi:information-outline"></iconify-icon>
+                                    <span id="paymentInfoText">Integrasi JakLingko: Transit antar tipe halte (BRT↔Pengumpan) maksimal Rp 5.000 total</span>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <div class="planner-modes mt-4">
                             <div class="d-flex align-items-center gap-2 mb-2">
                                 <iconify-icon icon="mdi:tune" class="text-muted"></iconify-icon>
@@ -1136,8 +1154,8 @@
                 </div>
             </div>
         </div>
-        
-    </div>
+
+                            </div>
     <!-- End of Main Content Area -->
     <!-- Modern Footer -->
     <footer class="modern-footer">
@@ -1387,6 +1405,34 @@
                     rotator.classList.add('swipe-in');
                 }, 500); // match animation duration
             }, 3000);
+        });
+    </script>
+
+    <!-- Payment Method Handler -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const paymentSelect = document.getElementById('jpPaymentMethod');
+            const paymentInfo = document.getElementById('paymentInfoText');
+            
+            if (paymentSelect && paymentInfo) {
+                paymentSelect.addEventListener('change', function() {
+                    const method = this.value;
+                    
+                    if (method === 'regular') {
+                        paymentInfo.textContent = 'Kartu Elektronik Biasa: Tarif penuh untuk setiap rute (BRT = 3500, Pengumpan = 3500)';
+                    } else {
+                        paymentInfo.textContent = 'Integrasi JakLingko: Transit antar tipe halte (BRT↔Pengumpan) maksimal Rp 5.000 total selama 3 jam';
+                    }
+                    
+                    // Trigger replan if journey planner exists and has active plan
+                    if (window.transJakartaApp && window.transJakartaApp.modules.journeyPlanner) {
+                        const jp = window.transJakartaApp.modules.journeyPlanner;
+                        if (jp.replan && typeof jp.replan === 'function') {
+                            jp.replan();
+                        }
+                    }
+                });
+            }
         });
     </script>
 
