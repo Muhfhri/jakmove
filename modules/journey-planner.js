@@ -1257,9 +1257,31 @@ export class JourneyPlanner {
             const gtfs = this.app.modules.gtfs;
             const routes = gtfs.getRoutes() || [];
             const stops = gtfs.getStops() || [];
+            const fareRules = gtfs.getFareRules() || [];
+            const fareAttributes = gtfs.getFareAttributes() || [];
             const stopsById = new Map(stops.map(s => [String(s.stop_id||''), s]));
+            const routesById = new Map(routes.map(r => [String(r.route_id||''), r]));
+            
+            // Build fare map: route_id -> fare
+            const fareMap = new Map();
+            fareRules.forEach(rule => {
+                const fareId = String(rule.fare_id || '');
+                const routeId = String(rule.route_id || '');
+                const fareAttr = fareAttributes.find(fa => String(fa.fare_id || '') === fareId);
+                if (fareAttr && routeId) {
+                    const price = parseFloat(fareAttr.price || 0);
+                    fareMap.set(routeId, price);
+                }
+            });
             
             if (!legs || !legs.length) return null;
+            
+            // Helper to get fare for a route
+            const getRouteFare = (routeId) => {
+                const fare = fareMap.get(String(routeId));
+                // Return fare from GTFS, or default 3500 if not found
+                return fare !== undefined ? fare : 3500;
+            };
             
             // Helper to check if stop is at BRT halte (NOT Pengumpan/Feeder halte)
             const isAtBRTHalte = (stopId) => {
@@ -1281,18 +1303,19 @@ export class JourneyPlanner {
                 
                 const startAtBRT = isAtBRTHalte(firstStopId);
                 const endAtBRT = isAtBRTHalte(lastStopId);
+                const routeFare = getRouteFare(rid); // Get actual fare from GTFS
                 
                 let fare = 0;
                 
                 if (i === 0) {
                     // First leg: check where it starts
                     if (startAtBRT) {
-                        // Starting at BRT halte: pay BRT integration
-                        fare = 3500;
-                        paidBRTIntegration = true;
+                        // Starting at BRT halte: pay BRT integration (use route fare)
+                        fare = routeFare;
+                        paidBRTIntegration = routeFare > 0; // Only mark as paid if fare > 0
                     } else {
-                        // Starting at Pengumpan halte: pay feeder fare
-                        fare = 3500;
+                        // Starting at Pengumpan halte: pay feeder fare (use route fare)
+                        fare = routeFare;
                         paidBRTIntegration = false;
                     }
                 } else {
@@ -1303,14 +1326,14 @@ export class JourneyPlanner {
                             // Already paid BRT integration: FREE
                             fare = 0;
                         } else {
-                            // Coming from Pengumpan, now at BRT halte: pay BRT
-                            fare = 3500;
-                            paidBRTIntegration = true;
+                            // Coming from Pengumpan, now at BRT halte: pay BRT (use route fare)
+                            fare = routeFare;
+                            paidBRTIntegration = routeFare > 0;
                         }
                     } else {
                         // Transit at Pengumpan halte (B-prefix)
-                        // Always pay when going to/from Pengumpan halte
-                        fare = 3500;
+                        // Always pay when going to/from Pengumpan halte (use route fare)
+                        fare = routeFare;
                         paidBRTIntegration = false;
                     }
                 }

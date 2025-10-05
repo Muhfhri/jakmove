@@ -272,9 +272,10 @@
                 <!-- Left: Main Title -->
                 <div class="col-lg-8 mb-3 mb-lg-0">
                     <div class="hero-content">
-                        <div class="hero-badge">
-                            <iconify-icon icon="mdi:bus-multiple"></iconify-icon>
-                            <span>Transjakarta & JakLingko</span>
+                        <!-- Sapaan -->
+                        <div class="betawi-greeting" id="betawiGreeting">
+                            <iconify-icon icon="mdi:hand-wave"></iconify-icon>
+                            <span class="greeting-text lancip">Selamat Pagi</span>
                         </div>
                         
                         <!-- Brand Logo & Slogan -->
@@ -714,6 +715,120 @@
 
     <!-- Main Content Area -->
     <div class="main-content container">
+        
+        <!-- ========================================
+             1. ROUTE PLANNER (PRIMARY ACTION)
+             Prioritas #1: User datang untuk plan journey
+        ======================================== -->
+        <div class="planner-section mb-4">
+            <div class="modern-card modern-planner-card">
+                <div class="modern-card-body p-4">
+                    <div class="planner-header-wrapper mb-4">
+                        <div class="card-header-content">
+                            <div class="card-icon-wrapper">
+                                <i class="fa-solid fa-city"></i>
+                            </div>
+                            <div>
+                                <h3 class="card-title plus-jakarta-sans">Perencanaan Rute</h3>
+                                <p class="card-subtitle">Temukan rute terbaik untuk perjalanan Anda</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="planner-form">
+                        <div class="row g-3 align-items-end">
+                            <div class="col-12 col-lg-5">
+                                <label for="jpFromInput" class="planner-label">Halte Keberangkatan</label>
+                                <div class="planner-input-wrapper">
+                                    <div class="planner-input-icon">
+                                        <iconify-icon icon="mdi:map-marker" class="text-success"></iconify-icon>
+                                    </div>
+                                    <input id="jpFromInput" class="planner-input" placeholder="Cari halte asal..." autocomplete="off">
+                                </div>
+                            </div>
+                            
+                            <div class="col-12 col-lg-1 d-flex justify-content-center">
+                                <button id="jpSwapBtn" type="button" class="planner-swap-btn" title="Tukar halte">
+                                    <iconify-icon icon="mdi:swap-vertical"></iconify-icon>
+                                </button>
+                            </div>
+                            
+                            <div class="col-12 col-lg-5">
+                                <label for="jpToInput" class="planner-label">Halte Tujuan</label>
+                                <div class="planner-input-wrapper">
+                                    <div class="planner-input-icon">
+                                        <iconify-icon icon="mdi:flag-checkered" class="text-danger"></iconify-icon>
+                                    </div>
+                                    <input id="jpToInput" class="planner-input" placeholder="Cari halte tujuan..." autocomplete="off">
+                                </div>
+                            </div>
+                            
+                            <div class="col-12 col-lg-1">
+                                <button id="jpPlanBtn" type="button" class="planner-search-btn w-100">
+                                    <iconify-icon icon="mdi:magnify"></iconify-icon>
+                                    <span>Cari Rute</span>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Departure Time -->
+                        <div class="mb-4">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                                <iconify-icon icon="mdi:clock-outline" class="text-muted"></iconify-icon>
+                                <span class="small text-muted fw-medium">Waktu Keberangkatan</span>
+                            </div>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <div class="planner-input-wrapper">
+                                        <div class="planner-input-icon">
+                                            <iconify-icon icon="mdi:calendar"></iconify-icon>
+                                        </div>
+                                        <input type="date" class="planner-input" id="jpDateInput" />
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="planner-input-wrapper">
+                                        <div class="planner-input-icon">
+                                            <iconify-icon icon="mdi:clock"></iconify-icon>
+                                        </div>
+                                        <input type="time" class="planner-input" id="jpTimeInput" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="planner-modes mt-4">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                                <iconify-icon icon="mdi:tune" class="text-muted"></iconify-icon>
+                                <span class="small text-muted fw-medium">Preferensi Rute</span>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2" id="jpModeGroup" role="group" aria-label="Mode Rute">
+                                <button type="button" class="planner-mode-btn active" data-mode="balanced">
+                                    <i class="fa-solid fa-scale-balanced"></i>
+                                    <span>Seimbang</span>
+                                </button>
+                                <button type="button" class="planner-mode-btn" data-mode="fastest">
+                                    <iconify-icon icon="mdi:speedometer"></iconify-icon>
+                                    <span>Tercepat</span>
+                                </button>
+                                <button type="button" class="planner-mode-btn" data-mode="cheapest">
+                                    <iconify-icon icon="mdi:currency-usd"></iconify-icon>
+                                    <span>Terhemat</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <datalist id="jpStopsList"></datalist>
+                    <div id="jpResults" class="planner-results mt-4"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================
+             2. INTERACTIVE MAP (VISUALIZATION)
+             Prioritas #2: Visualisasi hasil planning
+        ======================================== -->
         <!-- Map Section -->
         <div class="modern-card map-section mb-4">
             <div class="modern-card-header">
@@ -742,6 +857,10 @@
             </div>
         </div>
 
+        <!-- ========================================
+             3. SEARCH & SELECTION (EXPLORATION)
+             Prioritas #3: Eksplorasi layanan & halte
+        ======================================== -->
         <!-- Search & Selection Section -->
         <div class="modern-card search-section mb-4">
             <div class="modern-card-header">
@@ -988,6 +1107,10 @@
             </div>
         </div>
 
+        <!-- ========================================
+             4. SERVICE INFORMATION (DETAILS)
+             Prioritas #4: Detail rute yang dipilih
+        ======================================== -->
         <!-- Stops Section -->
         <div class="stops-section mb-4">
             <div class="modern-card">
@@ -1013,113 +1136,9 @@
                 </div>
             </div>
         </div>
-
-        <!-- Route Planner Section (placed below Informasi Layanan results) -->
-        <div class="planner-section mb-4">
-            <div class="modern-card modern-planner-card">
-                <div class="modern-card-body p-4">
-                    <div class="planner-header-wrapper mb-4">
-                        <div class="card-header-content">
-                            <div class="card-icon-wrapper">
-                                <i class="fa-solid fa-city"></i>
-                            </div>
-                            <div>
-                                <h3 class="card-title plus-jakarta-sans">Perencanaan Rute</h3>
-                                <p class="card-subtitle">Temukan rute terbaik untuk perjalanan Anda</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="planner-form">
-                        <div class="row g-3 align-items-end">
-                            <div class="col-12 col-lg-5">
-                                <label for="jpFromInput" class="planner-label">Halte Keberangkatan</label>
-                                <div class="planner-input-wrapper">
-                                    <div class="planner-input-icon">
-                                        <iconify-icon icon="mdi:map-marker" class="text-success"></iconify-icon>
-                                    </div>
-                                    <input id="jpFromInput" class="planner-input" placeholder="Cari halte asal..." autocomplete="off">
-                                </div>
-                            </div>
-                            
-                            <div class="col-12 col-lg-1 d-flex justify-content-center">
-                                <button id="jpSwapBtn" type="button" class="planner-swap-btn" title="Tukar halte">
-                                    <iconify-icon icon="mdi:swap-vertical"></iconify-icon>
-                                </button>
-                            </div>
-                            
-                            <div class="col-12 col-lg-5">
-                                <label for="jpToInput" class="planner-label">Halte Tujuan</label>
-                                <div class="planner-input-wrapper">
-                                    <div class="planner-input-icon">
-                                        <iconify-icon icon="mdi:flag-checkered" class="text-danger"></iconify-icon>
-                                    </div>
-                                    <input id="jpToInput" class="planner-input" placeholder="Cari halte tujuan..." autocomplete="off">
-                                </div>
-                            </div>
-                            
-                            <div class="col-12 col-lg-1">
-                                <button id="jpPlanBtn" type="button" class="planner-search-btn w-100">
-                                    <iconify-icon icon="mdi:magnify"></iconify-icon>
-                                    <span>Cari Rute</span>
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <!-- Departure Time -->
-                        <div class="mb-4">
-                            <div class="d-flex align-items-center gap-2 mb-2">
-                                <iconify-icon icon="mdi:clock-outline" class="text-muted"></iconify-icon>
-                                <span class="small text-muted fw-medium">Waktu Keberangkatan</span>
-                            </div>
-                            <div class="row g-2">
-                                <div class="col-6">
-                                    <div class="planner-input-wrapper">
-                                        <div class="planner-input-icon">
-                                            <iconify-icon icon="mdi:calendar"></iconify-icon>
-                                        </div>
-                                        <input type="date" class="planner-input" id="jpDateInput" />
-                                    </div>
-                                </div>
-                                <div class="col-6">
-                                    <div class="planner-input-wrapper">
-                                        <div class="planner-input-icon">
-                                            <iconify-icon icon="mdi:clock"></iconify-icon>
-                                        </div>
-                                        <input type="time" class="planner-input" id="jpTimeInput" />
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="planner-modes mt-4">
-                            <div class="d-flex align-items-center gap-2 mb-2">
-                                <iconify-icon icon="mdi:tune" class="text-muted"></iconify-icon>
-                                <span class="small text-muted fw-medium">Preferensi Rute</span>
-                            </div>
-                            <div class="d-flex flex-wrap gap-2" id="jpModeGroup" role="group" aria-label="Mode Rute">
-                                <button type="button" class="planner-mode-btn active" data-mode="balanced">
-                                    <i class="fa-solid fa-scale-balanced"></i>
-                                    <span>Seimbang</span>
-                                </button>
-                                <button type="button" class="planner-mode-btn" data-mode="fastest">
-                                    <iconify-icon icon="mdi:speedometer"></iconify-icon>
-                                    <span>Tercepat</span>
-                                </button>
-                                <button type="button" class="planner-mode-btn" data-mode="cheapest">
-                                    <iconify-icon icon="mdi:currency-usd"></iconify-icon>
-                                    <span>Terhemat</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <datalist id="jpStopsList"></datalist>
-                    <div id="jpResults" class="planner-results mt-4"></div>
-                </div>
-            </div>
-        </div>
+        
     </div>
+    <!-- End of Main Content Area -->
     <!-- Modern Footer -->
     <footer class="modern-footer">
         <div class="container">
@@ -1368,6 +1387,43 @@
                     rotator.classList.add('swipe-in');
                 }, 500); // match animation duration
             }, 3000);
+        });
+    </script>
+
+    <!-- Betawi Greeting Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const greetingEl = document.getElementById('betawiGreeting');
+            if (!greetingEl) return;
+            
+            const greetingText = greetingEl.querySelector('.greeting-text');
+            if (!greetingText) return;
+            
+            function updateBetawiGreeting() {
+                const hour = new Date().getHours();
+                let greeting = '';
+                
+                // Sapaan sesuai waktu (EYD)
+                if (hour >= 3 && hour < 10) {
+                    greeting = 'Selamat Pagi 🌅'; // Pagi (03:00 - 09:59)
+                } else if (hour >= 10 && hour < 15) {
+                    greeting = 'Selamat Siang ☀️'; // Siang (10:00 - 14:59)
+                } else if (hour >= 15 && hour < 18) {
+                    greeting = 'Selamat Sore 🌤️'; // Sore (15:00 - 17:59)
+                } else if (hour >= 18 && hour < 24) {
+                    greeting = 'Selamat Malam 🌙'; // Malam (18:00 - 23:59)
+                } else {
+                    greeting = 'Selamat Malam 🌃'; // Tengah malam (00:00 - 02:59)
+                }
+                
+                greetingText.textContent = greeting;
+            }
+            
+            // Update saat load
+            updateBetawiGreeting();
+            
+            // Update setiap 1 menit
+            setInterval(updateBetawiGreeting, 60000);
         });
     </script>
 
@@ -2466,19 +2522,51 @@
         <div class="active-routes-modal-content">
             <div class="active-routes-modal-header">
                 <div class="active-routes-modal-title">
-                    <div class="status-dot-pulse" style="width: 10px; height: 10px; margin-right: 8px;"></div>
-                    <h3>Layanan Aktif Saat Ini</h3>
+                    <iconify-icon icon="mdi:bus-multiple" style="font-size: 24px; color: #3b82f6; margin-right: 8px;"></iconify-icon>
+                    <h3>Daftar Layanan</h3>
                 </div>
                 <button class="active-routes-modal-close" id="closeActiveRoutesModal">
                     <iconify-icon icon="mdi:close"></iconify-icon>
                 </button>
             </div>
+            
+            <!-- Filter & Search Section -->
+            <div class="active-routes-controls">
+                <!-- Status Filter Tabs -->
+                <div class="active-routes-tabs">
+                    <button class="active-route-tab active" data-filter="active">
+                        <div class="status-dot-pulse" style="width: 8px; height: 8px; margin-right: 6px;"></div>
+                        <span>Aktif</span>
+                        <span class="tab-count" id="activeCount">0</span>
+                    </button>
+                    <button class="active-route-tab" data-filter="inactive">
+                        <iconify-icon icon="mdi:sleep"></iconify-icon>
+                        <span>Tidak Aktif</span>
+                        <span class="tab-count" id="inactiveCount">0</span>
+                    </button>
+                    <button class="active-route-tab" data-filter="all">
+                        <iconify-icon icon="mdi:format-list-bulleted"></iconify-icon>
+                        <span>Semua</span>
+                        <span class="tab-count" id="allCount">0</span>
+                    </button>
+                </div>
+                
+                <!-- Search Box -->
+                <div class="active-routes-search">
+                    <iconify-icon icon="mdi:magnify" class="search-icon"></iconify-icon>
+                    <input type="text" id="activeRoutesSearch" placeholder="Cari rute atau tujuan..." autocomplete="off">
+                    <button class="search-clear" id="clearActiveRoutesSearch" style="display: none;">
+                        <iconify-icon icon="mdi:close-circle"></iconify-icon>
+                    </button>
+                </div>
+            </div>
+            
             <div class="active-routes-modal-body" id="activeRoutesModalBody">
                 <div class="active-routes-loading">
                     <div class="spinner-border text-primary" role="status">
                         <span class="visually-hidden">Loading...</span>
                     </div>
-                    <p>Memuat layanan aktif...</p>
+                    <p>Memuat layanan...</p>
                 </div>
             </div>
         </div>

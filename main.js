@@ -697,34 +697,49 @@ class TransJakartaApp {
                 return;
             }
 
-            // Get active routes
-            const activeRoutes = routes.filter(route => {
+            // Categorize routes by status
+            const categorizedRoutes = {
+                active: [],
+                inactive: []
+            };
+
+            routes.forEach(route => {
                 try {
-                    return routeManager.isRouteActiveNow(route.route_id);
+                    const isActive = routeManager.isRouteActiveNow(route.route_id);
+                    if (isActive) {
+                        categorizedRoutes.active.push(route);
+                    } else {
+                        categorizedRoutes.inactive.push(route);
+                    }
                 } catch (e) {
-                    return false;
+                    categorizedRoutes.inactive.push(route);
                 }
             });
 
-            if (activeRoutes.length === 0) {
-                modalBody.innerHTML = '<div class="no-active-routes"><iconify-icon icon="mdi:bus-clock"></iconify-icon><p>Tidak ada layanan yang beroperasi saat ini</p></div>';
-                return;
-            }
-
             // Sort routes naturally
-            activeRoutes.sort((a, b) => this.modules.gtfs.naturalSort(a, b));
+            categorizedRoutes.active.sort((a, b) => this.modules.gtfs.naturalSort(a, b));
+            categorizedRoutes.inactive.sort((a, b) => this.modules.gtfs.naturalSort(a, b));
 
-            // Build routes list
-            const routesList = document.createElement('div');
-            routesList.className = 'active-routes-list';
+            // Store all routes for filtering/search
+            this.allRoutesData = {
+                active: categorizedRoutes.active,
+                inactive: categorizedRoutes.inactive,
+                all: [...categorizedRoutes.active, ...categorizedRoutes.inactive]
+            };
 
-            activeRoutes.forEach(route => {
-                const routeItem = this.createActiveRouteItem(route);
-                routesList.appendChild(routeItem);
-            });
+            // Update counts
+            document.getElementById('activeCount').textContent = categorizedRoutes.active.length;
+            document.getElementById('inactiveCount').textContent = categorizedRoutes.inactive.length;
+            document.getElementById('allCount').textContent = routes.length;
 
-            modalBody.innerHTML = '';
-            modalBody.appendChild(routesList);
+            // Setup filter tabs
+            this.setupActiveRoutesFilters();
+            
+            // Setup search
+            this.setupActiveRoutesSearch();
+
+            // Show active routes by default
+            this.filterActiveRoutes('active');
 
         } catch (error) {
             console.error('Error loading active routes:', error);
@@ -732,9 +747,99 @@ class TransJakartaApp {
         }
     }
 
-    createActiveRouteItem(route) {
+    setupActiveRoutesFilters() {
+        const tabs = document.querySelectorAll('.active-route-tab');
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Remove active class from all tabs
+                tabs.forEach(t => t.classList.remove('active'));
+                // Add active class to clicked tab
+                tab.classList.add('active');
+                
+                // Filter routes
+                const filter = tab.getAttribute('data-filter');
+                this.filterActiveRoutes(filter);
+            });
+        });
+    }
+
+    setupActiveRoutesSearch() {
+        const searchInput = document.getElementById('activeRoutesSearch');
+        const clearBtn = document.getElementById('clearActiveRoutesSearch');
+        
+        if (!searchInput || !clearBtn) return;
+
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.trim();
+            clearBtn.style.display = query ? 'flex' : 'none';
+            
+            // Get current filter
+            const activeTab = document.querySelector('.active-route-tab.active');
+            const filter = activeTab ? activeTab.getAttribute('data-filter') : 'active';
+            
+            this.filterActiveRoutes(filter, query);
+        });
+
+        clearBtn.addEventListener('click', () => {
+            searchInput.value = '';
+            clearBtn.style.display = 'none';
+            
+            const activeTab = document.querySelector('.active-route-tab.active');
+            const filter = activeTab ? activeTab.getAttribute('data-filter') : 'active';
+            this.filterActiveRoutes(filter);
+        });
+    }
+
+    filterActiveRoutes(filter, searchQuery = '') {
+        const modalBody = document.getElementById('activeRoutesModalBody');
+        if (!modalBody || !this.allRoutesData) return;
+
+        let routesToShow = [];
+        
+        // Select routes based on filter
+        if (filter === 'active') {
+            routesToShow = this.allRoutesData.active;
+        } else if (filter === 'inactive') {
+            routesToShow = this.allRoutesData.inactive;
+        } else {
+            routesToShow = this.allRoutesData.all;
+        }
+
+        // Apply search filter
+        if (searchQuery) {
+            const lowerQuery = searchQuery.toLowerCase();
+            routesToShow = routesToShow.filter(route => {
+                const shortName = (route.route_short_name || '').toLowerCase();
+                const longName = (route.route_long_name || '').toLowerCase();
+                return shortName.includes(lowerQuery) || longName.includes(lowerQuery);
+            });
+        }
+
+        // Display results
+        if (routesToShow.length === 0) {
+            const message = searchQuery 
+                ? 'Tidak ada rute yang cocok dengan pencarian' 
+                : (filter === 'active' ? 'Tidak ada layanan yang beroperasi saat ini' : 'Tidak ada layanan');
+            modalBody.innerHTML = `<div class="no-active-routes"><iconify-icon icon="mdi:${searchQuery ? 'magnify-close' : 'bus-clock'}"></iconify-icon><p>${message}</p></div>`;
+            return;
+        }
+
+        const routesList = document.createElement('div');
+        routesList.className = 'active-routes-list';
+
+        routesToShow.forEach(route => {
+            const isActive = this.allRoutesData.active.includes(route);
+            const routeItem = this.createActiveRouteItem(route, isActive);
+            routesList.appendChild(routeItem);
+        });
+
+        modalBody.innerHTML = '';
+        modalBody.appendChild(routesList);
+    }
+
+    createActiveRouteItem(route, isActive = true) {
         const item = document.createElement('div');
-        item.className = 'active-route-item';
+        item.className = `active-route-item ${isActive ? 'status-active' : 'status-inactive'}`;
         
         const routeShortName = route.route_short_name || route.route_id;
         const routeLongName = route.route_long_name || '';
@@ -742,7 +847,22 @@ class TransJakartaApp {
         
         // Get operating hours
         const hours = this.getRouteOperatingHours(route.route_id);
-        const hoursText = hours ? `${hours.start} - ${hours.end}` : 'Waktu operasional tidak tersedia';
+        let hoursText = 'Waktu operasional tidak tersedia';
+        let is24Hour = false;
+        
+        if (hours) {
+            // Use route-manager's formatOperatingHours logic
+            hoursText = this.formatOperatingHours(hours.start, hours.end);
+            
+            // Check if it's 24-hour service
+            if (hoursText.includes('24 jam') || hoursText.includes('24 Jam')) {
+                is24Hour = true;
+            }
+        }
+        
+        const statusIcon = isActive ? 'mdi:check-circle' : 'mdi:sleep';
+        const statusText = isActive ? 'Beroperasi' : 'Tidak Beroperasi';
+        const statusClass = isActive ? 'status-operating' : 'status-closed';
         
         item.innerHTML = `
             <div class="active-route-badge" style="background: ${routeColor};">
@@ -752,13 +872,13 @@ class TransJakartaApp {
                 <div class="active-route-name" title="${routeLongName}">
                     ${routeLongName || routeShortName}
                 </div>
-                <div class="active-route-time">
-                    <iconify-icon icon="mdi:clock-outline"></iconify-icon>
+                <div class="active-route-time ${is24Hour ? 'time-24hour' : ''}">
+                    <iconify-icon icon="${is24Hour ? 'mdi:clock-fast' : 'mdi:clock-outline'}"></iconify-icon>
                     ${hoursText}
                 </div>
-                <div class="active-route-status">
-                    <iconify-icon icon="mdi:check-circle"></iconify-icon>
-                    Beroperasi
+                <div class="active-route-status ${statusClass}">
+                    <iconify-icon icon="${statusIcon}"></iconify-icon>
+                    ${statusText}
                 </div>
             </div>
         `;
@@ -774,35 +894,127 @@ class TransJakartaApp {
         return item;
     }
 
+    formatOperatingHours(start, end) {
+        if (!start || !end) return 'Tidak tersedia';
+        
+        const [sh, sm] = start.split(':').map(Number);
+        const [eh, em] = end.split(':').map(Number);
+        
+        // Check for 24-hour operation (00:00 - 23:59)
+        if ((sh === 0 && sm === 0) && (eh === 23 && em === 59)) {
+            return '24 Jam';
+        }
+        
+        // Handle times >= 24:00 (next day)
+        if (eh >= 24) {
+            // Special case: 05:00 - 29:00 = 24 jam starting from 05:00
+            if (sh === 5 && sm === 0 && eh === 29 && em === 0) {
+                return '24 Jam';
+            }
+            // Another 24-hour case
+            if (sh === 0 && sm === 0 && (eh === 24 || (eh === 23 && em === 59))) {
+                return '24 Jam';
+            }
+            // Show as next day
+            let endH = eh - 24;
+            let endStr = `${String(endH).padStart(2,'0')}:${String(em).padStart(2,'0')}`;
+            return `${this.formatTimeString(start)} - ${endStr} (+1)`;
+        }
+        
+        return `${this.formatTimeString(start)} - ${this.formatTimeString(end)}`;
+    }
+
+    formatTimeString(time) {
+        if (!time) return '';
+        const parts = time.split(':');
+        return `${parts[0]}:${parts[1]}`;
+    }
+
     getRouteOperatingHours(routeId) {
         try {
             const trips = this.modules.gtfs.getTrips().filter(t => t.route_id === routeId);
             if (trips.length === 0) return null;
 
+            const frequencies = this.modules.gtfs.getFrequencies();
             const stopTimes = this.modules.gtfs.getStopTimes();
-            let minTime = Infinity;
-            let maxTime = -Infinity;
+            const tripIds = trips.map(t => t.trip_id);
+            const freqsForRoute = frequencies.filter(f => tripIds.includes(f.trip_id));
 
-            trips.forEach(trip => {
-                const tripStopTimes = stopTimes.filter(st => st.trip_id === trip.trip_id);
-                tripStopTimes.forEach(st => {
-                    const time = this.parseGTFSTime(st.departure_time || st.arrival_time);
-                    if (time !== null) {
-                        minTime = Math.min(minTime, time);
-                        maxTime = Math.max(maxTime, time);
-                    }
+            let minStart = null;
+            let maxEnd = null;
+            let minStartSeconds = Infinity;
+            let maxEndSeconds = -Infinity;
+
+            // Try to get from frequencies first (more accurate for scheduled routes)
+            if (freqsForRoute.length > 0) {
+                const startTimes = freqsForRoute.map(f => f.start_time).filter(Boolean);
+                const endTimes = freqsForRoute.map(f => f.end_time).filter(Boolean);
+                
+                if (startTimes.length > 0 && endTimes.length > 0) {
+                    // Find earliest start and latest end
+                    startTimes.forEach(time => {
+                        const seconds = this.timeToSeconds(time);
+                        if (seconds < minStartSeconds) {
+                            minStartSeconds = seconds;
+                            minStart = time;
+                        }
+                    });
+                    
+                    endTimes.forEach(time => {
+                        const seconds = this.timeToSeconds(time);
+                        if (seconds > maxEndSeconds) {
+                            maxEndSeconds = seconds;
+                            maxEnd = time;
+                        }
+                    });
+                }
+            }
+
+            // Fallback to stop_times if frequencies not available
+            if (!minStart || !maxEnd) {
+                trips.forEach(trip => {
+                    const tripStopTimes = stopTimes.filter(st => st.trip_id === trip.trip_id);
+                    tripStopTimes.forEach(st => {
+                        const time = st.departure_time || st.arrival_time;
+                        if (time) {
+                            const seconds = this.timeToSeconds(time);
+                            if (seconds < minStartSeconds) {
+                                minStartSeconds = seconds;
+                                minStart = time;
+                            }
+                            if (seconds > maxEndSeconds) {
+                                maxEndSeconds = seconds;
+                                maxEnd = time;
+                            }
+                        }
+                    });
                 });
-            });
+            }
 
-            if (minTime === Infinity || maxTime === -Infinity) return null;
+            if (!minStart || !maxEnd || minStartSeconds === Infinity || maxEndSeconds === -Infinity) {
+                return null;
+            }
 
             return {
-                start: this.formatTime(minTime),
-                end: this.formatTime(maxTime)
+                start: minStart,
+                end: maxEnd,
+                startSeconds: minStartSeconds,
+                endSeconds: maxEndSeconds
             };
         } catch (e) {
+            console.error('Error getting route operating hours:', e);
             return null;
         }
+    }
+
+    timeToSeconds(time) {
+        if (!time) return 0;
+        const parts = time.split(':');
+        if (parts.length < 2) return 0;
+        const hours = parseInt(parts[0]) || 0;
+        const minutes = parseInt(parts[1]) || 0;
+        const seconds = parseInt(parts[2]) || 0;
+        return hours * 3600 + minutes * 60 + seconds;
     }
 
     formatTime(seconds) {
