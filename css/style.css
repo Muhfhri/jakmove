@@ -5817,6 +5817,26 @@ body {
 	color: #cbd5e1 !important;
 }
 
+/* Dark mode overrides for live Speed/ETA cards inside popup-card-friendly */
+[data-theme="dark"] .popup-card-friendly [style*='background:#f8fafc'] { background: #0f172a !important; border-color: #1e293b !important; }
+[data-theme="dark"] .popup-card-friendly [style*='border:1px solid #e2e8f0'] { border-color: #1e293b !important; }
+[data-theme="dark"] .popup-card-friendly div[style*='color: #475569'],
+[data-theme="dark"] .popup-card-friendly span[style*='color: #475569'] { color: #cbd5e1 !important; }
+[data-theme="dark"] .popup-card-friendly [style*='background: #e5e7eb'] { background: #334155 !important; }
+[data-theme="dark"] .popup-card-friendly [style*='color: #374151'] { color: #cbd5e1 !important; }
+[data-theme="dark"] .popup-card-friendly [style*='border-top:1px solid #f1f5f9'] { border-top-color: #263043 !important; }
+
+/* Dark mode overrides for JakLingko savings block and light chips inside stop-popup */
+[data-theme="dark"] .stop-popup [style*='background:linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)'] {
+    background: linear-gradient(135deg, rgba(16,185,129,0.18) 0%, rgba(16,185,129,0.10) 100%) !important;
+    border-color: #1e293b !important;
+}
+[data-theme="dark"] .stop-popup [style*='color:#065f46'] { color: #34d399 !important; }
+[data-theme="dark"] .stop-popup [style*='color:#374151'] { color: #cbd5e1 !important; }
+[data-theme="dark"] .stop-popup [style*='color:#111827'] { color: #e2e8f0 !important; }
+[data-theme="dark"] .stop-popup [style*='background:#f8fafc'] { background: #0f172a !important; border-color: #263043 !important; }
+[data-theme="dark"] .stop-popup [style*='border:1px solid #e5e7f0'] { border-color: #263043 !important; }
+
 /* Hide MapLibre GeolocateControl puck and accuracy circle when custom marker is active */
 #map.live-has-custom-marker .maplibregl-user-location-dot,
 #map.live-has-custom-marker .maplibregl-user-location-accuracy-circle,
