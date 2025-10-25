@@ -9,6 +9,10 @@ import { UIManager } from './modules/ui-manager.js';
 import { SettingsManager } from './modules/settings-manager.js';
 import { JourneyPlanner } from './modules/journey-planner.js';
 import { TypedPlanner } from './modules/typed-planner.js';
+import { KRLManager } from './modules/krl-manager.js';
+import { MRTManager } from './modules/mrt-manager.js';
+import { LRTManager } from './modules/lrt-manager.js';
+import { LRTJakartaManager } from './modules/lrtj-manager.js';
 
 class TransJakartaApp {
     constructor() {
@@ -36,6 +40,10 @@ class TransJakartaApp {
             this.modules.ui = new UIManager();
             this.modules.journey = new JourneyPlanner(this);
             this.modules.typedPlanner = new TypedPlanner(this);
+            this.modules.krl = new KRLManager(this);
+            this.modules.mrt = new MRTManager(this);
+            this.modules.lrt = new LRTManager(this);
+            this.modules.lrtj = new LRTJakartaManager(this);
 
             // Step 1: Load GTFS data and basic settings
             const [gtfsData] = await Promise.all([
@@ -396,6 +404,151 @@ class TransJakartaApp {
                 this.modules.search.handleSearch(e.target.value);
             });
         }
+
+        // Intermodal toggle button with checkbox dropdown
+        const intermodalBtn = document.getElementById('toggleIntermodalBtn');
+        const intermodalDropdown = document.getElementById('intermodalDropdown');
+        
+        if (intermodalBtn && intermodalDropdown) {
+            // Toggle dropdown visibility
+            intermodalBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isVisible = intermodalDropdown.style.display === 'block';
+                intermodalDropdown.style.display = isVisible ? 'none' : 'block';
+            });
+            
+            // Keep dropdown open when clicking inside
+            intermodalDropdown.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+            
+            // Close dropdown when clicking outside
+            document.addEventListener('click', () => {
+                intermodalDropdown.style.display = 'none';
+            });
+            
+            // Update button status based on active modes
+            const updateButtonStatus = () => {
+                const btnIcon = intermodalBtn.querySelector('iconify-icon:first-child');
+                const btnSpan = intermodalBtn.querySelector('span');
+                
+                const activeCount = [
+                    this.modules.krl.isEnabled(),
+                    this.modules.mrt.isEnabled(),
+                    this.modules.lrt.isEnabled(),
+                    this.modules.lrtj.isEnabled()
+                ].filter(Boolean).length;
+                
+                if (activeCount > 0) {
+                    intermodalBtn.classList.remove('secondary');
+                    intermodalBtn.classList.add('success');
+                    
+                    const activeNames = [];
+                    if (this.modules.krl.isEnabled()) activeNames.push('KRL');
+                    if (this.modules.mrt.isEnabled()) activeNames.push('MRT');
+                    if (this.modules.lrt.isEnabled()) activeNames.push('LRT');
+                    if (this.modules.lrtj.isEnabled()) activeNames.push('LRTJ');
+                    
+                    if (btnIcon) btnIcon.setAttribute('icon', 'mdi:train-car');
+                    if (btnSpan) btnSpan.textContent = `${activeNames.join(' + ')} Aktif`;
+                } else {
+                    intermodalBtn.classList.remove('success');
+                    intermodalBtn.classList.add('secondary');
+                    if (btnIcon) btnIcon.setAttribute('icon', 'mdi:train-car');
+                    if (btnSpan) btnSpan.textContent = 'Tampilkan Antarmoda';
+                }
+            };
+            
+            // Handle checkbox changes
+            const krlCheck = document.getElementById('toggleKrlCheck');
+            const mrtCheck = document.getElementById('toggleMrtCheck');
+            const lrtCheck = document.getElementById('toggleLrtCheck');
+            const lrtjCheck = document.getElementById('toggleLrtjCheck');
+            
+            if (krlCheck) {
+                krlCheck.addEventListener('change', async (e) => {
+                    e.stopPropagation();
+                    krlCheck.disabled = true;
+                    
+                    try {
+                        if (e.target.checked) {
+                            await this.modules.krl.enable();
+                        } else {
+                            this.modules.krl.disable();
+                        }
+                        updateButtonStatus();
+                    } catch (error) {
+                        console.error('Failed to toggle KRL:', error);
+                        e.target.checked = !e.target.checked;
+                    } finally {
+                        krlCheck.disabled = false;
+                    }
+                });
+            }
+            
+            if (mrtCheck) {
+                mrtCheck.addEventListener('change', async (e) => {
+                    e.stopPropagation();
+                    mrtCheck.disabled = true;
+                    
+                    try {
+                        if (e.target.checked) {
+                            await this.modules.mrt.enable();
+                        } else {
+                            this.modules.mrt.disable();
+                        }
+                        updateButtonStatus();
+                    } catch (error) {
+                        console.error('Failed to toggle MRT:', error);
+                        e.target.checked = !e.target.checked;
+                    } finally {
+                        mrtCheck.disabled = false;
+                    }
+                });
+            }
+            
+            if (lrtCheck) {
+                lrtCheck.addEventListener('change', async (e) => {
+                    e.stopPropagation();
+                    lrtCheck.disabled = true;
+                    
+                    try {
+                        if (e.target.checked) {
+                            await this.modules.lrt.enable();
+                        } else {
+                            this.modules.lrt.disable();
+                        }
+                        updateButtonStatus();
+                    } catch (error) {
+                        console.error('Failed to toggle LRT:', error);
+                        e.target.checked = !e.target.checked;
+                    } finally {
+                        lrtCheck.disabled = false;
+                    }
+                });
+            }
+
+            if (lrtjCheck) {
+                lrtjCheck.addEventListener('change', async (e) => {
+                    e.stopPropagation();
+                    lrtjCheck.disabled = true;
+                    try {
+                        if (e.target.checked) {
+                            await this.modules.lrtj.enable();
+                        } else {
+                            this.modules.lrtj.disable();
+                        }
+                        updateButtonStatus();
+                    } catch (error) {
+                        console.error('Failed to toggle LRT Jakarta:', error);
+                        e.target.checked = !e.target.checked;
+                    } finally {
+                        lrtjCheck.disabled = false;
+                    }
+                });
+            }
+        }
+        
         // Temporary: press J to toggle Journey Planner
         document.addEventListener('keydown', (ev) => {
             if ((ev.key === 'j' || ev.key === 'J') && !ev.repeat) {

@@ -9972,6 +9972,18 @@ body::before {
     transform: translateY(-1px);
 }
 
+.modern-action-btn.secondary {
+    background: rgba(100, 116, 139, 0.1);
+    color: #475569;
+    border: 1px solid rgba(100, 116, 139, 0.2);
+}
+
+.modern-action-btn.secondary:hover {
+    background: rgba(100, 116, 139, 0.15);
+    border-color: rgba(100, 116, 139, 0.3);
+    transform: translateY(-1px);
+}
+
 .modern-card-body {
     padding: 0;
 }
@@ -10013,6 +10025,211 @@ body::before {
 [data-theme="dark"] .modern-action-btn.danger:hover {
     background: rgba(239, 68, 68, 0.2);
     border-color: rgba(239, 68, 68, 0.35);
+}
+
+[data-theme="dark"] .modern-action-btn.secondary {
+    background: rgba(148, 163, 184, 0.1);
+    color: #cbd5e1;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+[data-theme="dark"] .modern-action-btn.secondary:hover {
+    background: rgba(148, 163, 184, 0.15);
+    border-color: rgba(148, 163, 184, 0.3);
+}
+
+/* Intermodal Dropdown */
+.intermodal-checkbox-option:hover {
+    background: #f3f4f6 !important;
+    border-color: #e5e7eb !important;
+}
+
+.intermodal-checkbox-option:has(input:checked) {
+    background: #f0fdf4 !important;
+    border-color: #86efac !important;
+}
+
+[data-theme="dark"] .intermodal-checkbox-option:hover {
+    background: rgba(148, 163, 184, 0.1) !important;
+    border-color: rgba(148, 163, 184, 0.3) !important;
+}
+
+[data-theme="dark"] .intermodal-checkbox-option:has(input:checked) {
+    background: rgba(34, 197, 94, 0.1) !important;
+    border-color: rgba(34, 197, 94, 0.3) !important;
+}
+
+[data-theme="dark"] #intermodalDropdown {
+    background: #1e293b !important;
+    border-color: #334155 !important;
+}
+
+[data-theme="dark"] #intermodalDropdown .intermodal-checkbox-option div {
+    color: #e2e8f0 !important;
+}
+
+/* Popup dark-mode friendly sections */
+.im-header {
+    color: #991b1b;
+    background: #fef2f2;
+    border-left: 4px solid #dc2626;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-weight: 700;
+}
+[data-theme="dark"] .im-header {
+    color: #fecaca;
+    background: rgba(220, 38, 38, 0.15);
+    border-left-color: #ef4444;
+}
+
+.im-card {
+    background: #ffffff;
+    border: 2px solid #f3f4f6;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+[data-theme="dark"] .im-card {
+    background: #0f172a;
+    border-color: #334155;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.45);
+}
+
+.im-card-title {
+    color: #991b1b;
+    font-weight: 800;
+}
+[data-theme="dark"] .im-card-title {
+    color: #fecaca;
+}
+
+.im-muted {
+    color: #6b7280;
+}
+[data-theme="dark"] .im-muted {
+    color: #9ca3af;
+}
+
+.im-route-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.im-route-badge {
+    color: #ffffff;
+    padding: 4px 8px;
+    border-radius: 5px;
+    font-size: 0.75em;
+    font-weight: 800;
+    min-width: 30px;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.12);
+}
+[data-theme="dark"] .im-route-badge {
+    box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+}
+
+/* Station Info Elements - Dark Mode Support */
+.station-info-subtitle {
+    color: #6b7280;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+[data-theme="dark"] .station-info-subtitle {
+    color: #9ca3af;
+}
+
+.line-item {
+    background: #f9fafb;
+    border-radius: 6px;
+    padding: 8px 12px;
+}
+[data-theme="dark"] .line-item {
+    background: #1e293b;
+}
+
+.line-route-text {
+    color: #374151;
+    line-height: 1.4;
+}
+[data-theme="dark"] .line-route-text {
+    color: #cbd5e1;
+}
+
+.transit-card {
+    background: #f9fafb08;
+    border-radius: 8px;
+    padding: 10px 12px;
+}
+[data-theme="dark"] .transit-card {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+.transit-line-name {
+    color: #1f2937;
+    font-weight: 700;
+}
+[data-theme="dark"] .transit-line-name {
+    color: #f1f5f9;
+}
+
+.transit-line-desc {
+    color: #6b7280;
+}
+[data-theme="dark"] .transit-line-desc {
+    color: #94a3b8;
+}
+
+.transit-hub-title {
+    color: #ef4444;
+    font-weight: 700;
+    background: #fef2f2;
+    border-left: 4px solid #ef4444;
+    padding: 8px 10px;
+    border-radius: 6px;
+}
+[data-theme="dark"] .transit-hub-title {
+    color: #fca5a5;
+    background: rgba(239, 68, 68, 0.15);
+}
+
+.transit-info-box {
+    background: #fef3c7;
+    border-left: 4px solid #f59e0b;
+    border-radius: 6px;
+    color: #92400e;
+}
+[data-theme="dark"] .transit-info-box {
+    background: rgba(245, 158, 11, 0.15);
+    border-left-color: #fbbf24;
+    color: #fcd34d;
+}
+
+.generic-info-box {
+    background: #f9fafb;
+    border-left: 4px solid #dc2626;
+    border-radius: 6px;
+    padding: 10px 12px;
+    color: #6b7280;
+}
+[data-theme="dark"] .generic-info-box {
+    background: #1e293b;
+    border-left-color: #ef4444;
+    color: #94a3b8;
+}
+
+/* MRT specific styling for dark mode */
+[data-theme="dark"] .generic-info-box[style*="background:#dbeafe"] {
+    background: rgba(59, 130, 246, 0.15) !important;
+    color: #93c5fd !important;
+}
+
+/* LRT specific styling for dark mode */
+[data-theme="dark"] .generic-info-box[style*="background:#ede9fe"] {
+    background: rgba(139, 92, 246, 0.15) !important;
+    color: #c4b5fd !important;
 }
 
 /* Modern Search Elements */

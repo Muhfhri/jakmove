@@ -1,0 +1,302 @@
+{
+  "stations": {
+    "MRI": {
+      "name": "Manggarai",
+      "isTransitHub": true,
+      "lines": ["B", "C"],
+      "facilities": ["parking", "minimarket", "mosque", "restroom", "atm", "foodcourt", "wifi", "wheelchair", "elevator"]
+    },
+    "JUA": {
+      "name": "Juanda",
+      "isTransitHub": false,
+      "lines": ["B"],
+      "facilities": ["parking", "minimarket", "mosque", "restroom", "atm", "wifi", "wheelchair"]
+    },
+    "RJW": {
+      "name": "Rajawali",
+      "isTransitHub": false,
+      "lines": ["C"],
+      "facilities": [ "mosque", "restroom", "wifi", "wheelchair"]
+    },
+    "KMO": {
+      "name": "Kemayoran",
+      "isTransitHub": false,
+      "lines": ["C"],
+      "facilities": ["parking", "minimarket", "mosque", "restroom", "wifi", "wheelchair"]
+    },
+    "GST": {
+      "name": "Gang Sentiong",
+      "isTransitHub": false,
+      "lines": ["C"],
+      "facilities": ["mosque", "restroom", "wifi", "wheelchair"]
+    },
+    "KMT": {
+      "name": "Kramat",
+      "isTransitHub": false,
+      "lines": ["C"],
+      "facilities": ["mosque", "restroom", "atm", "wifi", "wheelchair"]
+    },
+    "POK": {
+      "name": "Pondok Jati",
+      "isTransitHub": false,
+      "lines": ["C"],
+      "facilities": ["mosque", "restroom", "atm", "wifi", "wheelchair"]
+    },
+    "JNG": {
+        "name": "Jatinegara",
+        "isTransitHub": false,
+        "lines": ["C"],
+        "facilities": ["minimarket", "mosque", "restroom", "atm", "wifi", "wheelchair", "elevator", "foodcourt"]
+    },
+    "KLD": {
+      "name": "Klender",
+      "isTransitHub": false,
+      "lines": ["C"],
+      "facilities": ["parking", "minimarket", "mosque", "restroom", "wifi", "wheelchair","elevator"]
+    },
+    "BUA": {
+        "name": "Buaran",
+        "isTransitHub": false,
+      "lines": ["C"],
+      "facilities": ["parking", "mosque", "restroom", "wifi", "wheelchair","elevator"]
+    },
+    "KLDB": {
+      "name": "Klender Baru",
+      "isTransitHub": false,
+      "lines": ["C"],
+      "facilities": ["mosque", "restroom", "wifi", "wheelchair","elevator"]
+    },
+    "CUK": {
+      "name": "Cakung",
+      "isTransitHub": false,
+      "lines": ["C"],
+      "facilities": ["parking", "foodcourt", "mosque", "restroom", "wifi", "wheelchair","elevator"]
+    },
+    "KRI": {
+      "name": "Kranji",
+      "isTransitHub": false,
+      "lines": ["C"],
+      "facilities": ["parking", "mosque", "restroom", "wifi", "wheelchair","elevator"]
+    },
+    "THB": {
+      "name": "Tanah Abang",
+      "isTransitHub": true,
+      "lines": ["C", "R"],
+      "facilities": ["parking", "minimarket", "mosque", "restroom", "atm", "foodcourt", "wifi", "wheelchair","elevator"]
+    },
+    "JAKK": {
+      "name": "Jakarta Kota",
+      "isTransitHub": true,
+      "lines": ["B", "TP"],
+      "facilities": ["parking", "minimarket", "mosque", "restroom", "atm", "foodcourt", "wifi", "wheelchair"]
+    },
+    "BOO": {
+      "name": "Bogor",
+      "lines": ["B"],
+      "facilities": ["parking", "minimarket", "mosque", "restroom", "atm", "foodcourt", "wifi", "wheelchair"]
+    },
+    "DP": {
+      "name": "Depok",
+      "lines": ["B"],
+      "facilities": ["parking", "minimarket", "mosque", "restroom", "atm", "wifi", "wheelchair"]
+    },
+    "DPB": {
+      "name": "Depok Baru",
+      "lines": ["B"],
+      "facilities": ["parking", "minimarket", "mosque", "restroom", "atm", "wifi", "wheelchair"]
+    },
+    "BKS": {
+      "name": "Bekasi",
+      "isTransitHub": false,
+      "lines": ["C"],
+      "facilities": ["parking", "minimarket", "mosque", "restroom", "atm", "foodcourt", "wifi", "wheelchair","elevator"]
+    },
+    "BKST": {
+      "name": "Bekasi Timur",
+      "isTransitHub": false,
+      "lines": ["C"],
+      "facilities": ["parking", "mosque", "restroom", "wifi", "wheelchair","elevator"]
+    },
+    "TLM": {
+      "name": "Metland Telagamurni",
+      "isTransitHub": false,
+      "lines": ["C"],
+      "facilities": ["parking", "mosque", "restroom", "wifi", "wheelchair","elevator"]
+    },
+    "CKR": {
+      "name": "Cikarang",
+      "lines": ["C"],
+      "facilities": ["parking", "minimarket", "mosque", "restroom", "atm", "wifi", "wheelchair"]
+    },
+    "TNG": {
+      "name": "Tangerang",
+      "lines": ["T"],
+      "facilities": ["parking", "minimarket", "mosque", "restroom", "atm", "wifi", "wheelchair"]
+    },
+    "PSE": {
+      "name": "Pasar Senen",
+      "isTransitHub": false,
+      "lines": ["C"],
+      "facilities": ["parking", "minimarket", "mosque", "restroom", "atm", "foodcourt", "wifi", "wheelchair"]
+    },
+    "SUD": {
+      "name": "Sudirman",
+      "lines": ["C"],
+      "facilities": ["elevator","minimarket", "mosque", "restroom", "atm", "wifi", "wheelchair","foodcourt"]
+    },
+    "SUDB": {
+      "name": "BNI City",
+      "lines": ["C"],
+      "facilities": ["parking", "elevator","minimarket", "mosque", "restroom", "atm", "wifi", "wheelchair","foodcourt"]
+    },
+    "KAT": {
+      "name": "Karet",
+      "lines": ["C"],
+      "facilities": [ "wifi", "wheelchair","foodcourt","minimarket","mosque","restroom"]
+    },
+    "DU": {
+      "name": "Duri",
+      "isTransitHub": true,
+      "lines": ["T", "C"],
+      "facilities": ["minimarket", "mosque", "restroom"]
+    },
+    "AK": {
+      "name": "Angke",
+      "isTransitHub": false,
+      "lines": ["C"],
+      "facilities": ["mosque", "restroom", "wifi", "wheelchair"]
+    },
+    "KPB": {
+      "name": "Kampung Bandan",
+      "isTransitHub": true,
+      "lines": ["C", "TP"],
+      "facilities": ["minimarket", "mosque", "restroom", "wifi","foodcourt"]
+    },
+    "TB": {
+      "name": "Tambun",
+      "lines": ["C"],
+      "facilities": ["parking", "minimarket", "mosque", "restroom", "wheelchair", "elevator"]
+    },
+    "TPK": {
+      "name": "Tanjung Priuk",
+      "lines": ["TP"],
+      "facilities": ["parking", "minimarket", "mosque", "restroom", "atm"]
+    },
+    "CTA": {
+      "name": "Citayam",
+      "lines": ["B"],
+      "facilities": ["parking", "minimarket", "mosque", "restroom", "atm"]
+    },
+    "UI": {
+      "name": "Universitas Indonesia",
+      "lines": ["B"],
+      "facilities": ["minimarket", "mosque", "restroom", "wifi", "wheelchair"]
+    },
+    "LNA": {
+      "name": "Lenteng Agung",
+      "lines": ["B"],
+      "facilities": ["parking", "minimarket", "mosque", "restroom"]
+    },
+    "CW": {
+      "name": "Cawang",
+      "isTransitHub": false,
+      "lines": ["B"],
+      "facilities": ["minimarket", "restroom", "lrt"]
+    },
+    "TEB": {
+      "name": "Tebet",
+      "isTransitHub": false,
+      "lines": ["B"],
+      "facilities": ["atm", "restroom", "wheelchair","mosque","parking"]
+    }
+  },
+  "lines": {
+    "B": {
+      "name": "Bogor",
+      "fullName": "Bogor - Manggarai - Jakarta Kota - Nambo",
+      "color": "#ec2329",
+      "destinations": ["Bogor", "Manggarai", "Jakarta Kota", "Nambo"]
+    },
+    "C": {
+      "name": "Cikarang",
+      "fullName": "Cikarang - Manggarai - Kampung Bandan - Pasar Senen",
+      "color": "#0066cc",
+      "destinations": ["Cikarang", "Manggarai", "Kampung Bandan", "Pasar Senen"]
+    },
+    "T": {
+      "name": "Tangerang",
+      "fullName": "Tangerang - Kali Deres - Duri",
+      "color": "#a05723",
+      "destinations": ["Tangerang", "Kali Deres", "Duri"]
+    },
+    "TP": {
+      "name": "Tanjung Priuk",
+      "fullName": "Tanjung Priuk - Ancol - Kampung Bandan - Jakarta Kota",
+      "color": "#00a8e3",
+      "destinations": ["Tanjung Priuk", "Ancol", "Kampung Bandan", "Jakarta Kota"]
+    },
+    "R": {
+      "name": "Rangkasbitung",
+      "fullName": "Rangkasbitung - Parung Panjang - Serpong - Tanah Abang",
+      "color": "#95E1D3",
+      "destinations": ["Rangkasbitung", "Parung Panjang", "Serpong", "Tanah Abang"]
+    }
+  },
+  "facilityIcons": {
+    "parking": {
+      "icon": "fa-square-parking",
+      "label": "Parkir",
+      "color": "#10b981"
+    },
+    "minimarket": {
+      "icon": "fa-store",
+      "label": "Minimarket",
+      "color": "#f59e0b"
+    },
+    "mosque": {
+      "icon": "fa-mosque",
+      "label": "Musholla",
+      "color": "#10b981"
+    },
+    "restroom": {
+      "icon": "fa-restroom",
+      "label": "Toilet",
+      "color": "#8b5cf6"
+    },
+    "atm": {
+      "icon": "fa-money-bill-1",
+      "label": "ATM",
+      "color": "#22c55e"
+    },
+    "foodcourt": {
+      "icon": "fa-utensils",
+      "label": "Food Court",
+      "color": "#f97316"
+    },
+    "wifi": {
+      "icon": "fa-wifi",
+      "label": "WiFi",
+      "color": "#06b6d4"
+    },
+    "wheelchair": {
+      "icon": "fa-wheelchair",
+      "label": "Akses Kursi Roda",
+      "color": "#3b82f6"
+    },
+    "elevator": {
+      "icon": "fa-elevator",
+      "label": "Lift",
+      "color": "#6366f1"
+    },
+    "mrt": {
+      "icon": "fa-train-subway",
+      "label": "Koneksi MRT",
+      "color": "#ef4444"
+    },
+    "lrt": {
+      "icon": "fa-train-tram",
+      "label": "Koneksi LRT",
+      "color": "#8b5cf6"
+    }
+  }
+}

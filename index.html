@@ -860,6 +860,131 @@
                     </div>
                 </div>
                 <div class="card-actions">
+                    <div style="position:relative;">
+                        <button id="toggleIntermodalBtn" class="modern-action-btn secondary">
+                            <iconify-icon icon="mdi:train-car"></iconify-icon>
+                            <span>Tampilkan Antarmoda</span>
+                            <iconify-icon icon="mdi:chevron-down" style="font-size:0.9em;"></iconify-icon>
+                        </button>
+                        <div id="intermodalDropdown" style="
+                            position:absolute;
+                            top:100%;
+                            left:0;
+                            margin-top:8px;
+                            background:white;
+                            border:1px solid #e5e7eb;
+                            border-radius:8px;
+                            box-shadow:0 4px 12px rgba(0,0,0,0.15);
+                            min-width:240px;
+                            display:none;
+                            z-index:1000;
+                        ">
+                            <div style="padding:12px;">
+                                <div style="font-size:0.75em;color:#6b7280;font-weight:600;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">
+                                    Pilih Moda Transportasi
+                                </div>
+                                
+                                <!-- KRL Option -->
+                                <label class="intermodal-checkbox-option" style="
+                                    padding:10px 12px;
+                                    border-radius:6px;
+                                    cursor:pointer;
+                                    display:flex;
+                                    align-items:center;
+                                    gap:10px;
+                                    transition:background 0.2s;
+                                    margin-bottom:6px;
+                                    border:1px solid transparent;
+                                ">
+                                    <input type="checkbox" id="toggleKrlCheck" data-mode="krl" style="
+                                        width:18px;
+                                        height:18px;
+                                        cursor:pointer;
+                                        accent-color:#dc2626;
+                                    ">
+                                    <iconify-icon icon="mdi:train" style="font-size:1.3em;color:#dc2626;"></iconify-icon>
+                                    <div style="flex:1;">
+                                        <div style="font-weight:600;font-size:0.9em;color:#1f2937;">KAI Commuter</div>
+                                        <div style="font-size:0.7em;color:#6b7280;">Kereta Commuter Line</div>
+                                    </div>
+                                </label>
+                                
+                                <!-- MRT Option -->
+                                <label class="intermodal-checkbox-option" style="
+                                    padding:10px 12px;
+                                    border-radius:6px;
+                                    cursor:pointer;
+                                    display:flex;
+                                    align-items:center;
+                                    gap:10px;
+                                    transition:background 0.2s;
+                                    margin-bottom:6px;
+                                    border:1px solid transparent;
+                                ">
+                                    <input type="checkbox" id="toggleMrtCheck" data-mode="mrt" style="
+                                        width:18px;
+                                        height:18px;
+                                        cursor:pointer;
+                                        accent-color:#0066cc;
+                                    ">
+                                    <iconify-icon icon="mdi:subway-variant" style="font-size:1.3em;color:#0066cc;"></iconify-icon>
+                                    <div style="flex:1;">
+                                        <div style="font-weight:600;font-size:0.9em;color:#1f2937;">MRT Jakarta</div>
+                                        <div style="font-size:0.7em;color:#6b7280;">Mass Rapid Transit</div>
+                                    </div>
+                                </label>
+                                
+                                <!-- LRT Jabodebek Option -->
+                                <label class="intermodal-checkbox-option" style="
+                                    padding:10px 12px;
+                                    border-radius:6px;
+                                    cursor:pointer;
+                                    display:flex;
+                                    align-items:center;
+                                    gap:10px;
+                                    transition:background 0.2s;
+                                    border:1px solid transparent;
+                                ">
+                                    <input type="checkbox" id="toggleLrtCheck" data-mode="lrt" style="
+                                        width:18px;
+                                        height:18px;
+                                        cursor:pointer;
+                                        accent-color:#8b5cf6;
+                                    ">
+                                    <iconify-icon icon="mdi:train-car-passenger" style="font-size:1.3em;color:#8b5cf6;"></iconify-icon>
+                                    <div style="flex:1;">
+                                        <div style="font-weight:600;font-size:0.9em;color:#1f2937;">LRT Jabodebek</div>
+                                        <div style="font-size:0.7em;color:#6b7280;">Light Rail Transit</div>
+                                    </div>
+                                </label>
+
+                                <!-- LRT Jakarta Option -->
+                                <label class="intermodal-checkbox-option" style="
+                                    padding:10px 12px;
+                                    border-radius:6px;
+                                    cursor:pointer;
+                                    display:flex;
+                                    align-items:center;
+                                    gap:10px;
+                                    transition:background 0.2s;
+                                    border:1px solid transparent;
+                                    margin-top:6px;
+                                ">
+                                    <input type="checkbox" id="toggleLrtjCheck" data-mode="lrtj" style="
+                                        width:18px;
+                                        height:18px;
+                                        cursor:pointer;
+                                        accent-color:#e31e24;
+                                    ">
+                                    <iconify-icon icon="mdi:train-variant" style="font-size:1.3em;color:#e31e24;"></iconify-icon>
+                                    <div style="flex:1;">
+                                        <div style="font-weight:600;font-size:0.9em;color:#1f2937;">LRT Jakarta</div>
+                                        <div style="font-size:0.7em;color:#6b7280;">Kelapa Gading - Velodrome</div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
                     <button id="liveLocationBtn" class="modern-action-btn primary">
                         <iconify-icon icon="mdi:crosshairs-gps"></iconify-icon>
                         <span>Lokasi Saya</span>

@@ -55,6 +55,12 @@ export class LocationManager {
         this._popupAnimStart = 0;
         this._popupAnimDurationMs = 150;
         this._renderedPopupPos = null;
+        
+        // Destination stop selection for live tracking
+        this.destinationStopId = null; // ID halte tujuan yang dipilih pengguna
+        this.destinationStop = null; // Object data halte tujuan
+        this.destinationPulseAnimation = null; // Animation interval untuk pulse effect
+        this._destinationLayersAdded = false; // Track if destination layers are added
     }
 
     // Toggle live location
@@ -71,6 +77,17 @@ export class LocationManager {
         if (!navigator.geolocation) {
             alert('Geolocation tidak didukung di browser ini.');
             return;
+        }
+
+        // Request notification permission for destination alerts
+        if ('Notification' in window && Notification.permission === 'default') {
+            Notification.requestPermission().then(permission => {
+                if (permission === 'granted') {
+                    console.log('[Location] Notification permission granted');
+                }
+            }).catch(e => {
+                console.warn('[Location] Notification permission error:', e);
+            });
         }
 
         if (this.geoWatchId) {
@@ -129,6 +146,12 @@ export class LocationManager {
         }
         const mapEl = document.getElementById('map');
         if (mapEl) mapEl.classList.remove('live-has-custom-marker');
+        
+        // Clear destination selection
+        this.destinationStopId = null;
+        this.destinationStop = null;
+        this.removeDestinationMarker();
+        
         // Bersihkan timer arrival
         if (this.arrivalTimer) {
             clearTimeout(this.arrivalTimer);
@@ -622,6 +645,12 @@ export class LocationManager {
         if (jarakNext < 30 && this.lastArrivedStopId !== nextStop.stop_id) {
             console.debug('[Location] Triggering arrival via distance logic for:', nextStop.stop_name, 'distance:', jarakNext);
             
+            // Check if arrived at destination
+            if (this.destinationStopId && String(nextStop.stop_id) === String(this.destinationStopId)) {
+                console.log('[Location] 🎉 ARRIVED AT DESTINATION:', nextStop.stop_name);
+                this.notifyDestinationArrival(nextStop);
+            }
+            
             // Only set arrival if not already set by gate logic
             if (!this.arrivalStop || this.arrivalStop.stop_id !== nextStop.stop_id) {
                 this.arrivalStop = nextStop;
@@ -1045,12 +1074,494 @@ export class LocationManager {
                     <!-- Next Stop Information -->
                     ${nextStopInfo}
                 </div>
+                
+                <!-- Destination Info (if destination is selected) -->
+                ${!isArriving && this.destinationStopId ? this.buildDestinationInfo(route, nextStop, userLat, userLon) : ''}
+                
                 ${!isArriving && streetNameInfo ? `<div style='margin-top:8px;border-top:1px solid #f1f5f9;padding-top:6px;'>${streetNameInfo}</div>` : ''}
                 
                 <!-- Background Decoration -->
                 <div style='position:absolute;bottom:0;right:0;opacity:${isArriving ? '0.08' : '0.04'};font-size:4em;pointer-events:none;'>${isArriving ? '🎉' : '🚌'}</div>
             </div>
         `;
+    }
+
+    // Notify user when arrived at destination
+    notifyDestinationArrival(stop) {
+        try {
+            // Show browser notification if supported
+            if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification('🎉 Tiba di Tujuan!', {
+                    body: `Anda telah tiba di ${stop.stop_name}`,
+                    icon: '/image/jakmoveicon.png',
+                    tag: 'destination-arrival'
+                });
+            }
+            
+            // Play sound if available
+            try {
+                const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBjGJ0fPTgjMGHm7A7+OZSA0PV6vn77BdGAU+lunvv2MdCSZ+zO/dkTQHGmW79+mhTgwMUKXh8bllHAY2kdXzw3opBitzyO3akjYIGGa8+e2gTgwOVqzm7rJeGQk7ltrzx3ksBCh+zO/dkjgIHmvA8OuaRw4RXLDn76xZFgo8mdv0yHoqBS6Czezbjz4KGGi68OqaTA0PVarn7rFaGQc5kdTzw3YtBSx5yu7bjz4KG2e79+maTQsMT6Tg77BdGgU4kdTzwHQoBit2yezZjzoJG2W69+qbTwwNVavl7bFZGQc4kNP0w3YtBSx4yO3ajz4KHGm+8OqaSwwMTqPe7bBeGgU2jtLzvnMqBSt0ye3ZjjkJGGO28emaTgwMT6Le7LBaGQc2jdLyvnIqBip0yOzYjjkIGGK18emaSwsLTJ7d7K9bGgY1jdHxvXEpBSh0yOzYjDcIF2G08OeZTQsMTJzc7K9bGQY0jdDxvG8pBSh0yOvXizcJF2C08OeZSwwLTJva6r9aGQYxi8/wvG4pBSdzxuvWijYJFl608uaYSgwLSpvX6bxaGQYvic3wum0oBCdyxurVijYJFl608eWXSgwKSJnW6LtZGQcvh8zvumwpBCVxxuvUiTQJFVuy8eSWSgsKRpjU6LpYGAYuhs3wuWsoBCVxxurTiDMIFFWx8OOVSQsJRZfT57hXGAQthsrvu2onBCVxxenShy4IFFSu7uKUSQsJRJbS57ZWGAMrhcruu2koBCRwxunShjAIE1St7uGTSAoIQ5XS5rVWFwMqhcnuumgoBCNvxujQhi8IE1Sr7t+SSAoIQpTQ5rNVFwMphcntuWcpBCJuxufPhiwIElOq7t+RRwoHQZPP5bJVFwIohMjtumYpAyFtxufOhSwJElKp7d6RRgkHQJHP5K9VFgIphMfsuWUoAyBsx+bOhSsIEVGo7N2QRgkGP5DP5K9TFgEnhMfsuGQoAh9rxubNhCoIEVCn7NyPRQkGPo/P462TFgEnhMbtt2MoAh5rxOXMgykIEE+m69uORAkFPY7M462TFgEmhMTttmIoAh1rxOXMgigIEE2m6tqOQwkFPY3M4quSFQElhMPttGIoAhxqxOXLgSgID0yl6dqNQwkEPI3L4aqSFAEkhMPss2AoAhtqxOTKgCcID0yk6dqNQgkEO4zL4amRFAEjg8Lsr18nARpqxOTKgCYID0qj6NqMQwkEPI3L4KmSEwEjg8LssmAoARpqxOPJfyUIC0ig59qMQQgDO4zL36mREwEigsLrsl8oARlpw+PJfyUIC0eg59qMQQgDO4vK36mREwEhgsLrsl8nARlpw+PJfiQIC0ae5tmKQAgDOorK3qqREwEhgsHrsl4nARhow+LIfSQHCkWd5tmKPwcCOYnJ3aqQEwEhgcHqsV4nARdow+LIfSMHCUSd5tiKPwcBOInJ3aqQEgEggMHqsV0mARZnw+LHfCMHCUOb5diKPgcBOIjI3KmQEgEfgMHqsF0mARVnwuHHeyMGCUOa5deJPgcBN4jI3KmPEgEef8DqsFwmARRnwuHHeyIGCEKa5deJPQcBNojI26mPEgEef8DqrlwmARNmwuDGeiEGCEGZ5NaJPQcBNojI26mPEgEef8DqrlwmAREewf//');
+                audio.volume = 0.3;
+                audio.play().catch(() => {}); // Ignore if autoplay blocked
+            } catch (e) {}
+            
+            console.log('[Location] Destination arrival notification sent');
+        } catch (e) {
+            console.error('[Location] Error sending destination notification:', e);
+        }
+    }
+
+    // Select destination stop
+    selectDestination(stopId) {
+        try {
+            const gtfs = window.transJakartaApp.modules.gtfs;
+            if (!gtfs) return;
+            
+            const stops = gtfs.getStops();
+            const stop = stops.find(s => String(s.stop_id) === String(stopId));
+            
+            if (!stop) return;
+            
+            this.destinationStopId = stopId;
+            this.destinationStop = stop;
+            
+            console.log('[Location] Destination selected:', stop.stop_name);
+            
+            // Add visual marker for destination
+            this.addDestinationMarker(stop);
+            
+            // Refresh popup untuk menampilkan informasi tujuan
+            if (this.lastUserPos) {
+                this.refreshUserPopup(this.lastUserPos.lat, this.lastUserPos.lon);
+            }
+            
+            // Close current popup if open
+            const mapManager = window.transJakartaApp.modules.map;
+            if (mapManager && mapManager._currentPopup) {
+                mapManager._currentPopup.remove();
+            }
+        } catch (e) {
+            console.error('[Location] Error selecting destination:', e);
+        }
+    }
+
+    // Clear destination stop
+    clearDestination() {
+        this.destinationStopId = null;
+        this.destinationStop = null;
+        
+        console.log('[Location] Destination cleared');
+        
+        // Remove destination marker
+        this.removeDestinationMarker();
+        
+        // Refresh popup
+        if (this.lastUserPos) {
+            this.refreshUserPopup(this.lastUserPos.lat, this.lastUserPos.lon);
+        }
+        
+        // Close current popup if open
+        const mapManager = window.transJakartaApp.modules.map;
+        if (mapManager && mapManager._currentPopup) {
+            mapManager._currentPopup.remove();
+        }
+    }
+    
+    // Add visual marker for destination stop using map layer (fixed position like stop markers)
+    addDestinationMarker(stop) {
+        try {
+            const mapManager = window.transJakartaApp.modules.map;
+            if (!mapManager || !mapManager.map) return;
+            
+            // Remove existing destination marker if any
+            this.removeDestinationMarker();
+            
+            const map = mapManager.map;
+            const sourceId = 'destination-marker-source';
+            const layerId = 'destination-marker-layer';
+            const pulseLayerId = 'destination-marker-pulse';
+            
+            // Add CSS animation if not already added
+            if (!document.getElementById('destination-marker-style')) {
+                const style = document.createElement('style');
+                style.id = 'destination-marker-style';
+                style.textContent = `
+                    @keyframes pulse-destination {
+                        0%, 100% {
+                            opacity: 0.6;
+                        }
+                        50% {
+                            opacity: 0.3;
+                        }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+            
+            // Create GeoJSON feature for destination
+            const destinationFeature = {
+                type: 'Feature',
+                geometry: {
+                    type: 'Point',
+                    coordinates: [parseFloat(stop.stop_lon), parseFloat(stop.stop_lat)]
+                },
+                properties: {
+                    stopId: stop.stop_id,
+                    stopName: stop.stop_name
+                }
+            };
+            
+            // Add or update source
+            if (map.getSource(sourceId)) {
+                map.getSource(sourceId).setData({
+                    type: 'FeatureCollection',
+                    features: [destinationFeature]
+                });
+            } else {
+                map.addSource(sourceId, {
+                    type: 'geojson',
+                    data: {
+                        type: 'FeatureCollection',
+                        features: [destinationFeature]
+                    }
+                });
+            }
+            
+            // Add pulse layer (larger circle with animation)
+            if (!map.getLayer(pulseLayerId)) {
+                map.addLayer({
+                    id: pulseLayerId,
+                    type: 'circle',
+                    source: sourceId,
+                    paint: {
+                        'circle-radius': 20,
+                        'circle-color': '#f59e0b',
+                        'circle-opacity': 0.3,
+                        'circle-stroke-width': 0
+                    }
+                });
+                
+                // Animate pulse effect
+                let radius = 20;
+                let growing = true;
+                this.destinationPulseAnimation = setInterval(() => {
+                    if (!map.getLayer(pulseLayerId)) {
+                        clearInterval(this.destinationPulseAnimation);
+                        return;
+                    }
+                    
+                    if (growing) {
+                        radius += 0.5;
+                        if (radius >= 28) growing = false;
+                    } else {
+                        radius -= 0.5;
+                        if (radius <= 20) growing = true;
+                    }
+                    
+                    try {
+                        map.setPaintProperty(pulseLayerId, 'circle-radius', radius);
+                        map.setPaintProperty(pulseLayerId, 'circle-opacity', 0.6 - (radius - 20) / 40);
+                    } catch (e) {
+                        clearInterval(this.destinationPulseAnimation);
+                    }
+                }, 50);
+            }
+            
+            // Add main marker layer (solid circle on top)
+            if (!map.getLayer(layerId)) {
+                map.addLayer({
+                    id: layerId,
+                    type: 'circle',
+                    source: sourceId,
+                    paint: {
+                        'circle-radius': 12,
+                        'circle-color': '#f59e0b',
+                        'circle-stroke-width': 3,
+                        'circle-stroke-color': '#ffffff'
+                    }
+                });
+            }
+            
+            // Add icon layer (location pin)
+            const iconLayerId = 'destination-marker-icon';
+            if (!map.getLayer(iconLayerId)) {
+                // Load icon image if not already loaded
+                const iconUrl = 'data:image/svg+xml;base64,' + btoa(`
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16">
+                        <path fill="white" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                    </svg>
+                `);
+                
+                if (!map.hasImage('destination-pin-icon')) {
+                    map.loadImage(iconUrl, (error, image) => {
+                        if (error) throw error;
+                        if (!map.hasImage('destination-pin-icon')) {
+                            map.addImage('destination-pin-icon', image);
+                        }
+                        
+                        // Add symbol layer for icon
+                        if (!map.getLayer(iconLayerId)) {
+                            map.addLayer({
+                                id: iconLayerId,
+                                type: 'symbol',
+                                source: sourceId,
+                                layout: {
+                                    'icon-image': 'destination-pin-icon',
+                                    'icon-size': 0.8,
+                                    'icon-allow-overlap': true,
+                                    'icon-ignore-placement': true
+                                }
+                            });
+                        }
+                    });
+                } else {
+                    map.addLayer({
+                        id: iconLayerId,
+                        type: 'symbol',
+                        source: sourceId,
+                        layout: {
+                            'icon-image': 'destination-pin-icon',
+                            'icon-size': 0.8,
+                            'icon-allow-overlap': true,
+                            'icon-ignore-placement': true
+                        }
+                    });
+                }
+            }
+            
+            // Add click handler
+            map.on('click', layerId, (e) => {
+                const coordinates = e.features[0].geometry.coordinates.slice();
+                const properties = e.features[0].properties;
+                
+                mapManager.showStopPopup(
+                    {
+                        properties: {
+                            stopId: properties.stopId,
+                            stopName: properties.stopName
+                        },
+                        geometry: {
+                            coordinates: coordinates
+                        }
+                    },
+                    {
+                        lng: coordinates[0],
+                        lat: coordinates[1]
+                    }
+                );
+            });
+            
+            // Change cursor on hover
+            map.on('mouseenter', layerId, () => {
+                map.getCanvas().style.cursor = 'pointer';
+            });
+            map.on('mouseleave', layerId, () => {
+                map.getCanvas().style.cursor = '';
+            });
+            
+            this._destinationLayersAdded = true;
+            
+            console.log('[Location] Destination marker added for:', stop.stop_name);
+        } catch (e) {
+            console.error('[Location] Error adding destination marker:', e);
+        }
+    }
+    
+    // Remove destination marker
+    removeDestinationMarker() {
+        try {
+            const mapManager = window.transJakartaApp.modules.map;
+            if (!mapManager || !mapManager.map) return;
+            
+            const map = mapManager.map;
+            const sourceId = 'destination-marker-source';
+            const layerId = 'destination-marker-layer';
+            const pulseLayerId = 'destination-marker-pulse';
+            const iconLayerId = 'destination-marker-icon';
+            
+            // Stop animation
+            if (this.destinationPulseAnimation) {
+                clearInterval(this.destinationPulseAnimation);
+                this.destinationPulseAnimation = null;
+            }
+            
+            // Remove layers
+            if (map.getLayer(iconLayerId)) {
+                map.removeLayer(iconLayerId);
+            }
+            if (map.getLayer(layerId)) {
+                map.removeLayer(layerId);
+            }
+            if (map.getLayer(pulseLayerId)) {
+                map.removeLayer(pulseLayerId);
+            }
+            
+            // Remove source
+            if (map.getSource(sourceId)) {
+                map.removeSource(sourceId);
+            }
+            
+            this._destinationLayersAdded = false;
+            
+            console.log('[Location] Destination marker removed');
+        } catch (e) {
+            console.error('[Location] Error removing destination marker:', e);
+        }
+    }
+
+    // Calculate destination info (distance and stops remaining)
+    calculateDestinationInfo(route, nextStop, userLat, userLon) {
+        try {
+            if (!this.destinationStopId || !route || !nextStop) return null;
+            
+            const gtfs = window.transJakartaApp.modules.gtfs;
+            if (!gtfs) return null;
+            
+            const trips = gtfs.getTrips().filter(t => String(t.route_id) === String(this.selectedRouteIdForUser));
+            if (trips.length === 0) return null;
+            
+            const trip = trips[0];
+            const stopTimes = gtfs.getStopTimes().filter(st => String(st.trip_id) === String(trip.trip_id));
+            stopTimes.sort((a, b) => parseInt(a.stop_sequence) - parseInt(b.stop_sequence));
+            
+            const currentStopIndex = stopTimes.findIndex(st => String(st.stop_id) === String(nextStop.stop_id));
+            const destinationStopIndex = stopTimes.findIndex(st => String(st.stop_id) === String(this.destinationStopId));
+            
+            if (currentStopIndex === -1 || destinationStopIndex === -1) return null;
+            if (destinationStopIndex <= currentStopIndex) return null; // Destination sudah lewat
+            
+            // Hitung jumlah halte tersisa
+            const stopsRemaining = destinationStopIndex - currentStopIndex;
+            
+            // Hitung estimasi jarak
+            let estimatedDistance = 0;
+            
+            // Jarak dari posisi user ke next stop
+            const distanceToNextStop = this.haversine(
+                userLat, userLon,
+                parseFloat(nextStop.stop_lat), parseFloat(nextStop.stop_lon)
+            );
+            estimatedDistance += distanceToNextStop;
+            
+            // Jarak antar halte (estimasi 800m per halte)
+            const avgDistancePerStop = 800;
+            estimatedDistance += (stopsRemaining - 1) * avgDistancePerStop;
+            
+            // Jarak dari halte sebelum tujuan ke tujuan
+            if (destinationStopIndex > 0) {
+                const stops = gtfs.getStops();
+                const prevDestStop = stopTimes[destinationStopIndex - 1];
+                const prevStop = stops.find(s => String(s.stop_id) === String(prevDestStop.stop_id));
+                
+                if (prevStop && this.destinationStop) {
+                    const distanceToDest = this.haversine(
+                        parseFloat(prevStop.stop_lat), parseFloat(prevStop.stop_lon),
+                        parseFloat(this.destinationStop.stop_lat), parseFloat(this.destinationStop.stop_lon)
+                    );
+                    // Replace rata-rata dengan jarak sebenarnya
+                    estimatedDistance = estimatedDistance - avgDistancePerStop + distanceToDest;
+                }
+            }
+            
+            // Estimasi waktu tempuh (asumsi kecepatan rata-rata 20 km/jam di dalam kota)
+            const avgSpeedKmh = 20;
+            const estimatedTimeMinutes = Math.round((estimatedDistance / 1000) / avgSpeedKmh * 60);
+            
+            return {
+                stopsRemaining,
+                estimatedDistance,
+                estimatedTimeMinutes,
+                destinationStop: this.destinationStop
+            };
+        } catch (e) {
+            console.error('[Location] Error calculating destination info:', e);
+            return null;
+        }
+    }
+
+    // Build destination info display
+    buildDestinationInfo(route, nextStop, userLat, userLon) {
+        try {
+            const destInfo = this.calculateDestinationInfo(route, nextStop, userLat, userLon);
+            if (!destInfo) return '';
+            
+            const distanceText = destInfo.estimatedDistance < 1000 ? 
+                `${Math.round(destInfo.estimatedDistance)}m` : 
+                `${(destInfo.estimatedDistance/1000).toFixed(1)}km`;
+            
+            const timeText = destInfo.estimatedTimeMinutes < 60 ?
+                `~${destInfo.estimatedTimeMinutes} menit` :
+                `~${Math.floor(destInfo.estimatedTimeMinutes/60)}j ${destInfo.estimatedTimeMinutes%60}m`;
+            
+            return `
+                <div style="
+                    margin:8px 0;
+                    padding:10px;
+                    background:linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+                    border:2px solid #f59e0b;
+                    border-radius:12px;
+                    box-shadow:0 4px 12px rgba(245,158,11,0.3);
+                ">
+                    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+                        <i class="fa-solid fa-location-dot" style="color:#d97706;font-size:1.1em;"></i>
+                        <div style="font-size:0.85em;font-weight:700;color:#92400e;">Menuju Tujuan</div>
+                    </div>
+                    <div style="font-size:0.95em;font-weight:600;color:#78350f;margin-bottom:6px;">
+                        ${destInfo.destinationStop.stop_name}
+                    </div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                        <div style="
+                            background:white;
+                            border:1px solid #fbbf24;
+                            border-radius:8px;
+                            padding:4px 8px;
+                            font-size:0.75em;
+                            font-weight:600;
+                            color:#92400e;
+                            display:flex;
+                            align-items:center;
+                            gap:4px;
+                        ">
+                            <i class="fa-solid fa-bus-simple" style="font-size:0.9em;"></i>
+                            <span>${destInfo.stopsRemaining} halte tersisa</span>
+                        </div>
+                        <div style="
+                            background:white;
+                            border:1px solid #fbbf24;
+                            border-radius:8px;
+                            padding:4px 8px;
+                            font-size:0.75em;
+                            font-weight:600;
+                            color:#92400e;
+                            display:flex;
+                            align-items:center;
+                            gap:4px;
+                        ">
+                            <i class="fa-solid fa-route" style="font-size:0.9em;"></i>
+                            <span>${distanceText}</span>
+                        </div>
+                        <div style="
+                            background:white;
+                            border:1px solid #fbbf24;
+                            border-radius:8px;
+                            padding:4px 8px;
+                            font-size:0.75em;
+                            font-weight:600;
+                            color:#92400e;
+                            display:flex;
+                            align-items:center;
+                            gap:4px;
+                        ">
+                            <i class="fa-solid fa-clock" style="font-size:0.9em;"></i>
+                            <span>${timeText}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        } catch (e) {
+            console.error('[Location] Error building destination info:', e);
+            return '';
+        }
     }
 
     // Build time and duration info
@@ -1978,6 +2489,11 @@ export class LocationManager {
         this.currentStopId = null;
         this.lastArrivedStopId = null;
         this.arrivalStop = null;
+        
+        // Clear destination selection
+        this.destinationStopId = null;
+        this.destinationStop = null;
+        this.removeDestinationMarker();
         
         // Clear countdown interval if active
         if (this.arrivalCountdownInterval) {

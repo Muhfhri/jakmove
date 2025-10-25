@@ -970,26 +970,37 @@ export class JourneyPlanner {
         this._addEndpointMarker(this.origin.lat, this.origin.lon, 'start');
         this._addEndpointMarker(this.destination.lat, this.destination.lon, 'end');
 
-        // No longer need to parse steps - draw walking paths based on actual distance only
+        // Parse steps to determine actual walks needed
+        const walksFromSteps = new Set();
+        for (const step of planSteps) {
+            if (step.type === 'walk') {
+                // Extract walk info from step text
+                walksFromSteps.add(step.text);
+            }
+        }
+        
+        console.log(`📋 Steps contain ${walksFromSteps.size} walk segments:`, Array.from(walksFromSteps));
 
-        // Draw walking: origin -> startStop (based on distance only, not steps)
+        // Draw walking: origin -> startStop ONLY if steps include it
         const dStart = this._haversine(this.origin.lat, this.origin.lon, parseFloat(startStop.stop_lat), parseFloat(startStop.stop_lon));
-        if (dStart > 10) { // Draw if distance is significant (>10m to avoid clutter)
-            console.log(`  🚶 Drawing initial walk to ${startStop.stop_name}: ${dStart.toFixed(0)}m`);
+        const hasInitialWalk = Array.from(walksFromSteps).some(w => w.includes(startStop.stop_name));
+        if (dStart > 5 && hasInitialWalk) { // Only draw if not already at stop AND step exists
+            console.log(`  🚶 Drawing initial walk to ${startStop.stop_name}`);
             this._drawWalk(this.origin.lat, this.origin.lon, parseFloat(startStop.stop_lat), parseFloat(startStop.stop_lon), 
                 { type: 'walk', toStopName: startStop.stop_name, preferStraight: dStart <= 100, ensureComplete: true });
         } else {
-            console.log(`  ⏭️ Skipping initial walk: too short (${dStart.toFixed(0)}m)`);
+            console.log(`  ⏭️ Skipping initial walk (${dStart.toFixed(0)}m, hasStep=${hasInitialWalk})`);
         }
         
-        // Draw walking: goalStop -> destination (based on distance only, not steps)
+        // Draw walking: goalStop -> destination ONLY if steps include it
         const dEnd = this._haversine(parseFloat(goalStop.stop_lat), parseFloat(goalStop.stop_lon), this.destination.lat, this.destination.lon);
-        if (dEnd > 10) { // Draw if distance is significant (>10m to avoid clutter)
-            console.log(`  🚶 Drawing final walk to destination: ${dEnd.toFixed(0)}m`);
+        const hasFinalWalk = Array.from(walksFromSteps).some(w => w.includes('tujuan') || w.includes(goalStop.stop_name));
+        if (dEnd > 5 && hasFinalWalk) { // Only draw if not already at destination AND step exists
+            console.log(`  🚶 Drawing final walk to destination`);
             this._drawWalk(parseFloat(goalStop.stop_lat), parseFloat(goalStop.stop_lon), this.destination.lat, this.destination.lon, 
                 { type: 'walk', toStopName: 'Tujuan', preferStraight: dEnd <= 100, ensureComplete: true });
         } else {
-            console.log(`  ⏭️ Skipping final walk: too short (${dEnd.toFixed(0)}m)`);
+            console.log(`  ⏭️ Skipping final walk (${dEnd.toFixed(0)}m, hasStep=${hasFinalWalk})`);
         }
         // Draw transit legs (chunked to avoid blocking UI)
         const seq = ++this._drawSeq;
@@ -1085,36 +1096,41 @@ export class JourneyPlanner {
         };
         legs.forEach((leg, idx) => { setTimeout(() => drawOneLeg(leg, idx), idx * 0); });
 
-        // Draw walking between transfer stops (based on distance only)
+        // Draw walking between transfer stops ONLY if mentioned in steps
         console.log(`🔄 Checking ${legs.length - 1} potential transfers...`);
         for (let i = 0; i < legs.length - 1; i++) {
             const currLastId = String(legs[i].stops[legs[i].stops.length - 1]);
             const nextFirstId = String(legs[i+1].stops[0]);
-            
-            // Skip if same stop (no walking needed)
-            if (currLastId === nextFirstId) {
-                console.log(`  ⏭️ Same stop, no walking needed`);
-                continue;
-            }
             
             // Get stop objects
             const a = stopsById.get(currLastId);
             const b = stopsById.get(nextFirstId);
             if (!a || !b) continue;
             
+            // Check if steps explicitly mention walking between these stops
+            const transferWalk = Array.from(walksFromSteps).find(w => 
+                w.includes(a.stop_name) && w.includes(b.stop_name)
+            );
+            
+            if (!transferWalk) {
+                console.log(`  ⏭️ No walk step for transfer ${a.stop_name} → ${b.stop_name}, skipping`);
+                continue;
+            }
+            
             // Calculate actual distance
             const stopDistance = this._haversine(parseFloat(a.stop_lat), parseFloat(a.stop_lon), parseFloat(b.stop_lat), parseFloat(b.stop_lon));
             
-            // Only draw if distance is significant (>20m to avoid clutter for same platform)
-            if (stopDistance > 20) {
             console.log(`  🚶 Drawing transfer walk: ${a.stop_name} → ${b.stop_name} (${stopDistance.toFixed(0)}m)`);
+            
+            // Only draw if distance is significant and not same location
+            if (stopDistance > 20 && currLastId !== nextFirstId) {
                 this._drawWalk(
                     parseFloat(a.stop_lat), parseFloat(a.stop_lon),
                     parseFloat(b.stop_lat), parseFloat(b.stop_lon),
                     { type: 'walk', toStopName: b.stop_name, preferStraight: stopDistance <= 150, ensureComplete: true }
                 );
             } else {
-                console.log(`  ⏭️ Too short (${stopDistance.toFixed(0)}m), skipping visual`);
+                console.log(`    ⏭️ Too short or same stop, skipping visual`);
             }
         }
         
@@ -1519,13 +1535,15 @@ export class JourneyPlanner {
             return; // Don't draw gap bridges less than 100m
         }
         
-        const drawStraight = (approx = false) => {
+        // Create unique ID for this walk segment to replace placeholder later
+        const walkId = `walk-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        
+        const drawStraight = (approx = true, isPlaceholder = false) => {
             const path = [[lat1, lon1], [lat2, lon2]];
             const label = approx ? `Perkiraan (garis lurus) • ${this._fmtDist(straightDist)}` : `Jalan kaki • ${this._fmtDist(straightDist)}`;
-            const metaData = { ...meta, type: 'walk', approximate: approx, distance: straightDist };
+            const metaData = { ...meta, type: 'walk', approximate: approx, distance: straightDist, walkId: isPlaceholder ? walkId : undefined };
             this._drawPolyline(path, '#10b981', 3, 0.9, [2, 2], metaData);
             this._addLineLabel(path, label, '#10b981');
-            console.log(`  ✅ Drew straight line: ${straightDist.toFixed(0)}m`);
         };
         
         // Check if walking distance is reasonable
@@ -1534,83 +1552,128 @@ export class JourneyPlanner {
             return; // Don't draw anything for unreasonably long walks
         }
         
-        // For very short walks, forced straight, or gap bridges - just draw simple line (no OSRM)
-        if ((meta && (meta.forceStraight || meta.preferStraight)) || straightDist <= 200 || isGapBridge) {
-            console.log(`  🚶 Drawing simple walk: ${straightDist.toFixed(0)}m (no OSRM needed)`);
+        // For very short walks or forced straight, just draw simple line without OSRM
+        try {
+            if ((meta && (meta.forceStraight || meta.preferStraight)) || straightDist <= 100) {
                 drawStraight(false);
                 return;
             }
+        } catch (_) {}
         
-        // For longer walks, ALWAYS draw straight line first (so it's never invisible)
-        console.log(`  🗺️ Drawing walk with straight line first, then trying OSRM: ${straightDist.toFixed(0)}m`);
-        drawStraight(false);
+        // For gap bridges or very short walks, skip OSRM entirely (just draw straight line)
+        if (isGapBridge || straightDist <= 150) {
+            console.log(`  🚶 Drawing simple walk: ${straightDist.toFixed(0)}m (skipping OSRM)`);
+            drawStraight(false); // Draw without "Perkiraan" label
+            return;
+        }
         
-        // Try OSRM enhancement in background (optional, best-effort)
-        // If this fails, straight line is already visible so no problem
-        const routeUrl = (sLon, sLat, eLon, eLat) => `https://router.project-osrm.org/route/v1/foot/${sLon},${sLat};${eLon},${eLat}?overview=full&geometries=geojson&steps=true&alternatives=false`;
+        // Only use OSRM for actual user walking (origin/destination or significant transfers)
+        console.log(`  🗺️ Fetching OSRM route for ${straightDist.toFixed(0)}m walk`);
         
-        // OSRM enhancement (non-blocking, best-effort only)
-        setTimeout(async () => {
+        // Tampilkan placeholder garis lurus terlebih dahulu agar tidak "hilang" saat OSRM fetch
+        drawStraight(false, true); // Use false to avoid "Perkiraan" label on placeholder
+        
+        // Snap ke jalan terdekat lalu rute OSRM dengan steps; fallback garis lurus bila tidak konsisten
+        const nearestUrl = (lat, lon) => `https://router.project-osrm.org/nearest/v1/foot/${lon},${lat}?number=1`;
+        const routeUrl = (sLon, sLat, eLon, eLat) => `https://router.project-osrm.org/route/v1/foot/${sLon},${sLat};${eLon},${eLat}?overview=full&geometries=geojson&steps=true&alternatives=false&radiuses=30;30`;
+        (async () => {
             try {
-                const timeout = (ms, promise) => {
-                    return Promise.race([
-                        promise,
-                        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
-                    ]);
-                };
-                
-                // Try direct OSRM route with timeout
-                const resp = await timeout(3000, fetch(routeUrl(lon1, lat1, lon2, lat2)));
-                const data = await timeout(2000, resp.json());
-                
+                const [sn1, sn2] = await Promise.all([
+                    fetch(nearestUrl(lat1, lon1)).then(r=>r.json()).catch(()=>null),
+                    fetch(nearestUrl(lat2, lon2)).then(r=>r.json()).catch(()=>null)
+                ]);
+                let sLat = lat1, sLon = lon1, eLat = lat2, eLon = lon2;
+                let snapOk = false;
+                try {
+                    const w1 = (sn1 && sn1.waypoints && sn1.waypoints[0]) ? sn1.waypoints[0] : null;
+                    const w2 = (sn2 && sn2.waypoints && sn2.waypoints[0]) ? sn2.waypoints[0] : null;
+                    if (w1 && w2) {
+                        const p1 = w1.location; // [lon, lat]
+                        const p2 = w2.location;
+                        const d1 = this._haversine(lat1, lon1, p1[1], p1[0]);
+                        const d2 = this._haversine(lat2, lon2, p2[1], p2[0]);
+                        if (d1 <= 120 && d2 <= 120) { // jangan snap terlalu jauh
+                            sLat = p1[1]; sLon = p1[0]; eLat = p2[1]; eLon = p2[0];
+                            snapOk = true;
+                        }
+                    }
+                } catch(_) {}
+                const resp = await fetch(routeUrl(sLon, sLat, eLon, eLat));
+                const data = await resp.json();
                 if (!data || !data.routes || !data.routes[0] || !data.routes[0].geometry) {
-                    console.log(`  ℹ️ OSRM unavailable, keeping straight line`);
+                    console.log(`  ⚠️ OSRM failed, keeping simple straight line`);
+                    // Fallback ke segmented approach jika ada cukup distance
+                    if (straightDist > 150) {
+                        const attemptSegmented = async () => {
+                            try {
+                                const midLat = lat1 + (lat2 - lat1) * 0.5;
+                                const midLon = lon1 + (lon2 - lon1) * 0.5;
+                                const [p1, pm, p2] = await Promise.all([
+                                    fetch(nearestUrl(lat1, lon1)).then(r=>r.json()).catch(()=>null),
+                                    fetch(nearestUrl(midLat, midLon)).then(r=>r.json()).catch(()=>null),
+                                    fetch(nearestUrl(lat2, lon2)).then(r=>r.json()).catch(()=>null)
+                                ]);
+                                if (!p1?.waypoints?.[0] || !p2?.waypoints?.[0]) return false;
+                                const coords = [];
+                                let totalDist = 0;
+                                if (pm?.waypoints?.[0]) {
+                                    const r1 = await fetch(routeUrl(p1.waypoints[0].location[0], p1.waypoints[0].location[1], 
+                                                                  pm.waypoints[0].location[0], pm.waypoints[0].location[1]))
+                                                     .then(r=>r.json()).catch(()=>null);
+                                    if (r1?.routes?.[0]?.geometry) {
+                                        coords.push(...r1.routes[0].geometry.coordinates.map(([lng, lat]) => [lat, lng]));
+                                        totalDist += r1.routes[0].distance || 0;
+                                    }
+                                    const r2 = await fetch(routeUrl(pm.waypoints[0].location[0], pm.waypoints[0].location[1], 
+                                                                  p2.waypoints[0].location[0], p2.waypoints[0].location[1]))
+                                                     .then(r=>r.json()).catch(()=>null);
+                                    if (r2?.routes?.[0]?.geometry) {
+                                        coords.push(...r2.routes[0].geometry.coordinates.slice(1).map(([lng, lat]) => [lat, lng]));
+                                        totalDist += r2.routes[0].distance || 0;
+                                    }
+                                }
+                                if (coords.length > 1) {
+                                    this._drawPolyline(coords, '#10b981', 3, 0.9, [2, 2], { type: 'walk', approximate: false, distance: totalDist, ...meta });
+                                    this._addLineLabel(coords, `Jalan kaki • ${this._fmtDist(totalDist)}`, '#10b981');
+                                    return true;
+                                }
+                                return false;
+                            } catch(_) { return false; }
+                        };
+                        attemptSegmented();
+                    }
+                    // Placeholder garis lurus sudah ada dari drawStraight(true, true) sebelumnya
                     return;
                 }
-                
-                const osrmDist = data.routes[0].distance || straightDist;
-                const osrmDur = data.routes[0].duration;
-                
-                // Reject if OSRM route is way too long (unrealistic detour)
-                if (osrmDist > straightDist * 2.5) {
-                    console.log(`  ⚠️ OSRM route too long (${osrmDist.toFixed(0)}m vs ${straightDist.toFixed(0)}m), keeping straight line`);
+                const osrmDist = typeof data.routes[0].distance === 'number' ? data.routes[0].distance : null;
+                const osrmDur = typeof data.routes[0].duration === 'number' ? data.routes[0].duration : null;
+                // Hindari detour berlebihan (mis. di dalam terminal)
+                if (osrmDist !== null && osrmDist > Math.max(350, straightDist * 2.2)) {
+                    console.log(`  ⚠️ OSRM route too long (${osrmDist}m vs ${straightDist}m straight), keeping placeholder`);
+                    // Don't redraw - placeholder is already there
                     return;
                 }
-                
-                // OSRM looks good - draw enhanced route
-                // Note: This will appear AFTER straight line, but that's okay - it's an enhancement
                 const coords = data.routes[0].geometry.coordinates.map(([lng, lat]) => [lat, lng]);
-                const label = `Jalan kaki • ${this._fmtDist(osrmDist)}${osrmDur ? ' • ' + Math.max(1, Math.round(osrmDur/60)) + ' mnt' : ''}`;
-                
-                // Extract walking steps if available
+                const label = `Jalan kaki • ${this._fmtDist(osrmDist || straightDist)}${osrmDur ? ' • ' + Math.max(1, Math.round(osrmDur/60)) + ' mnt' : ''}`;
+                // Extract simple step texts if available
                 let walkSteps = [];
                 try {
-                    const steps = data.routes[0].legs?.[0]?.steps || [];
+                    const steps = (data.routes[0].legs && data.routes[0].legs[0] && data.routes[0].legs[0].steps) ? data.routes[0].legs[0].steps : [];
                     walkSteps = steps.map(st => {
                         const name = st.name ? (' di ' + st.name) : '';
                         const dist = st.distance ? ` (${Math.round(st.distance)} m)` : '';
-                        const maneuver = st.maneuver?.instruction || st.maneuver?.type || 'Jalan';
+                        const maneuver = (st.maneuver && st.maneuver.instruction) ? st.maneuver.instruction : (st.maneuver && st.maneuver.type ? st.maneuver.type : 'Jalan');
                         return `${maneuver}${name}${dist}`;
                     });
                 } catch(_) {}
-                
-                // Draw OSRM-enhanced route with thicker line to "replace" straight line visually
-                this._drawPolyline(coords, '#059669', 4, 0.95, [2, 2], { 
-                    type: 'walk', 
-                    approximate: false, 
-                    distance: osrmDist, 
-                    duration: osrmDur, 
-                    walkSteps, 
-                    ...meta 
-                });
-                this._addLineLabel(coords, label, '#059669');
-                console.log(`  ✅ OSRM enhanced route drawn: ${osrmDist.toFixed(0)}m`);
-                
-            } catch (e) {
-                // Silent fail - straight line is already visible
-                console.log(`  ℹ️ OSRM enhancement failed (${e.message}), straight line remains`);
+                this._drawPolyline(coords, '#10b981', 3, 0.9, [2, 2], { type: 'walk', approximate: false, distance: osrmDist || straightDist, duration: osrmDur || null, walkSteps, ...meta });
+                this._addLineLabel(coords, label, '#10b981');
+        } catch (e) {
+                console.error(`  ❌ Walk drawing error: ${e.message}`);
+                // Ensure straight line fallback is shown
+                drawStraight(true);
             }
-        }, 100); // Small delay to let straight line render first
+        })();
     }
 
     _drawPolyline(latlngs, color = '#2563eb', width = 4, opacity = 0.88, dash = null, meta = null) {

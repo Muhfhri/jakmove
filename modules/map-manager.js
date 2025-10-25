@@ -239,6 +239,55 @@ export class MapManager {
             // Move overlay layers above
             this._ensureOverlaysOnTop();
             
+            // Re-add intermodal layers (KRL, MRT, LRT) if they were enabled
+            try {
+                const app = window.transJakartaApp;
+                if (app && app.modules) {
+                    // Re-enable KRL if it was active
+                    if (app.modules.krl && app.modules.krl.isEnabled()) {
+                        const wasEnabled = app.modules.krl.enabled;
+                        app.modules.krl.enabled = false; // Reset state
+                        app.modules.krl.layerIds = [];
+                        app.modules.krl.sourceIds = [];
+                        if (wasEnabled) {
+                            setTimeout(() => app.modules.krl.enable(), 100);
+                        }
+                    }
+                    // Re-enable MRT if it was active
+                    if (app.modules.mrt && app.modules.mrt.isEnabled()) {
+                        const wasEnabled = app.modules.mrt.enabled;
+                        app.modules.mrt.enabled = false; // Reset state
+                        app.modules.mrt.layerIds = [];
+                        app.modules.mrt.sourceIds = [];
+                        if (wasEnabled) {
+                            setTimeout(() => app.modules.mrt.enable(), 200);
+                        }
+                    }
+                    // Re-enable LRT Jabodebek if it was active
+                    if (app.modules.lrt && app.modules.lrt.isEnabled()) {
+                        const wasEnabled = app.modules.lrt.enabled;
+                        app.modules.lrt.enabled = false; // Reset state
+                        app.modules.lrt.layerIds = [];
+                        app.modules.lrt.sourceIds = [];
+                        if (wasEnabled) {
+                            setTimeout(() => app.modules.lrt.enable(), 300);
+                        }
+                    }
+                    // Re-enable LRT Jakarta if it was active
+                    if (app.modules.lrtj && app.modules.lrtj.isEnabled()) {
+                        const wasEnabled = app.modules.lrtj.enabled;
+                        app.modules.lrtj.enabled = false; // Reset state
+                        app.modules.lrtj.layerIds = [];
+                        app.modules.lrtj.sourceIds = [];
+                        if (wasEnabled) {
+                            setTimeout(() => app.modules.lrtj.enable(), 350);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('Failed to restore intermodal layers:', e);
+            }
+            
             // If for some reason stops layer still missing, force re-render via RouteManager
             try {
                 const hasStopsLayer = this.map.getLayer('stops-markers');
@@ -1571,6 +1620,78 @@ export class MapManager {
                         const html = rm.buildIntermodalStationInfo ? rm.buildIntermodalStationInfo(stopObj) : ''; 
                         return html || ''; 
                     } catch(e){ return ''; } 
+                })()}
+                
+                ${(() => {
+                    // Add destination button if live tracking is active
+                    try {
+                        const loc = window.transJakartaApp.modules.location;
+                        if (!loc || !loc.isActive || !loc.selectedRouteIdForUser) return '';
+                        
+                        const stopId = stop.properties.stopId;
+                        const isDestination = loc.destinationStopId && String(loc.destinationStopId) === String(stopId);
+                        
+                        if (isDestination) {
+                            return `
+                                <div style="
+                                    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+                                    border: 2px solid #f59e0b;
+                                    border-radius: 12px;
+                                    padding: 10px;
+                                    margin-bottom: 16px;
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: space-between;
+                                    box-shadow: 0 4px 12px rgba(245,158,11,0.3);
+                                ">
+                                    <div style="display:flex;align-items:center;gap:8px;">
+                                        <i class="fa-solid fa-location-dot" style="color:#d97706;font-size:1.2em;"></i>
+                                        <span style="font-size:0.9em;font-weight:700;color:#92400e;">Tujuan Anda</span>
+                                    </div>
+                                    <button onclick="window.transJakartaApp.modules.location.clearDestination()" style="
+                                        background:#ef4444;
+                                        color:white;
+                                        border:none;
+                                        border-radius:8px;
+                                        padding:6px 12px;
+                                        font-size:0.75em;
+                                        font-weight:600;
+                                        cursor:pointer;
+                                        box-shadow: 0 2px 4px rgba(239,68,68,0.3);
+                                    ">
+                                        <i class="fa-solid fa-xmark"></i> Hapus
+                                    </button>
+                                </div>
+                            `;
+                        } else {
+                            return `
+                                <button onclick="window.transJakartaApp.modules.location.selectDestination('${stopId}')" style="
+                                    width: 100%;
+                                    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+                                    color: white;
+                                    border: none;
+                                    border-radius: 12px;
+                                    padding: 12px;
+                                    font-size: 0.9em;
+                                    font-weight: 700;
+                                    cursor: pointer;
+                                    margin-bottom: 16px;
+                                    box-shadow: 0 4px 12px rgba(59,130,246,0.4);
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: center;
+                                    gap: 8px;
+                                    transition: all 0.2s;
+                                " onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 6px 16px rgba(59,130,246,0.5)'" onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='0 4px 12px rgba(59,130,246,0.4)'">
+                                    <i class="fa-solid fa-location-dot" style="font-size:1.1em;"></i>
+                                    <span>Jadikan Tujuan</span>
+                                </button>
+                            `;
+                        }
+                    } catch(e) {
+                        console.debug('[Map] Error building destination button:', e);
+                        return '';
+                    }
                 })()}
                 
                 <!-- Content -->
