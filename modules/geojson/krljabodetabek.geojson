@@ -176277,11 +176277,12 @@
       "geometry": {
         "type": "Point",
         "coordinates": [
-          -6.2618245, 107.0837982
+          107.0837982,
+          -6.2618245
         ]
       },
       "id": "node/CIT"
-    },
+    },    
     {
       "type": "Feature",
       "properties": {
