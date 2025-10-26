@@ -12,6 +12,7 @@ export class TypedPlanner {
         this.currentMode = 'balanced';
         this._stopsIndex = []; // {id, name}
         this._cachedPlans = new Map(); // Cache computed plans to avoid recomputation inconsistencies
+        this._sharedPlanMap = new Map(); // In-memory store for shareable plans (cross-platform safe)
     }
 
     init() {
@@ -430,14 +431,14 @@ export class TypedPlanner {
                 });
             });
 
-            // Wire share buttons
+            // Wire share buttons (cross-platform safe via in-memory plan map)
             this.resultsDiv.querySelectorAll('[data-share]')?.forEach(btn => {
                 btn.addEventListener('click', () => {
                     try {
-                        const planData = btn.getAttribute('data-plan-index');
-                        if (!planData) return;
-                        
-                        const plan = JSON.parse(planData);
+                        const planId = btn.getAttribute('data-plan-id');
+                        if (!planId) return;
+                        const plan = this._sharedPlanMap.get(planId);
+                        if (!plan) return;
                         const shareManager = this.app.modules.share;
                         if (shareManager && typeof shareManager.showShareDialog === 'function') {
                             shareManager.showShareDialog(plan);
@@ -987,6 +988,10 @@ export class TypedPlanner {
             const accuracyColor = accuracy >= 90 ? '#10b981' : accuracy >= 80 ? '#f59e0b' : '#ef4444';
             const accuracyIcon = accuracy >= 90 ? 'mdi:check-circle' : accuracy >= 80 ? 'mdi:alert-circle' : 'mdi:information';
             
+            // Create a lightweight share ID and store plan in memory (avoid huge HTML data attributes)
+            const planId = `jp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+            try { this._sharedPlanMap.set(planId, plan); } catch(_) {}
+
             return `
                 <div class="col-12 col-lg-4">
                     <div class="planner-result-card h-100">
@@ -1036,7 +1041,7 @@ export class TypedPlanner {
                                     <iconify-icon icon="mdi:map"></iconify-icon>
                                     <span>Tampilkan di Peta</span>
                                 </button>
-                                <button type="button" class="planner-result-share-btn" data-share data-plan-index="${this.escape(JSON.stringify(plan))}">
+                                <button type="button" class="planner-result-share-btn" data-share data-plan-id="${planId}">
                                     <iconify-icon icon="mdi:share-variant"></iconify-icon>
                                     <span>Bagikan Rute</span>
                                 </button>
