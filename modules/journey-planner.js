@@ -22,6 +22,7 @@ export class JourneyPlanner {
         this._when = new Date();
         this._activeServiceByYmdCache = new Map(); // ymd -> Set(service_id)
         this._windowsByRouteYmdCache = new Map(); // `${routeId}|${ymd}` -> Array<{start:number,end:number}>
+        this._preferredRoutes = new Set();
     }
 
     _isMapPanning() {
@@ -770,6 +771,10 @@ export class JourneyPlanner {
                         continue;
                     }
                     distComponent = stepDist * TRANSIT_WEIGHT;
+                    // Soft preference for shared preferred routes (tie-breaker bias)
+                    if (this._preferredRoutes && this._preferredRoutes.has(String(edgeRid))) {
+                        edgePenalty -= Math.round(BIG * 0.05);
+                    }
                     if (!cur.rid) {
                         nextRid = edgeRid; // boarding, no transfer penalty
                         // JAK route penalty: discourage JAK routes unless they're clearly best
@@ -877,6 +882,10 @@ export class JourneyPlanner {
                         if (isJAKRoute(String(r))) {
                             cost2 += JAK_PENALTY;
                         }
+                        // Preferred route bias
+                        if (this._preferredRoutes && this._preferredRoutes.has(String(r))) {
+                            cost2 -= Math.round(BIG * 0.05);
+                        }
                         if (mode === 'cheapest') {
                             const grp = serviceGroupForRoute(String(r));
                             nextFareUsed = grp;
@@ -913,6 +922,10 @@ export class JourneyPlanner {
                         // JAK route penalty for transfers
                         if (isJAKRoute(String(r))) {
                             cost2 += JAK_PENALTY;
+                        }
+                        // Preferred route bias
+                        if (this._preferredRoutes && this._preferredRoutes.has(String(r))) {
+                            cost2 -= Math.round(BIG * 0.05);
                         }
                         if (mode === 'cheapest') {
                             const grp = serviceGroupForRoute(String(r));
@@ -1192,6 +1205,13 @@ export class JourneyPlanner {
         } catch (_) { this._when = new Date(); }
     }
 
+    // Public: set preferred routeIds to bias path selection (used for shared plan consistency)
+    setPreferredRoutes(routeIds) {
+        try {
+            this._preferredRoutes = new Set((routeIds || []).map(r => String(r)));
+        } catch (_) { this._preferredRoutes = new Set(); }
+    }
+
     _ymdOf(date) {
         const y = date.getFullYear();
         const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -1444,9 +1464,9 @@ export class JourneyPlanner {
         // End walk
         const endWalk = Math.round((distEnd || 0) / WALK_MPS);
         totalSec += endWalk; parts.push({ type: 'walk', sec: endWalk, label: `Jalan ke tujuan` });
-        // ETA clock time
-        const now = new Date();
-        const eta = new Date(now.getTime() + totalSec * 1000);
+        // ETA clock time based on selected departure time (this._when)
+        const base = (this._when instanceof Date && !isNaN(this._when.getTime())) ? this._when : new Date();
+        const eta = new Date(base.getTime() + totalSec * 1000);
         return { totalSec, parts, etaISO: eta.toISOString(), etaLabel: eta.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) };
     }
 

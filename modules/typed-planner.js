@@ -463,7 +463,7 @@ export class TypedPlanner {
         const enhanced = results.map(plan => {
             const duration = plan.duration?.totalSec || 0;
             const fare = plan.fare?.total || 0;
-            const transfers = (plan.legs || []).filter(leg => leg.mode === 'TRANSIT').length - 1;
+            const transfers = Math.max(0, (plan.legs || []).length - 1);
             const walkingDistance = (plan.legs || []).filter(leg => leg.mode === 'WALK')
                 .reduce((sum, leg) => sum + (leg.distance || 0), 0);
             
@@ -991,7 +991,7 @@ export class TypedPlanner {
             // Create a lightweight share ID and store plan in memory (avoid huge HTML data attributes)
             const planId = `jp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
             try { this._sharedPlanMap.set(planId, plan); } catch(_) {}
-
+            
             return `
                 <div class="col-12 col-lg-4">
                     <div class="planner-result-card h-100">

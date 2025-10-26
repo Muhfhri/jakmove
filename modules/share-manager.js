@@ -250,6 +250,14 @@ export class ShareManager {
                 } catch(_) {}
             }
 
+            // Feed preferred routes from shared legs to bias the selection
+            try {
+                const pref = Array.isArray(plan.legs) ? plan.legs.map(l => String(l.routeId || '')).filter(Boolean) : [];
+                if (pref.length && typeof journey.setPreferredRoutes === 'function') {
+                    journey.setPreferredRoutes(pref);
+                }
+            } catch(_) {}
+
             // Try compute
             let computed = null;
             if (fromId && toId) {
