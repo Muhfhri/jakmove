@@ -242,7 +242,12 @@ export class ShareManager {
 
             // Set date/time if available
             if (plan.departureTime && typeof journey.setDepartureDateTime === 'function') {
-                journey.setDepartureDateTime(new Date(plan.departureTime));
+                const dt = new Date(plan.departureTime);
+                journey.setDepartureDateTime(dt);
+                try {
+                    if (typedPlanner?.dateInput) typedPlanner.dateInput.value = dt.toISOString().split('T')[0];
+                    if (typedPlanner?.timeInput) typedPlanner.timeInput.value = dt.toTimeString().slice(0,5);
+                } catch(_) {}
             }
 
             // Try compute
@@ -323,11 +328,33 @@ export class ShareManager {
             if (plan?.duration?.totalSec) duration = Math.round(plan.duration.totalSec / 60);
             else if (typeof plan.totalDuration === 'number') duration = Math.round(plan.totalDuration);
             const fareTotal = (plan?.fare && typeof plan.fare === 'object') ? (Number(plan.fare.total) || 0) : (Number(plan.fare) || 0);
-            const transitLegsCount = (plan.legs || []).filter(l => l.mode === 'TRANSIT').length;
+
+            // Robust transfers: prefer legs length, fallback to steps
+            const legs = Array.isArray(plan.legs) ? plan.legs : [];
+            let transitLegsCount = 0;
+            if (legs.length > 0) {
+                // If mode property exists, count those marked as transit/ride; else use legs length
+                const hasMode = legs.some(l => typeof l.mode !== 'undefined' || typeof l.type !== 'undefined');
+                if (hasMode) {
+                    transitLegsCount = legs.filter(l => String(l.mode || '').toUpperCase() === 'TRANSIT' || String(l.type || '').toLowerCase() === 'ride').length;
+                    if (transitLegsCount === 0) transitLegsCount = legs.length; // fallback
+                } else {
+                    transitLegsCount = legs.length;
+                }
+            }
+            // Fallback from steps: count "Transit di ..."
+            if (transitLegsCount === 0) {
+                try {
+                    const steps = Array.isArray(plan.steps) ? plan.steps : [];
+                    const tSteps = steps.filter(s => /transit di/i.test(String(s.text || ''))).length;
+                    // transfers = tSteps; legsCount approx = transfers + 1 when there is any transit
+                    if (tSteps > 0) transitLegsCount = tSteps + 1;
+                } catch(_) {}
+            }
             const transfers = Math.max(0, transitLegsCount - 1);
 
             // Build transit legs summary
-            const transitLegs = (plan.legs || []).filter(l => l.mode === 'TRANSIT');
+            const transitLegs = legs;
             const routesSummary = transitLegs.length > 0
                 ? transitLegs.map(leg => `<span class="badge" style="background:#dc2626;color:white;margin:2px;">${(leg.routeShortName || leg.routeId || '').toString()}</span>`).join('')
                 : '<span style="color:#9ca3af;">Hanya jalan kaki</span>';

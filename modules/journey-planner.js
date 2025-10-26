@@ -75,6 +75,15 @@ export class JourneyPlanner {
         
         console.log(`✅ JourneyPlanner init completed in ${(performance.now() - startTime).toFixed(2)}ms`);
     }
+
+    // Public: set departure/check time for time-aware planning
+    setDepartureDateTime(dateObj) {
+        try {
+            const d = (dateObj instanceof Date) ? dateObj : new Date(dateObj);
+            if (isNaN(d.getTime())) return;
+            this._when = d;
+        } catch (_) {}
+    }
     
     _loadGraphFromCache() {
         try {
