@@ -432,19 +432,57 @@ export class ShareManager {
         // Copy URL button
         const copyBtn = document.getElementById('copyURLBtn');
         if (copyBtn) {
-            copyBtn.addEventListener('click', () => {
+            copyBtn.addEventListener('click', async () => {
                 const urlInput = document.getElementById('shareURLInput');
-                if (urlInput) {
-                    urlInput.select();
-                    document.execCommand('copy');
-                    
-                    // Show feedback
-                    const originalHTML = copyBtn.innerHTML;
-                    copyBtn.innerHTML = '<i class="fa-solid fa-check me-1"></i>Tersalin!';
-                    setTimeout(() => {
-                        copyBtn.innerHTML = originalHTML;
-                    }, 2000);
+                if (!urlInput) return;
+
+                const text = String(urlInput.value || '');
+                let copied = false;
+
+                // Prefer modern Clipboard API on secure contexts
+                try {
+                    if (navigator.clipboard && window.isSecureContext) {
+                        await navigator.clipboard.writeText(text);
+                        copied = true;
+                    }
+                } catch (_) {}
+
+                // Fallback: enable/select input (iOS-friendly)
+                if (!copied) {
+                    try {
+                        const wasReadOnly = urlInput.hasAttribute('readonly');
+                        if (wasReadOnly) urlInput.removeAttribute('readonly');
+                        urlInput.focus({ preventScroll: true });
+                        urlInput.select();
+                        try { urlInput.setSelectionRange(0, text.length); } catch (_) {}
+                        copied = document.execCommand('copy');
+                        if (wasReadOnly) urlInput.setAttribute('readonly', '');
+                    } catch (_) {}
                 }
+
+                // Fallback: hidden textarea
+                if (!copied) {
+                    try {
+                        const ta = document.createElement('textarea');
+                        ta.value = text;
+                        ta.setAttribute('readonly', '');
+                        ta.style.position = 'absolute';
+                        ta.style.left = '-9999px';
+                        document.body.appendChild(ta);
+                        ta.focus({ preventScroll: true });
+                        ta.select();
+                        try { ta.setSelectionRange(0, text.length); } catch (_) {}
+                        copied = document.execCommand('copy');
+                        document.body.removeChild(ta);
+                    } catch (_) {}
+                }
+
+                // Feedback
+                const originalHTML = copyBtn.innerHTML;
+                copyBtn.innerHTML = copied
+                    ? '<i class="fa-solid fa-check me-1"></i>Tersalin!'
+                    : '<i class="fa-solid fa-xmark me-1"></i>Gagal';
+                setTimeout(() => { copyBtn.innerHTML = originalHTML; }, 2000);
             });
         }
 
