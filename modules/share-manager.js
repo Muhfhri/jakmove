@@ -167,52 +167,43 @@ export class ShareManager {
         try {
             console.log('🗺️ Rendering shared route:', plan);
 
-            // Get typed planner module
-            const typedPlanner = this.app.modules.journey;
-            if (!typedPlanner) {
-                console.error('TypedPlanner not available');
+            const typedPlanner = this.app.modules.typedPlanner;
+            const journey = this.app.modules.journey;
+            if (!typedPlanner || !journey) {
+                console.error('TypedPlanner/JourneyPlanner not available');
                 return;
             }
 
-            // Populate inputs
-            if (typedPlanner.fromInput && plan.startStop) {
-                typedPlanner.fromInput.value = plan.startStop.stop_name || plan.startStop.stop_id;
-            }
-            if (typedPlanner.toInput && plan.goalStop) {
-                typedPlanner.toInput.value = plan.goalStop.stop_name || plan.goalStop.stop_id;
-            }
-
-            // Set mode
-            if (plan.mode && typedPlanner.setMode) {
-                typedPlanner.setMode(plan.mode);
-            }
+            // Compute fresh plan using GTFS by stop IDs (more reliable than decoded legs)
+            const fromId = plan.startStop?.stop_id || plan.from;
+            const toId = plan.goalStop?.stop_id || plan.to;
+            const mode = plan.mode || 'balanced';
 
             // Set date/time if available
-            if (plan.departureTime) {
-                const dt = new Date(plan.departureTime);
-                if (typedPlanner.dateInput) {
-                    typedPlanner.dateInput.value = dt.toISOString().split('T')[0];
-                }
-                if (typedPlanner.timeInput) {
-                    typedPlanner.timeInput.value = dt.toTimeString().split(' ')[0].substring(0, 5);
-                }
+            if (plan.departureTime && typeof journey.setDepartureDateTime === 'function') {
+                journey.setDepartureDateTime(new Date(plan.departureTime));
             }
 
-            // Render the plan in results
-            if (typedPlanner.resultsDiv && typedPlanner.renderPlanCard) {
-                typedPlanner.resultsDiv.innerHTML = '';
-                const card = typedPlanner.renderPlanCard(plan, true);
-                typedPlanner.resultsDiv.appendChild(card);
-
-                // Render on map
-                const jpModule = this.app.modules.journeyPlanner;
-                if (jpModule && jpModule.visualizePlan) {
-                    await jpModule.visualizePlan(plan);
-                }
-
-                // Show notification
-                this.showNotification('✅ Rute berhasil dimuat dari tautan!', 'success');
+            const computed = journey.computePlanByStopIds(String(fromId || ''), String(toId || ''), mode);
+            if (!computed) {
+                this.showNotification('❌ Gagal memuat rute dari tautan', 'error');
+                return;
             }
+
+            // Cache for map button wiring
+            try { typedPlanner._cachedPlans.set(`${fromId}|${toId}|${mode}`, computed); } catch(_) {}
+
+            // Render card
+            if (typedPlanner.resultsDiv && typeof typedPlanner.renderPlanCard === 'function') {
+                typedPlanner.resultsDiv.innerHTML = `<div class="row g-3">${typedPlanner.renderPlanCard(computed, true)}</div>`;
+            }
+
+            // Draw on map
+            if (typeof journey.showPlanOnMap === 'function') {
+                journey.showPlanOnMap(computed);
+            }
+
+            this.showNotification('✅ Rute berhasil dimuat dari tautan!', 'success');
 
         } catch (error) {
             console.error('Error rendering shared route:', error);
@@ -252,17 +243,20 @@ export class ShareManager {
     updateShareModalContent(plan, shareURL) {
         try {
             // Route summary
-            const fromName = plan.startStop?.stop_name || 'Unknown';
-            const toName = plan.goalStop?.stop_name || 'Unknown';
-            const duration = Math.round(plan.totalDuration || 0);
-            const fare = plan.fare || 0;
-            const transfers = (plan.legs || []).filter(l => l.mode === 'TRANSIT').length - 1;
+            const fromName = plan.startStop?.stop_name || plan.fromName || 'Unknown';
+            const toName = plan.goalStop?.stop_name || plan.toName || 'Unknown';
+            let duration = 0;
+            if (plan?.duration?.totalSec) duration = Math.round(plan.duration.totalSec / 60);
+            else if (typeof plan.totalDuration === 'number') duration = Math.round(plan.totalDuration);
+            const fareTotal = (plan?.fare && typeof plan.fare === 'object') ? (Number(plan.fare.total) || 0) : (Number(plan.fare) || 0);
+            const transitLegsCount = (plan.legs || []).filter(l => l.mode === 'TRANSIT').length;
+            const transfers = Math.max(0, transitLegsCount - 1);
 
             // Build transit legs summary
             const transitLegs = (plan.legs || []).filter(l => l.mode === 'TRANSIT');
-            const routesSummary = transitLegs.map(leg => 
-                `<span class="badge" style="background:#dc2626;color:white;margin:2px;">${leg.routeShortName || leg.routeId}</span>`
-            ).join('');
+            const routesSummary = transitLegs.length > 0
+                ? transitLegs.map(leg => `<span class="badge" style="background:#dc2626;color:white;margin:2px;">${(leg.routeShortName || leg.routeId || '').toString()}</span>`).join('')
+                : '<span style="color:#9ca3af;">Hanya jalan kaki</span>';
 
             // Update summary card
             const summaryEl = document.getElementById('shareSummary');
@@ -287,7 +281,7 @@ export class ShareManager {
                             </div>
                             <div style="background:white;border-radius:8px;padding:10px;text-align:center;">
                                 <div style="color:#6b7280;font-size:0.75em;margin-bottom:4px;">Tarif</div>
-                                <div style="font-weight:700;color:#111827;">Rp ${fare.toLocaleString('id-ID')}</div>
+                                <div style="font-weight:700;color:#111827;">Rp ${fareTotal.toLocaleString('id-ID')}</div>
                             </div>
                             <div style="background:white;border-radius:8px;padding:10px;text-align:center;">
                                 <div style="color:#6b7280;font-size:0.75em;margin-bottom:4px;">Transfer</div>
@@ -296,7 +290,7 @@ export class ShareManager {
                         </div>
                         <div style="margin-top:12px;padding:10px;background:white;border-radius:8px;">
                             <div style="color:#6b7280;font-size:0.75em;margin-bottom:6px;">Rute yang Digunakan:</div>
-                            <div>${routesSummary || '<span style="color:#9ca3af;">Hanya jalan kaki</span>'}</div>
+                            <div>${routesSummary}</div>
                         </div>
                     </div>
                 `;
