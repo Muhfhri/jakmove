@@ -14,6 +14,53 @@ export class ShareManager {
         this.checkForSharedRoute();
     }
 
+    // Helper: simple text normalize
+    _normalize(str) {
+        try {
+            return String(str || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}+/gu, '').trim();
+        } catch (_) {
+            return String(str || '').toLowerCase().trim();
+        }
+    }
+
+    // Helper: find stop id by name (prefer H/B)
+    findStopIdByName(name) {
+        try {
+            const gtfs = this.app.modules.gtfs;
+            const stops = gtfs.getStops ? (gtfs.getStops() || []) : [];
+            if (!stops.length) return null;
+            const q = this._normalize(name);
+            if (!q) return null;
+            // First pass: exact startsWith in H/B
+            let best = stops.find(s => (String(s.stop_id || '').startsWith('H') || String(s.stop_id || '').startsWith('B')) && this._normalize(s.stop_name).startsWith(q));
+            if (best) return String(best.stop_id);
+            // Second pass: includes in H/B
+            best = stops.find(s => (String(s.stop_id || '').startsWith('H') || String(s.stop_id || '').startsWith('B')) && this._normalize(s.stop_name).includes(q));
+            if (best) return String(best.stop_id);
+            // Third pass: any stop
+            best = stops.find(s => this._normalize(s.stop_name).includes(q));
+            return best ? String(best.stop_id) : null;
+        } catch (_) {
+            return null;
+        }
+    }
+
+    // Wait until compute is available
+    async _waitForPlannerReady(timeoutMs = 5000) {
+        const start = Date.now();
+        while (Date.now() - start < timeoutMs) {
+            try {
+                const journey = this.app.modules?.journey;
+                const gtfs = this.app.modules?.gtfs;
+                if (journey && typeof journey.computePlanByStopIds === 'function' && gtfs && typeof gtfs.getStops === 'function') {
+                    return true;
+                }
+            } catch(_) {}
+            await new Promise(r => setTimeout(r, 150));
+        }
+        return false;
+    }
+
     /**
      * Encode route plan to URL-safe string
      */
@@ -28,7 +75,7 @@ export class ShareManager {
                 date: plan.departureTime ? new Date(plan.departureTime).toISOString().split('T')[0] : '',
                 time: plan.departureTime ? new Date(plan.departureTime).toTimeString().split(' ')[0].substring(0,5) : '',
                 legs: (plan.legs || []).map(leg => ({
-                    m: leg.mode, // WALK or TRANSIT
+                    m: leg.mode,
                     r: leg.routeId || '',
                     rn: leg.routeShortName || '',
                     from: leg.fromStop?.stop_id || '',
@@ -167,26 +214,54 @@ export class ShareManager {
         try {
             console.log('🗺️ Rendering shared route:', plan);
 
-            const typedPlanner = this.app.modules.typedPlanner;
-            const journey = this.app.modules.journey;
-            if (!typedPlanner || !journey) {
-                console.error('TypedPlanner/JourneyPlanner not available');
+            // Ensure planner & GTFS ready
+            const ready = await this._waitForPlannerReady(7000);
+            if (!ready) {
+                this.showNotification('❌ Aplikasi belum siap memuat rute', 'error');
                 return;
             }
 
-            // Compute fresh plan using GTFS by stop IDs (more reliable than decoded legs)
-            const fromId = plan.startStop?.stop_id || plan.from;
-            const toId = plan.goalStop?.stop_id || plan.to;
+            const typedPlanner = this.app.modules.typedPlanner;
+            const journey = this.app.modules.journey;
+            const gtfs = this.app.modules.gtfs;
+            if (!typedPlanner || !journey || !gtfs) {
+                console.error('TypedPlanner/JourneyPlanner/GTFS not available');
+                return;
+            }
+
+            // Determine from/to ids
+            let fromId = plan.startStop?.stop_id || plan.from;
+            let toId = plan.goalStop?.stop_id || plan.to;
+            const fromName = plan.startStop?.stop_name || plan.fromName || '';
+            const toName = plan.goalStop?.stop_name || plan.toName || '';
             const mode = plan.mode || 'balanced';
+
+            // If missing IDs, try resolve via names
+            if (!fromId && fromName) fromId = this.findStopIdByName(fromName);
+            if (!toId && toName) toId = this.findStopIdByName(toName);
 
             // Set date/time if available
             if (plan.departureTime && typeof journey.setDepartureDateTime === 'function') {
                 journey.setDepartureDateTime(new Date(plan.departureTime));
             }
 
-            const computed = journey.computePlanByStopIds(String(fromId || ''), String(toId || ''), mode);
+            // Try compute
+            let computed = null;
+            if (fromId && toId) {
+                computed = journey.computePlanByStopIds(String(fromId), String(toId), mode);
+            }
+
+            // Fallback: try resolving IDs via names even if IDs exist but failed
             if (!computed) {
-                this.showNotification('❌ Gagal memuat rute dari tautan', 'error');
+                if (fromName && !fromId) fromId = this.findStopIdByName(fromName);
+                if (toName && !toId) toId = this.findStopIdByName(toName);
+                if (fromId && toId) {
+                    computed = journey.computePlanByStopIds(String(fromId), String(toId), mode);
+                }
+            }
+
+            if (!computed) {
+                this.showNotification('❌ Gagal memuat rute dari tautan (tidak menemukan halte)', 'error');
                 return;
             }
 
@@ -204,7 +279,6 @@ export class ShareManager {
             }
 
             this.showNotification('✅ Rute berhasil dimuat dari tautan!', 'success');
-
         } catch (error) {
             console.error('Error rendering shared route:', error);
             this.showNotification('❌ Gagal memuat rute dari tautan', 'error');
