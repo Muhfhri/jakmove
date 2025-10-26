@@ -13,6 +13,7 @@ import { KRLManager } from './modules/krl-manager.js';
 import { MRTManager } from './modules/mrt-manager.js';
 import { LRTManager } from './modules/lrt-manager.js';
 import { LRTJakartaManager } from './modules/lrtj-manager.js';
+import { ShareManager } from './modules/share-manager.js';
 
 class TransJakartaApp {
     constructor() {
@@ -44,6 +45,7 @@ class TransJakartaApp {
             this.modules.mrt = new MRTManager(this);
             this.modules.lrt = new LRTManager(this);
             this.modules.lrtj = new LRTJakartaManager(this);
+            this.modules.share = new ShareManager(this);
 
             // Step 1: Load GTFS data and basic settings
             const [gtfsData] = await Promise.all([
@@ -84,7 +86,15 @@ class TransJakartaApp {
                 }
             } catch (e) {}
             
-            // Step 10: Mark app as fully ready
+            // Step 10: Initialize ShareManager for route sharing
+            try {
+                this.modules.share.init();
+                console.log('✅ ShareManager initialized');
+            } catch (e) {
+                console.warn('ShareManager init failed:', e);
+            }
+            
+            // Step 11: Mark app as fully ready
             this.markAppAsReady();
             
             console.log('TransJakarta App initialized successfully');

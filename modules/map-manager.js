@@ -2295,6 +2295,32 @@ export class MapManager {
         this.map.addLayer({ id, type: 'circle', source: sourceId, paint: { 'circle-radius': 6, 'circle-color': '#d9534f', 'circle-stroke-color': '#fff', 'circle-stroke-width': 2 } });
         this.layers.set(id, { sourceId, layerId: id });
         this.showHtmlPopupAt(lng, lat, title);
+
+        // Make the marker clickable to reopen the last place popup (or fallback title)
+        try {
+            const onClick = () => {
+                try {
+                    const app = window.transJakartaApp;
+                    const search = app && app.modules && app.modules.search;
+                    const ctx = search && search._lastPlaceContext;
+                    if (ctx && search && typeof search.showPlacePopupWithStops === 'function' && typeof search.findNearestStops === 'function') {
+                        // Recompute nearest stops for freshness, then show full place popup
+                        search.findNearestStops(ctx.lat, ctx.lon, 800)
+                            .then(ns => { search.showPlacePopupWithStops(ctx.place, Array.isArray(ns) ? ns : [], this); })
+                            .catch(() => { search.showPlacePopupWithStops(ctx.place, [], this); });
+                    } else {
+                        // Fallback: simple title-only popup
+                        this.showHtmlPopupAt(lng, lat, title);
+                    }
+                } catch (_) {
+                    this.showHtmlPopupAt(lng, lat, title);
+                }
+            };
+            // Bind click and hover cursor to the circle layer
+            this.map.on('click', id, onClick);
+            this.map.on('mouseenter', id, () => { this.map.getCanvas().style.cursor = 'pointer'; });
+            this.map.on('mouseleave', id, () => { this.map.getCanvas().style.cursor = ''; });
+        } catch (_) {}
         return id;
     }
 

@@ -12,6 +12,12 @@
       "lines": ["B"],
       "facilities": ["parking", "minimarket", "mosque", "restroom", "atm", "wifi", "wheelchair"]
     },
+    "GDD": {
+      "name": "Gondangdia",
+      "isTransitHub": false,
+      "lines": ["B"],
+      "facilities": ["parking", "minimarket", "mosque", "restroom", "atm", "wifi", "wheelchair"]
+    },
     "RJW": {
       "name": "Rajawali",
       "isTransitHub": false,
@@ -40,7 +46,7 @@
       "name": "Pondok Jati",
       "isTransitHub": false,
       "lines": ["C"],
-      "facilities": ["mosque", "restroom", "atm", "wifi", "wheelchair"]
+      "facilities": ["mosque", "restroom", "wifi", "wheelchair"]
     },
     "JNG": {
         "name": "Jatinegara",
@@ -174,6 +180,11 @@
     },
     "TB": {
       "name": "Tambun",
+      "lines": ["C"],
+      "facilities": ["parking", "minimarket", "mosque", "restroom", "wheelchair", "elevator"]
+    },
+    "CIT": {
+      "name": "Cibitung",
       "lines": ["C"],
       "facilities": ["parking", "minimarket", "mosque", "restroom", "wheelchair", "elevator"]
     },

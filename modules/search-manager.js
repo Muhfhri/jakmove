@@ -8,6 +8,28 @@ export class SearchManager {
         this._activeFilter = 'all';
         this._allResults = null; // Store all results for filtering
         this._currentSearchController = null; // For cancelling ongoing searches
+        // Indexed data for fast search
+        this._indexBuilt = false;
+        this._stopIndex = [];
+        this._routeIndex = [];
+        // Rail stations (KRL/MRT/LRT/LRTJ)
+        this._railIndex = [];
+        this._railIndexBuilt = false;
+        this._railInitStarted = false;
+        // Offline aliases for well-known places (used as fallback)
+        this._placeAliasCoords = {
+            'gelora bung karno': { lat: -6.2185, lon: 106.8029, name: 'Gelora Bung Karno (Stadion GBK)', type: 'stadium', category: 'attraction' },
+            'gbk': { lat: -6.2185, lon: 106.8029, name: 'Gelora Bung Karno (GBK)', type: 'stadium', category: 'attraction' },
+            'monas': { lat: -6.175392, lon: 106.827153, name: 'Monumen Nasional (Monas)', type: 'monument', category: 'tourism' },
+            'bundaran hi': { lat: -6.193, lon: 106.8239, name: 'Bundaran Hotel Indonesia', type: 'attraction', category: 'tourism' },
+            'istiqlal': { lat: -6.1703, lon: 106.8316, name: 'Masjid Istiqlal', type: 'place_of_worship', category: 'amenity' },
+            'kota tua': { lat: -6.1352, lon: 106.8133, name: 'Kota Tua Jakarta', type: 'attraction', category: 'tourism' },
+            'tmii': { lat: -6.302, lon: 106.895, name: 'Taman Mini Indonesia Indah (TMII)', type: 'attraction', category: 'tourism' },
+            'taman mini indonesia indah': { lat: -6.302, lon: 106.895, name: 'Taman Mini Indonesia Indah', type: 'attraction', category: 'tourism' },
+            'ragunan': { lat: -6.3111, lon: 106.8206, name: 'Kebun Binatang Ragunan', type: 'zoo', category: 'tourism' },
+            'taman ismail marzuki': { lat: -6.1967, lon: 106.8383, name: 'Taman Ismail Marzuki (TIM)', type: 'theatre', category: 'amenity' },
+            'tim': { lat: -6.1967, lon: 106.8383, name: 'Taman Ismail Marzuki (TIM)', type: 'theatre', category: 'amenity' }
+        };
         this.initFilterTabs();
     }
 
@@ -65,9 +87,14 @@ export class SearchManager {
             }
         }
         
+        // Stations are considered places in filter UX, but shown under their own header
         if (this._activeFilter === 'all' || this._activeFilter === 'places') {
             if (this._allResults.places && this._allResults.places.length > 0) {
                 this.addPlacesResults(this._allResults.places, ul);
+                hasResults = true;
+            }
+            if (this._allResults.stations && this._allResults.stations.length > 0) {
+                this.addStationsResults(this._allResults.stations, ul);
                 hasResults = true;
             }
         }
@@ -91,7 +118,7 @@ export class SearchManager {
             this._currentSearchController.abort();
         }
 
-        // Debounce 50ms untuk pencarian yang lebih responsif
+        // Debounce agar pencarian responsif tanpa membanjiri UI (120ms)
         clearTimeout(this._debounceId);
         this._debounceId = setTimeout(async () => {
             // Create new search controller for this search
@@ -140,10 +167,13 @@ export class SearchManager {
             // Show immediate loading for better UX
             this.showSearchingIndicator(resultsDiv, q);
             
+            // Pastikan index telah siap (lazy-build)
+            try { this._ensureIndex(); } catch(_) {}
+            
             // Search all categories with optimized order
             await this.searchAllCategoriesOptimized(q, resultsDiv);
             this._currentSearchController = null;
-        }, 50);
+        }, 120);
     }
 
     // Show searching indicator for immediate feedback
@@ -167,65 +197,45 @@ export class SearchManager {
         resultsDiv.appendChild(ul);
     }
 
-    // Optimized search with parallel execution for faster results
+    // Optimized search: render local instantly, append stations/places later
     async searchAllCategoriesOptimized(query, resultsDiv) {
         const startTime = Date.now();
-        
         try {
-            // Start all searches in parallel for better performance
-            const [localResults, placesResults] = await Promise.allSettled([
-                this.searchLocalData(query),
-                this.searchPlacesDataFast(query)
-            ]);
-
-            // Process local results (always available)
-            let foundStops = [];
-            let foundRoutes = [];
-            let stopToRoutes = {};
-            let allRoutes = [];
-
-            if (localResults.status === 'fulfilled') {
-                const { stops, routes, stopToRoutes: str, allRoutes: ar } = localResults.value;
-                foundStops = stops;
-                foundRoutes = routes;
-                stopToRoutes = str;
-                allRoutes = ar;
-            }
-
-            // Process places results (may fail or be slow)
-            let foundPlaces = [];
-            if (placesResults.status === 'fulfilled') {
-                foundPlaces = placesResults.value;
-            } else {
-                console.warn('Places search failed:', placesResults.reason);
-            }
-
-            // Store all results
-            this._allResults = {
-                routes: foundRoutes,
-                stops: foundStops,
-                places: foundPlaces,
-                stopToRoutes: stopToRoutes,
-                allRoutes: allRoutes
-            };
-
+            // Local first
+            const { stops, routes, stopToRoutes, allRoutes } = await this.searchLocalData(query);
+            this._allResults = { routes, stops, places: [], stations: [], stopToRoutes, allRoutes };
             this._lastQuery = query;
-            
-            // Clear searching indicator and show results
             resultsDiv.innerHTML = '';
             this.applyFilterToResults();
 
-            // Cache results
+            // Cache local render
             const cacheKey = `${query}_${this._activeFilter}`;
             if (this._searchCache.size >= 50) {
-                const firstKey = this._searchCache.keys().next().value;
-                this._searchCache.delete(firstKey);
+                const firstKey = this._searchCache.keys().next().value; this._searchCache.delete(firstKey);
             }
             this._searchCache.set(cacheKey, resultsDiv.innerHTML);
 
-            const endTime = Date.now();
-            console.log(`Search completed in ${endTime - startTime}ms`);
+            // Stations (background)
+            this.searchRailStations(query).then(stations => {
+                if (!stations || stations.length === 0) return;
+                if (this._lastQuery !== query) return;
+                this._allResults.stations = stations;
+                const container = document.getElementById('searchResults');
+                if (container) this.addStationsResults(stations, container);
+            }).catch(()=>{});
 
+            // Places (background, cap time)
+            const placesPromise = this.searchPlacesDataFast(query);
+            const timeout = new Promise(resolve => setTimeout(() => resolve([]), 1200));
+            const places = await Promise.race([placesPromise, timeout]).catch(()=>[]);
+            if (Array.isArray(places) && places.length > 0 && this._lastQuery === query) {
+                this._allResults.places = places;
+                const container = document.getElementById('searchResults');
+                if (container) this.addPlacesResults(places, container);
+            }
+
+            const endTime = Date.now();
+            console.log(`Search local render in ${endTime - startTime}ms; appended stations/places asynchronously`);
         } catch (error) {
             console.error('Search failed:', error);
             resultsDiv.innerHTML = '';
@@ -238,31 +248,61 @@ export class SearchManager {
     // Fast local data search (stops & routes)
     async searchLocalData(query) {
         return new Promise((resolve) => {
-            const stops = window.transJakartaApp.modules.gtfs.getStops();
-            const routes = window.transJakartaApp.modules.gtfs.getRoutes();
-            const stopToRoutes = window.transJakartaApp.modules.gtfs.getStopToRoutes();
+            const gtfs = window.transJakartaApp.modules.gtfs;
+            const stops = gtfs.getStops();
+            const routes = gtfs.getRoutes();
+            const stopToRoutes = gtfs.getStopToRoutes();
 
-            // Search stops
-            let foundStops = stops
-                .filter(s => s.stop_name.toLowerCase().includes(query))
-                .filter(s => !(String(s.stop_id || '').startsWith('E') || String(s.stop_id || '').startsWith('H')));
+            // Ensure index is built
+            this._ensureIndex();
 
-            // Search routes
-            let foundRoutes = routes.filter(r =>
-                (r.route_short_name && r.route_short_name.toLowerCase().includes(query)) ||
-                (r.route_long_name && r.route_long_name.toLowerCase().includes(query))
-            );
+            const normQuery = this._normalizeText(query);
+            const queryTokens = this._tokenize(normQuery);
 
-            // Sort routes naturally
-            foundRoutes = foundRoutes.sort((a, b) => 
-                window.transJakartaApp.modules.gtfs.naturalSort(a, b)
-            );
+            // Expand queries (aliases)
+            const expanded = this.expandSearchKeywords(normQuery);
+            const variants = Array.from(new Set([normQuery, ...expanded]));
 
-            // If no exact matches for stops, try fuzzy matches
-            if (foundStops.length === 0 && query.length >= 3) {
-                const fuzzyResult = this.findFuzzyMatches(stops, query);
-                foundStops = fuzzyResult.matches;
+            // Score stops across query variants
+            const stopScores = new Map();
+            for (const qv of variants) {
+                const tokens = this._tokenize(qv);
+                for (const entry of this._stopIndex) {
+                    const score = this._scoreTokensMatch(entry, tokens, qv);
+                    if (score <= 0) continue;
+                    const prev = stopScores.get(entry.ref) || 0;
+                    if (score > prev) stopScores.set(entry.ref, score);
+                }
             }
+            let foundStops = Array.from(stopScores.entries())
+                .sort((a,b) => b[1]-a[1])
+                .slice(0, 50)
+                .map(([ref]) => ref);
+
+            // Fallback to fuzzy
+            if (foundStops.length === 0 && normQuery.length >= 3) {
+                const filteredForFuzzy = stops.filter(s => this._isSearchableStopId(String(s.stop_id || '')));
+                const fuzzy = this.findFuzzyMatches(filteredForFuzzy, normQuery);
+                foundStops = fuzzy.matches || [];
+            }
+
+            // Routes scoring
+            const routeScores = new Map();
+            for (const qv of variants) {
+                const tokens = this._tokenize(qv);
+                for (const r of this._routeIndex) {
+                    let score = 0;
+                    if (r.normLong.includes(qv)) score += 3;
+                    if (r.short && r.short.toLowerCase() === qv) score += 5;
+                    if (this._isTokenSubset(tokens, r.tokensLong)) score += 2 + tokens.length * 0.2;
+                    if (score > 0) {
+                        const prev = routeScores.get(r.ref) || 0;
+                        if (score > prev) routeScores.set(r.ref, score);
+                    }
+                }
+            }
+            let foundRoutes = Array.from(routeScores.keys());
+            foundRoutes = foundRoutes.sort((a, b) => window.transJakartaApp.modules.gtfs.naturalSort(a, b));
 
             resolve({
                 stops: foundStops,
@@ -297,6 +337,14 @@ export class SearchManager {
             
             // Try multiple search strategies
             let places = await this.searchWithMultipleStrategies(query);
+
+            // Fallback: offline alias if no results
+            if (!places || places.length === 0) {
+                const aliasPlace = this._matchPlaceAlias(this._normalizeText(query));
+                if (aliasPlace) {
+                    places = [aliasPlace];
+                }
+            }
             
             console.log(`✅ Found ${places.length} places for: "${query}"`);
             
@@ -315,7 +363,9 @@ export class SearchManager {
             } else {
                 console.warn('❌ Places search failed for:', query, error);
             }
-            return [];
+            // Try offline alias on failure
+            const aliasPlace = this._matchPlaceAlias(this._normalizeText(query));
+            return aliasPlace ? [aliasPlace] : [];
         }
     }
 
@@ -413,6 +463,7 @@ export class SearchManager {
             'gbk': ['gelora bung karno', 'gelora senayan'],
             'gelora bung karno': ['gbk', 'gelora senayan'],
             'senayan': ['gelora bung karno', 'gbk'],
+            'bundaran hi bank jakarta': ['bundaran hi', 'bundaran hi astra'],
             'istiqlal': ['masjid istiqlal', 'islamic centre'],
             'katedral': ['gereja katedral', 'cathedral'],
             'ancol': ['taman impian jaya ancol', 'ancol dreamland'],
@@ -421,7 +472,7 @@ export class SearchManager {
             'tmii': ['taman mini indonesia indah', 'taman mini'],
             'ragunan': ['kebun binatang ragunan', 'ragunan zoo'],
             'planetarium': ['planetarium jakarta', 'planetarium taman ismail marzuki'],
-            'tim': ['taman ismail marzuki', 'taman ismail marzuki jakarta'],
+            'tim': ['taman ismail marzuki', 'taman ismail marzuki jakarta', 'taman ismail marzuki (tim)'],
             'balai kota': ['balai kota jakarta', 'jakarta city hall'],
             'bundaran hi': ['hotel indonesia roundabout', 'bundaran hotel indonesia'],
             'grand indonesia': ['grand indonesia mall', 'gi mall'],
@@ -458,31 +509,31 @@ export class SearchManager {
 
     // Perform single place search with timeout
     async performSinglePlaceSearch(searchQuery) {
-        const controller = this._currentSearchController || new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), searchQuery.timeout);
-
-        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery.query)}&limit=10&countrycodes=id&accept-language=id&addressdetails=1&extratags=1`;
-        
+        // Use per-request controller and link to global abort
+        const globalController = this._currentSearchController;
+        const localController = new AbortController();
+        const onGlobalAbort = () => { try { localController.abort(); } catch(_) {} };
         try {
-            const response = await fetch(url, {
-                signal: controller.signal,
-                headers: {
-                    'User-Agent': 'JakMove/1.0'
-                }
-            });
-            
-            clearTimeout(timeoutId);
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
+            if (globalController && globalController.signal && globalController.signal.aborted) {
+                throw Object.assign(new Error('Aborted'), { name: 'AbortError' });
             }
-            
+            if (globalController && globalController.signal) {
+                globalController.signal.addEventListener('abort', onGlobalAbort, { once: true });
+            }
+            const timeoutId = setTimeout(() => localController.abort(), searchQuery.timeout);
+            const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery.query)}&limit=10&countrycodes=id&accept-language=id&addressdetails=1&extratags=1`;
+            const response = await fetch(url, {
+                signal: localController.signal,
+                headers: { 'User-Agent': 'JakMove/1.0' }
+            });
+            clearTimeout(timeoutId);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const places = await response.json();
             return places || [];
-
         } catch (error) {
-            clearTimeout(timeoutId);
             throw error;
+        } finally {
+            try { if (globalController && globalController.signal) globalController.signal.removeEventListener('abort', onGlobalAbort); } catch(_) {}
         }
     }
 
@@ -550,8 +601,12 @@ export class SearchManager {
 
         // Search stops
         let foundStops = stops
-            .filter(s => s.stop_name.toLowerCase().includes(query))
-            .filter(s => !(String(s.stop_id || '').startsWith('E') || String(s.stop_id || '').startsWith('H')));
+            .filter(s => this._isSearchableStopId(String(s.stop_id || '')))
+            .filter(s => {
+                const ns = this._normalizeText(s.stop_name);
+                if (ns.includes(query)) return true;
+                return this._isTokenSubset(this._tokenize(query), this._tokenize(ns));
+            });
 
         // Search routes
         let foundRoutes = routes.filter(r =>
@@ -566,7 +621,8 @@ export class SearchManager {
 
         // If no exact matches for stops, try fuzzy matches
         if (foundStops.length === 0 && query.length >= 3) {
-            const fuzzyResult = this.findFuzzyMatches(stops, query);
+            const filteredForFuzzy = stops.filter(s => this._isSearchableStopId(String(s.stop_id || '')));
+            const fuzzyResult = this.findFuzzyMatches(filteredForFuzzy, query);
             foundStops = fuzzyResult.matches;
         }
 
@@ -696,7 +752,8 @@ export class SearchManager {
 
         // If no exact matches for stops, try fuzzy matches
         if (foundStops.length === 0 && query.length >= 3) {
-            const fuzzyResult = this.findFuzzyMatches(stops, query);
+            const filteredForFuzzy = stops.filter(s => this._isSearchableStopId(String(s.stop_id||'')));
+            const fuzzyResult = this.findFuzzyMatches(filteredForFuzzy, query);
             foundStops = fuzzyResult.matches;
             suggestionMessage = fuzzyResult.suggestion;
         }
@@ -971,6 +1028,9 @@ export class SearchManager {
         if (searchInput) searchInput.value = '';
         if (filterTabs) filterTabs.style.display = 'none';
         
+        // Keep the reopen chip to allow reopening place popup after close
+        // but remove if user explicitly clears via clear button (handled elsewhere)
+        
         this._allResults = null;
         this._lastQuery = '';
     }
@@ -1012,6 +1072,182 @@ export class SearchManager {
             const re = new RegExp(`(${esc})`, 'ig');
             return String(text).replace(re, '<mark>$1</mark>');
         } catch (e) { return text; }
+    }
+
+    // =============================
+    // Indexing & Token utilities
+    // =============================
+    _normalizeText(text) {
+        try {
+            let t = String(text || '').toLowerCase();
+            // remove diacritics if supported
+            try { t = t.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); } catch(_) {}
+            // keep alnum and spaces
+            t = t.replace(/[^a-z0-9\s]/g, ' ');
+            // remove common stopwords/prefixes
+            const stopwords = ['halte', 'stasiun', 'terminal', 'koridor', 'transjakarta', 'tj', 'busway', 'jalan', 'jl', 'jln'];
+            stopwords.forEach(w => { t = t.replace(new RegExp(`\\b${w}\\b`, 'g'), ' '); });
+            t = t.replace(/\s+/g, ' ').trim();
+            return t;
+        } catch (_) { return String(text || '').toLowerCase().trim(); }
+    }
+
+    _tokenize(text) {
+        const norm = this._normalizeText(text);
+        return norm ? norm.split(/\s+/).filter(Boolean) : [];
+    }
+
+    _isTokenSubset(needles, haystack) {
+        if (!needles || needles.length === 0) return false;
+        if (!haystack || haystack.length === 0) return false;
+        return needles.every(n => haystack.some(h => h.includes(n)));
+    }
+
+    _isSearchableStopId(stopId) {
+        try {
+            const id = String(stopId || '');
+            return id.startsWith('H') || id.startsWith('B');
+        } catch(_) { return false; }
+    }
+
+    _ensureIndex() {
+        if (this._indexBuilt) return;
+        try { this._buildIndex(); } catch(_) {}
+    }
+
+    _buildIndex() {
+        const gtfs = window.transJakartaApp && window.transJakartaApp.modules && window.transJakartaApp.modules.gtfs;
+        if (!gtfs) return;
+        const stops = gtfs.getStops() || [];
+        const routes = gtfs.getRoutes() || [];
+        this._stopIndex = stops
+            .filter(s => this._isSearchableStopId(String(s.stop_id || '')))
+            .map(s => {
+                const normName = this._normalizeText(s.stop_name);
+                const tokens = this._tokenize(normName);
+                return { ref: s, normName, tokens };
+            });
+        this._routeIndex = routes.map(r => {
+            const short = r.route_short_name || '';
+            const long = r.route_long_name || '';
+            const normLong = this._normalizeText(long);
+            const tokensLong = this._tokenize(normLong);
+            return { ref: r, short, long, normLong, tokensLong };
+        });
+        this._indexBuilt = true;
+    }
+
+    async _ensureRailInit() {
+        if (this._railInitStarted) return;
+        this._railInitStarted = true;
+        try {
+            const app = window.transJakartaApp;
+            if (!app || !app.modules) return;
+            const krl = app.modules.krl; const mrt = app.modules.mrt; const lrt = app.modules.lrt; const lrtj = app.modules.lrtj;
+            const tasks = [];
+            if (krl && typeof krl.isLoaded === 'function' && !krl.isLoaded()) tasks.push(krl.init());
+            if (mrt && typeof mrt.isLoaded === 'function' && !mrt.isLoaded() && mrt.init) tasks.push(mrt.init());
+            if (lrt && typeof lrt.isLoaded === 'function' && !lrt.isLoaded() && lrt.init) tasks.push(lrt.init());
+            if (lrtj && typeof lrtj.isLoaded === 'function' && !lrtj.isLoaded() && lrtj.init) tasks.push(lrtj.init());
+            await Promise.allSettled(tasks);
+            this._buildRailIndex();
+        } catch (_) {}
+    }
+
+    _buildRailIndex() {
+        try {
+            const app = window.transJakartaApp;
+            if (!app || !app.modules) return;
+            const list = [];
+            const norm = (t) => this._normalizeText(t);
+            const pushStations = (arr, mode) => {
+                (arr || []).forEach(st => {
+                    const name = st.name || st.properties?.name || '';
+                    const coords = st.coordinates || st.geometry?.coordinates || [];
+                    if (!name || !Array.isArray(coords) || coords.length < 2) return;
+                    const normName = norm(name);
+                    const tokens = this._tokenize(normName);
+                    list.push({
+                        ref: { name, lat: coords[1], lon: coords[0], mode },
+                        normName,
+                        tokens
+                    });
+                });
+            };
+            try { const krl = app.modules.krl; if (krl && (krl.getAllStations || krl.stations)) pushStations((krl.getAllStations ? krl.getAllStations() : krl.stations), 'KRL'); } catch(_) {}
+            try { const mrt = app.modules.mrt; if (mrt && mrt.stations) pushStations(mrt.stations, 'MRT'); } catch(_) {}
+            try { const lrt = app.modules.lrt; if (lrt && lrt.stations) pushStations(lrt.stations, 'LRT'); } catch(_) {}
+            try { const lrtj = app.modules.lrtj; if (lrtj && lrtj.stations) pushStations(lrtj.stations, 'LRTJ'); } catch(_) {}
+            this._railIndex = list;
+            this._railIndexBuilt = list.length > 0;
+        } catch (_) {}
+    }
+
+    async searchRailStations(query) {
+        try {
+            const normQuery = this._normalizeText(query);
+            const tokens = this._tokenize(normQuery);
+            if (!this._railIndexBuilt) {
+                // kick off async load but do not block
+                this._ensureRailInit();
+                // Try building immediately with whatever is loaded
+                this._buildRailIndex();
+                if (!this._railIndexBuilt) return [];
+            }
+            const scores = new Map();
+            const variants = Array.from(new Set([normQuery, ...this.expandSearchKeywords(normQuery)]));
+            for (const v of variants) {
+                const vt = this._tokenize(v);
+                for (const entry of this._railIndex) {
+                    let s = 0;
+                    if (entry.normName.includes(v)) s += 3;
+                    if (this._isTokenSubset(vt, entry.tokens)) s += 2 + vt.length * 0.2;
+                    if (s > 0) scores.set(entry.ref, Math.max(scores.get(entry.ref) || 0, s));
+                }
+            }
+            return Array.from(scores.entries())
+                .sort((a,b) => b[1]-a[1])
+                .slice(0, 30)
+                .map(([ref]) => ref);
+        } catch (_) {
+            return [];
+        }
+    }
+
+    _scoreTokensMatch(entry, queryTokens, queryNorm) {
+        if (!entry || (!queryTokens || queryTokens.length === 0)) return 0;
+        let score = 0;
+        // direct substring gives higher weight
+        if (queryNorm && entry.normName.includes(queryNorm)) score += 3;
+        // token subset match
+        if (this._isTokenSubset(queryTokens, entry.tokens)) score += 2 + (queryTokens.length * 0.2);
+        // prefix bonus
+        try {
+            const first = queryTokens[0] || '';
+            if (first && entry.normName.startsWith(first)) score += 0.8;
+        } catch(_) {}
+        return score;
+    }
+
+    _matchPlaceAlias(normQuery) {
+        try {
+            if (!normQuery) return null;
+            const keys = Object.keys(this._placeAliasCoords || {});
+            for (const key of keys) {
+                if (normQuery.includes(key) || key.includes(normQuery)) {
+                    const a = this._placeAliasCoords[key];
+                    return {
+                        lat: String(a.lat),
+                        lon: String(a.lon),
+                        display_name: a.name,
+                        type: a.type,
+                        category: a.category,
+                        importance: 0.5
+                    };
+                }
+            }
+        } catch(_) {}
+        return null;
     }
 
     // Enhanced fuzzy match with better typo tolerance
@@ -1180,9 +1416,7 @@ export class SearchManager {
     // Improved fuzzy matching with better typo tolerance
     findFuzzyMatches(stops, query) {
         const cleanQuery = query.toLowerCase().trim();
-        const filteredStops = stops.filter(s => 
-            !(String(s.stop_id || '').startsWith('E') || String(s.stop_id || '').startsWith('H'))
-        );
+        const filteredStops = stops.filter(s => this._isSearchableStopId(String(s.stop_id || '')));
         
         let bestMatches = [];
         let suggestionText = '';
@@ -1383,6 +1617,61 @@ export class SearchManager {
             ul.appendChild(li);
         });
     }
+
+    // Add rail stations results to the UI
+    addStationsResults(stations, resultsDiv) {
+        // Ensure list exists
+        let ul = resultsDiv.querySelector('ul.search-results-list');
+        if (!ul) { ul = this.createResultsList(); resultsDiv.appendChild(ul); }
+
+        // Header
+        const header = document.createElement('li');
+        header.className = 'search-result-header';
+        header.innerHTML = `
+            <iconify-icon icon="mdi:train" class="me-2"></iconify-icon>
+            <span>Stasiun</span>
+        `;
+        ul.appendChild(header);
+
+        stations.forEach(st => {
+            const li = this.createStationResultItem(st);
+            ul.appendChild(li);
+        });
+    }
+
+    createStationResultItem(st) {
+        const li = document.createElement('li');
+        li.className = 'search-result-item place-result-item';
+
+        const mode = String(st.mode || '').toUpperCase();
+        const modeColor = mode === 'KRL' ? '#dc2626' : (mode === 'MRT' ? '#0066cc' : (mode === 'LRTJ' ? '#e31e24' : '#8b5cf6'));
+        const modeLabel = mode === 'KRL' ? 'KRL' : (mode === 'MRT' ? 'MRT' : (mode === 'LRTJ' ? 'LRTJ' : 'LRT'));
+
+        li.innerHTML = `
+            <div class="search-result-content">
+                <div class="place-icon-wrapper" style="background:${modeColor}15;border-color:${modeColor}55;display:flex;align-items:center;justify-content:center;">
+                    <span style="background:${modeColor};color:#fff;border-radius:6px;padding:2px 6px;font-size:10px;font-weight:800;">${modeLabel}</span>
+                </div>
+                <div class="place-info">
+                    <div class="place-name">${this.highlight(st.name || '')}</div>
+                    <div class="place-type">Stasiun ${modeLabel}</div>
+                </div>
+            </div>
+            <iconify-icon icon="mdi:chevron-right" class="search-result-arrow"></iconify-icon>
+        `;
+
+        li.onclick = () => {
+            try {
+                const mapManager = window.transJakartaApp.modules.map;
+                if (mapManager && st.lat && st.lon) {
+                    mapManager.setView(parseFloat(st.lat), parseFloat(st.lon), 16);
+                    mapManager.addSearchResultMarker(parseFloat(st.lat), parseFloat(st.lon), `${st.name} (Stasiun ${mode})`);
+                }
+            } catch(_) {}
+            this.clearSearchResults();
+        };
+        return li;
+    }
     
     // Create place result item
     createPlaceResultItem(place) {
@@ -1477,6 +1766,8 @@ export class SearchManager {
         
         // Add place marker
         const placeMarkerId = mapManager.addSearchResultMarker(lat, lon, placeName);
+        // Persist last place context for easy reopen
+        this._lastPlaceContext = { place, lat, lon, placeName, markerId: placeMarkerId };
         
         // Find and show nearest stops
         try {
@@ -1509,6 +1800,7 @@ export class SearchManager {
                         </div>
                     </div>
                 `);
+                // Reopen handled via clicking search marker
             }
         } catch (error) {
             console.warn('Failed to find nearest stops:', error);
@@ -1520,6 +1812,7 @@ export class SearchManager {
                     </div>
                 </div>
             `);
+            // Reopen handled via clicking search marker
         }
     }
     
@@ -1569,17 +1862,15 @@ export class SearchManager {
             const badgeClass = stopType === 'Pengumpan' ? 'badge-warning' : 'badge-primary';
             
             return `
-                <div class="stop-item d-flex align-items-center justify-content-between py-2 border-bottom" 
-                     style="cursor: pointer;" 
-                     data-stop-lat="${stop.stop_lat}" 
-                     data-stop-lon="${stop.stop_lon}"
-                     data-stop-name="${stop.stop_name}"
-                     data-stop-id="${stop.stop_id}">
-                    <div class="flex-grow-1">
-                        <div class="fw-semibold">${stop.stop_name}</div>
-                        <span class="badge ${badgeClass} badge-sm">${stopType}</span>
+                <div class="stop-item" 
+                     style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:10px 8px;border-radius:10px;border:1px solid #e5e7eb;margin-bottom:8px;background:#fff;">
+                    <div class="flex-grow-1" style="min-width:0;">
+                        <div class="fw-semibold" style="color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${stop.stop_name}</div>
+                        <span class="badge ${badgeClass} badge-sm" style="margin-top:4px;">${stopType}</span>
                     </div>
-                    <div class="text-muted small">${distanceText}</div>
+                    <div class="text-muted small" style="margin-left:10px;white-space:nowrap;">${distanceText}</div>
+                    <span class="ms-2" style="color:#2563eb;"><i class="fa-solid fa-chevron-right"></i></span>
+                    <div style="display:none" data-stop-lat="${stop.stop_lat}" data-stop-lon="${stop.stop_lon}" data-stop-name="${stop.stop_name}" data-stop-id="${stop.stop_id}"></div>
                 </div>
             `;
         }).join('');
@@ -1588,24 +1879,22 @@ export class SearchManager {
         const placeWeatherHtml = this.getPlaceWeatherHtml(lat, lon);
         
         const popupHtml = `
-            <div class="plus-jakarta-sans" style="min-width: 280px; max-width: 350px;">
-                <div class="place-header d-flex align-items-start gap-2 mb-3" style="padding: 12px 12px 0 12px;">
-                    <iconify-icon icon="mdi:map-marker" class="text-success mt-1" style="font-size: 1.3em;"></iconify-icon>
-                    <div>
-                        <div class="fw-bold text-dark">${placeName}</div>
+            <div class="plus-jakarta-sans" style="min-width: 300px; max-width: 380px;">
+                <div class="d-flex align-items-start gap-3" style="padding: 12px 12px 8px 12px; border-bottom: 1px solid #e5e7eb;">
+                    <div style="width:36px;height:36px;border-radius:10px;background:#10b981;display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 2px 6px rgba(16,185,129,0.3)"><i class="fa-solid fa-map-marker-alt"></i></div>
+                    <div style="flex:1;min-width:0;">
+                        <div class="fw-bold" style="color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${placeName}</div>
                         <div class="small text-muted">${placeType}</div>
                     </div>
                 </div>
-                
                 ${placeWeatherHtml}
-                
-                <div class="nearest-stops" style="padding: 0 12px 12px 12px;">
-                    <div class="fw-semibold mb-2 text-primary">
-                        <iconify-icon icon="mdi:bus-stop" class="me-1"></iconify-icon>
+                <div class="nearest-stops" style="padding: 8px 12px 12px 12px;">
+                    <div class="fw-semibold mb-2" style="color:#2563eb;display:flex;align-items:center;gap:6px;">
+                        <i class="fa-solid fa-bus"></i>
                         Halte Terdekat
                     </div>
-                    <div class="stops-list" style="max-height: 200px; overflow-y: auto;">
-                        ${stopsHtml}
+                    <div class="stops-list" style="max-height: 240px; overflow-y: auto;">
+                        ${stopsHtml || '<div class="text-muted small">Tidak ada halte dalam radius 800m</div>'}
                     </div>
                 </div>
             </div>
@@ -1620,10 +1909,11 @@ export class SearchManager {
             
             popupEl.querySelectorAll('.stop-item').forEach(item => {
                 item.addEventListener('click', () => {
-                    const stopLat = parseFloat(item.dataset.stopLat);
-                    const stopLon = parseFloat(item.dataset.stopLon);
-                    const stopName = item.dataset.stopName;
-                    const stopId = item.dataset.stopId;
+                    const hidden = item.querySelector('div[data-stop-id]');
+                    const stopLat = parseFloat(hidden?.dataset.stopLat || 'NaN');
+                    const stopLon = parseFloat(hidden?.dataset.stopLon || 'NaN');
+                    const stopName = hidden?.dataset.stopName || '';
+                    const stopId = hidden?.dataset.stopId || '';
                     
                     // Focus map on the selected stop
                     mapManager.setView(stopLat, stopLon, 17);
@@ -1643,13 +1933,51 @@ export class SearchManager {
                 
                 // Hover effects
                 item.addEventListener('mouseenter', () => {
-                    item.style.backgroundColor = '#f8f9fa';
+                    item.style.backgroundColor = '#f3f4f6';
                 });
                 item.addEventListener('mouseleave', () => {
                     item.style.backgroundColor = '';
                 });
             });
         }, 50);
+    }
+
+    // Ensure a small floating chip exists to reopen the last place popup after close
+    _ensurePlaceReopenChip(place, onReopen) {
+        try {
+            const mapEl = document.getElementById('map');
+            if (!mapEl) return;
+            // Create container if not exists
+            let chip = document.getElementById('placeReopenChip');
+            if (!chip) {
+                chip = document.createElement('button');
+                chip.id = 'placeReopenChip';
+                chip.type = 'button';
+                chip.style.position = 'absolute';
+                chip.style.zIndex = '1001';
+                chip.style.top = '12px';
+                chip.style.right = '12px';
+                chip.style.background = 'rgba(255,255,255,0.95)';
+                chip.style.backdropFilter = 'blur(6px)';
+                chip.style.border = '1px solid #e5e7eb';
+                chip.style.borderRadius = '999px';
+                chip.style.padding = '8px 12px';
+                chip.style.boxShadow = '0 4px 16px rgba(0,0,0,0.12)';
+                chip.style.fontSize = '12px';
+                chip.style.fontWeight = '700';
+                chip.style.color = '#111827';
+                chip.style.display = 'flex';
+                chip.style.alignItems = 'center';
+                chip.style.gap = '6px';
+                chip.style.cursor = 'pointer';
+                chip.title = 'Buka kembali informasi tempat';
+                mapEl.appendChild(chip);
+            }
+            const name = this.formatPlaceName(place.display_name || place.name || 'Tempat');
+            chip.innerHTML = `<i class="fa-solid fa-map-location-dot" style="color:#2563eb"></i><span style="max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${this.escapeHtml(name)}</span>`;
+            // Bind click
+            chip.onclick = () => { try { onReopen && onReopen(); } catch(_){} };
+        } catch (_) {}
     }
 
     // HTML escape utility

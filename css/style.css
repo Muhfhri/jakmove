@@ -7379,21 +7379,22 @@ body.no-scroll { overflow: hidden; height: 100vh; }
 .planner-result-actions {
     display: flex;
     justify-content: flex-end;
+    gap: 8px;
     padding-top: 12px;
     border-top: 1px solid rgba(226, 232, 240, 0.6);
 }
 
 .planner-result-map-btn {
-    padding: 10px 16px;
+    padding: 8px 12px;
     background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
     border: none;
-    border-radius: 10px;
+    border-radius: 8px;
     color: white;
     font-weight: 500;
-    font-size: 0.875rem;
+    font-size: 0.8rem;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
     transition: all 0.3s ease;
     cursor: pointer;
     box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
@@ -7403,6 +7404,36 @@ body.no-scroll { overflow: hidden; height: 100vh; }
     transform: translateY(-1px);
     box-shadow: 0 6px 16px rgba(37, 99, 235, 0.3);
     background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+}
+
+.planner-result-map-btn iconify-icon {
+    font-size: 1rem;
+}
+
+.planner-result-share-btn {
+    padding: 8px 12px;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    border: none;
+    border-radius: 8px;
+    color: white;
+    font-weight: 500;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+}
+
+.planner-result-share-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(16, 185, 129, 0.3);
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+}
+
+.planner-result-share-btn iconify-icon {
+    font-size: 1rem;
 }
 
 /* Planner suggestion dropdown styles */
@@ -7633,6 +7664,16 @@ body.no-scroll { overflow: hidden; height: 100vh; }
 [data-theme="dark"] .planner-result-map-btn:hover {
     background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
     box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+}
+
+[data-theme="dark"] .planner-result-share-btn {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+[data-theme="dark"] .planner-result-share-btn:hover {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
 }
 
 /* Desktop Column Layout for Planner Form */

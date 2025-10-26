@@ -362,6 +362,8 @@ export class TypedPlanner {
                 return;
             }
             const jp = this.app.modules.journey;
+            // Apply chosen departure date/time to planner (time-aware filtering)
+            try { jp.setDepartureDateTime(this.getDepartureDateTime()); } catch(_) {}
             
             // Get all three modes but prioritize user's preferred mode
             const allModes = ['balanced', 'fastest', 'cheapest'];
@@ -381,7 +383,10 @@ export class TypedPlanner {
             }
             
             if (results.length === 0) {
-                this.resultsDiv.innerHTML = `<div class="row g-3">${this.renderError('Rute tidak ditemukan. Coba halte yang berbeda.')}</div>`;
+                // Show error and try alternatives (time shift and longer walk to nearby stops)
+                const errHtml = `<div class="row g-3">${this.renderError('Rute tidak ditemukan pada tanggal/jam tersebut. Kami carikan alternatif lainnya di bawah.')}</div>`;
+                this.resultsDiv.innerHTML = errHtml;
+                this.findAndRenderAlternatives(fromId, toId);
                 return;
             }
             
@@ -421,6 +426,26 @@ export class TypedPlanner {
                         }
                     } catch (e) {
                         console.error('Error showing plan on map:', e);
+                    }
+                });
+            });
+
+            // Wire share buttons
+            this.resultsDiv.querySelectorAll('[data-share]')?.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    try {
+                        const planData = btn.getAttribute('data-plan-index');
+                        if (!planData) return;
+                        
+                        const plan = JSON.parse(planData);
+                        const shareManager = this.app.modules.share;
+                        if (shareManager && typeof shareManager.showShareDialog === 'function') {
+                            shareManager.showShareDialog(plan);
+                        } else {
+                            console.error('ShareManager not available');
+                        }
+                    } catch (e) {
+                        console.error('Error sharing plan:', e);
                     }
                 });
             });
@@ -533,6 +558,173 @@ export class TypedPlanner {
         });
         
         return enhanced;
+    }
+
+    async findAndRenderAlternatives(fromId, toId) {
+        try {
+            const jp = this.app.modules.journey;
+            const gtfs = this.app.modules.gtfs;
+            const stops = gtfs.getStops() || [];
+            const stopsById = new Map(stops.map(s => [String(s.stop_id||''), s]));
+            const fromStop = stopsById.get(String(fromId));
+            const toStop = stopsById.get(String(toId));
+            const when = this.getDepartureDateTime();
+
+            const suggestions = [];
+            const cards = [];
+
+            // 1) Try future times (next 30/60/120/180 minutes)
+            const offsets = [30, 60, 120, 180];
+            for (const off of offsets) {
+                try {
+                    const t2 = new Date(when.getTime() + off*60000);
+                    jp.setDepartureDateTime(t2);
+                    const p = jp.computePlanByStopIds(fromId, toId, this.currentMode);
+                    if (p) {
+                        suggestions.push({ type: 'time', minutes: off, plan: p, when: t2 });
+                        // Only collect up to 2 time alternatives
+                        if (suggestions.filter(s=>s.type==='time').length >= 2) break;
+                    }
+                } catch(_) {}
+            }
+
+            // 2) Try longer walk alternatives (nearby start or end stops up to ~1.2km)
+            const maxDist = 1200; // meters
+            const nearest = (center, limit=6) => {
+                const res = [];
+                for (const s of stops) {
+                    if (!s || !s.stop_lat || !s.stop_lon) continue;
+                    const sid = String(s.stop_id||'');
+                    // Only consider main/feeder stops that appear in stop_times
+                    // We approximate by checking they're in stopToRoutes
+                    try {
+                        const str = gtfs.getStopToRoutes(); if (!str[sid] || str[sid].length===0) continue;
+                    } catch(_) { continue; }
+                    const d = this.haversine(center.stop_lat, center.stop_lon, s.stop_lat, s.stop_lon);
+                    if (d>0 && d<=maxDist) res.push({ s, d });
+                }
+                res.sort((a,b) => a.d - b.d);
+                return res.slice(0, limit).map(x=>x);
+            };
+            if (fromStop && toStop && suggestions.length < 2) {
+                const nearFrom = nearest(fromStop, 6);
+                for (const cand of nearFrom) {
+                    try {
+                        jp.setDepartureDateTime(when);
+                        const p = jp.computePlanByStopIds(String(cand.s.stop_id), toId, this.currentMode);
+                        if (p) {
+                            suggestions.push({ type: 'walk_from', meters: Math.round(cand.d), altFrom: cand.s, plan: p, when });
+                            if (suggestions.filter(s=>s.type!=='time').length >= 2) break;
+                        }
+                    } catch(_){}
+                }
+                if (suggestions.filter(s=>s.type!=='time').length < 2) {
+                    const nearTo = nearest(toStop, 6);
+                    for (const cand of nearTo) {
+                        try {
+                            jp.setDepartureDateTime(when);
+                            const p = jp.computePlanByStopIds(fromId, String(cand.s.stop_id), this.currentMode);
+                            if (p) {
+                                suggestions.push({ type: 'walk_to', meters: Math.round(cand.d), altTo: cand.s, plan: p, when });
+                                if (suggestions.filter(s=>s.type!=='time').length >= 2) break;
+                            }
+                        } catch(_){}
+                    }
+                }
+            }
+
+            // Render suggestions
+            if (suggestions.length === 0) return;
+            const grid = document.createElement('div');
+            grid.className = 'row g-3';
+
+            const fmtMin = (m)=> `${m} mnt lagi`;
+            const fmtWalk = (m)=> (m<1000? `${m} m` : `${(m/1000).toFixed(1)} km`);
+            const timeStr = (d)=> d.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+
+            suggestions.slice(0,3).forEach((sug, idx) => {
+                const plan = sug.plan;
+                const dur = this.formatDuration(plan && plan.duration ? plan.duration.totalSec : 0);
+                let title = '';
+                let subtitle = '';
+                if (sug.type === 'time') {
+                    title = `Berangkat ${fmtMin(sug.minutes)}`;
+                    subtitle = `ETA ${timeStr(sug.when)}`;
+                } else if (sug.type === 'walk_from') {
+                    title = `Jalan ke ${this.escape(String(sug.altFrom.stop_name))}`;
+                    subtitle = `${fmtWalk(sug.meters)} • Durasi ${dur}`;
+                } else if (sug.type === 'walk_to') {
+                    title = `Turun di ${this.escape(String(sug.altTo.stop_name))}`;
+                    subtitle = `${fmtWalk(sug.meters)} • Durasi ${dur}`;
+                }
+
+                const col = document.createElement('div');
+                col.className = 'col-12 col-lg-4';
+                col.innerHTML = `
+                    <div class="planner-result-card h-100">
+                        <div class="planner-result-header">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div class="planner-result-mode">
+                                    <iconify-icon icon="mdi:lightbulb-on"></iconify-icon>
+                                    <span>Alternatif</span>
+                                </div>
+                                <div class="planner-result-badges">
+                                    <div class="planner-result-badge">${this.escape(dur)}</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="planner-result-body">
+                            <div class="planner-result-summary">
+                                <div class="planner-result-info">
+                                    <div class="planner-result-info-item">
+                                        <div class="planner-result-info-label">Opsi</div>
+                                        <div class="planner-result-info-value">${title}</div>
+                                    </div>
+                                    <div class="planner-result-info-item">
+                                        <div class="planner-result-info-label">Detail</div>
+                                        <div class="planner-result-info-value">${subtitle}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="planner-result-actions">
+                                <button type="button" class="planner-result-map-btn" data-alt-idx="${idx}">
+                                    <iconify-icon icon="mdi:map"></iconify-icon>
+                                    <span>Tampilkan di Peta</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(col);
+                cards.push(plan);
+            });
+
+            this.resultsDiv.appendChild(grid);
+            // Wire buttons
+            this.resultsDiv.querySelectorAll('[data-alt-idx]')?.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const idx = parseInt(btn.getAttribute('data-alt-idx'), 10) || 0;
+                    const plan = cards[idx];
+                    if (plan) {
+                        this.app.modules.journey.showPlanOnMap(plan);
+                    }
+                });
+            });
+        } catch (e) {
+            console.warn('findAndRenderAlternatives error:', e);
+        } finally {
+            // restore selected time on journey planner
+            try { this.app.modules.journey.setDepartureDateTime(this.getDepartureDateTime()); } catch(_) {}
+        }
+    }
+
+    haversine(lat1, lon1, lat2, lon2) {
+        const toRad = (x)=> x*Math.PI/180;
+        const R = 6371e3; // meters
+        const dLat = toRad(lat2-lat1);
+        const dLon = toRad(lon2-lon1);
+        const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+        return 2*R*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
     
     sortResultsByPreference(results) {
@@ -844,6 +1036,10 @@ export class TypedPlanner {
                                     <iconify-icon icon="mdi:map"></iconify-icon>
                                     <span>Tampilkan di Peta</span>
                                 </button>
+                                <button type="button" class="planner-result-share-btn" data-share data-plan-index="${this.escape(JSON.stringify(plan))}">
+                                    <iconify-icon icon="mdi:share-variant"></iconify-icon>
+                                    <span>Bagikan Rute</span>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -974,94 +1170,13 @@ export class TypedPlanner {
     
     getServiceStatusBadgeAtTime(plan, checkTime) {
         try {
-            const gtfs = this.app.modules.gtfs;
-            const trips = gtfs.getTrips ? (gtfs.getTrips() || []) : [];
-            const calendar = gtfs.getCalendar ? (gtfs.getCalendar() || []) : [];
-            if (!Array.isArray(calendar) || calendar.length === 0) return '';
-
-            // Build service_id -> calendar entries map
-            const calByService = new Map();
-            for (const c of calendar) {
-                const sid = String(c.service_id || '');
-                if (!sid) continue;
-                if (!calByService.has(sid)) calByService.set(sid, []);
-                calByService.get(sid).push(c);
-            }
-
-            // For each route in the plan, ensure there exists at least one active service at the specified time
+            const jp = this.app.modules.journey;
+            if (!jp) return '';
             const routeIds = new Set((plan.legs || []).map(l => String(l.routeId || '')));
-            const checkDate = new Date(checkTime);
-            const dayMap = { 0: 'sunday', 1: 'monday', 2: 'tuesday', 3: 'wednesday', 4: 'thursday', 5: 'friday', 6: 'saturday' };
-            const dayKey = dayMap[checkDate.getDay()];
-
-            const yyyymmddToDate = (s) => {
-                if (!s || String(s).length !== 8) return null;
-                const y = parseInt(String(s).slice(0, 4), 10);
-                const m = parseInt(String(s).slice(4, 6), 10) - 1;
-                const d = parseInt(String(s).slice(6, 8), 10);
-                return new Date(y, m, d);
-            };
-
-            const isServiceActiveAtTime = (serviceId) => {
-                const entries = calByService.get(String(serviceId) || '') || [];
-                for (const c of entries) {
-                    try {
-                        if (String(c[dayKey]) !== '1') continue;
-                        const start = yyyymmddToDate(c.start_date);
-                        const end = yyyymmddToDate(c.end_date);
-                        if (!start || !end) continue;
-                        // Compare by date only
-                        const t = new Date(checkDate.getFullYear(), checkDate.getMonth(), checkDate.getDate());
-                        if (t >= start && t <= end) return true;
-                    } catch (_) { /* ignore */ }
-                }
-                return false;
-            };
-
-            const tripsByRoute = new Map();
-            for (const t of trips) {
-                const rid = String(t.route_id || '');
-                if (!rid) continue;
-                if (!tripsByRoute.has(rid)) tripsByRoute.set(rid, []);
-                tripsByRoute.get(rid).push(t);
-            }
-
-            let allRoutesActive = true;
-            for (const rid of routeIds) {
-                const ts = tripsByRoute.get(rid) || [];
-                let routeActive = false;
-                for (const t of ts) {
-                    const sid = String(t.service_id || '');
-                    if (sid && isServiceActiveAtTime(sid)) { routeActive = true; break; }
-                }
-                if (!routeActive) { allRoutesActive = false; break; }
-            }
-
-            // Additional check for operation hours at the specified time
-            const hour = checkTime.getHours();
-            const minute = checkTime.getMinutes();
-            const currentTime = hour * 60 + minute;
-            
-            let operatingAtTime = allRoutesActive;
-            if (allRoutesActive) {
-                // Check if routes are operating at specified time
-                for (const rid of routeIds) {
-                    const routeShortName = this.getRouteShortName(rid);
-                    const operationHours = this.getRouteOperationHours(routeShortName);
-                    if (!this.isRouteOperatingNow(operationHours, currentTime)) {
-                        operatingAtTime = false;
-                        break;
-                    }
-                }
-            }
-            
-            if (operatingAtTime) {
-                return '<span class="badge bg-success-subtle text-success">Beroperasi</span>';
-            } else if (allRoutesActive) {
-                return '<span class="badge bg-warning-subtle text-warning">Tidak beroperasi saat ini</span>';
-            } else {
-                return '<span class="badge bg-secondary-subtle text-secondary">Tidak beroperasi</span>';
-            }
+            const ok = Array.from(routeIds).every(rid => jp.isRouteOperatingAt(String(rid), checkTime));
+            return ok
+                ? '<span class="badge bg-success-subtle text-success">Beroperasi</span>'
+                : '<span class="badge bg-secondary-subtle text-secondary">Tidak beroperasi</span>';
         } catch (_) { return ''; }
     }
     

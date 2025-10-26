@@ -537,7 +537,12 @@ export class MRTManager {
                                             <div class=\"im-muted\" style=\"font-size:0.75em;margin-bottom:4px;font-weight:600;\">Layanan TransJakarta:</div>
                                             <div class=\"im-route-badges\">
                                                 ${sortedRoutes.map(route => `
-                                                    <div class=\"im-route-badge\" style=\"background:#${route.route_color};\">${route.route_short_name}</div>
+                                                    <div class=\"im-route-badge im-route-clickable\" 
+                                                         data-route-id=\"${route.route_id}\"
+                                                         style=\"background:#${route.route_color};cursor:pointer;\"
+                                                         title=\"Klik untuk lihat rute ${route.route_short_name}\">
+                                                        ${route.route_short_name}
+                                                    </div>
                                                 `).join('')}
                                             </div>
                                         </div>`
@@ -627,6 +632,31 @@ export class MRTManager {
             
             // Show popup using map manager
             this.app.modules.map.showHtmlPopupAt(lngLat.lng, lngLat.lat, html);
+            
+            // Attach click handlers for route badges after popup is rendered
+            setTimeout(() => {
+                const badges = document.querySelectorAll('.im-route-clickable');
+                badges.forEach(badge => {
+                    badge.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const routeId = badge.getAttribute('data-route-id');
+                        if (routeId && this.app.modules.routes) {
+                            console.log(`🚌 Opening TransJakarta route: ${routeId}`);
+                            this.app.modules.routes.selectRoute(routeId);
+                            const popup = this.app.modules.map.featurePopup;
+                            if (popup && popup.isOpen && popup.isOpen()) popup.remove();
+                        }
+                    });
+                    badge.addEventListener('mouseenter', () => {
+                        badge.style.transform = 'scale(1.08)';
+                        badge.style.boxShadow = '0 3px 8px rgba(0,0,0,0.2)';
+                    });
+                    badge.addEventListener('mouseleave', () => {
+                        badge.style.transform = 'scale(1)';
+                        badge.style.boxShadow = '';
+                    });
+                });
+            }, 50);
             
         } catch (error) {
             console.error('Failed to show MRT station popup:', error);

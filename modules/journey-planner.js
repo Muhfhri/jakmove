@@ -18,6 +18,10 @@ export class JourneyPlanner {
         this._mode = 'balanced'; // 'fastest' | 'cheapest' | 'balanced'
         this._replanTimer = null; // debounce timer for replan
         this._drawSeq = 0; // token to cancel stale scheduled draws
+        // Time-aware planning
+        this._when = new Date();
+        this._activeServiceByYmdCache = new Map(); // ymd -> Set(service_id)
+        this._windowsByRouteYmdCache = new Map(); // `${routeId}|${ymd}` -> Array<{start:number,end:number}>
     }
 
     _isMapPanning() {
@@ -752,6 +756,10 @@ export class JourneyPlanner {
                 let nextFareUsed = cur.fareUsed || '';
                 if (edgeRid) {
                     // riding transit
+                    // Time filter: skip routes not operating at selected time
+                    if (!this._isRouteOperatingAt(edgeRid, this._when)) {
+                        continue;
+                    }
                     distComponent = stepDist * TRANSIT_WEIGHT;
                     if (!cur.rid) {
                         nextRid = edgeRid; // boarding, no transfer penalty
@@ -848,6 +856,10 @@ export class JourneyPlanner {
             const routeSet = this._routesAtStop.get(cur.sid);
             if (routeSet && routeSet.size) {
                 for (const r of routeSet) {
+                    // Time filter for in-place transfer / initial boarding
+                    if (!this._isRouteOperatingAt(String(r), this._when)) {
+                        continue;
+                    }
                     if (!cur.rid) {
                         // first boarding, include fare-aware penalty in 'cheapest'
                         let cost2 = cur.cost;
@@ -1158,6 +1170,161 @@ export class JourneyPlanner {
             const h = parts[0] || 0, m = parts[1] || 0, s = parts[2] || 0;
             return h * 3600 + m * 60 + s;
         } catch (_) { return NaN; }
+    }
+
+    // Public: set departure date/time for planning
+    setDepartureDateTime(date) {
+        try {
+            if (date instanceof Date && !isNaN(date.getTime())) {
+                this._when = date;
+            } else {
+                this._when = new Date();
+            }
+        } catch (_) { this._when = new Date(); }
+    }
+
+    _ymdOf(date) {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}${m}${d}`;
+    }
+
+    _getActiveServicesForYmd(ymd) {
+        try {
+            const key = String(ymd);
+            if (this._activeServiceByYmdCache.has(key)) return this._activeServiceByYmdCache.get(key);
+            const gtfs = this.app.modules.gtfs;
+            const calendar = gtfs.getCalendar ? (gtfs.getCalendar() || []) : [];
+            const calendarDates = gtfs.getCalendarDates ? (gtfs.getCalendarDates() || []) : [];
+            const serviceMap = new Map(); // service_id -> entries
+            calendar.forEach(cal => {
+                const sid = String(cal.service_id || '');
+                if (!serviceMap.has(sid)) serviceMap.set(sid, []);
+                serviceMap.get(sid).push(cal);
+            });
+            const y = parseInt(ymd.slice(0,4),10);
+            const m = parseInt(ymd.slice(4,6),10);
+            const d = parseInt(ymd.slice(6,8),10);
+            const dateObj = new Date(y, m-1, d);
+            const dayIdx = dateObj.getDay(); // 0=Sun..6=Sat
+            const dayField = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'][dayIdx];
+            const active = new Set();
+            for (const [sid, entries] of serviceMap.entries()) {
+                let on = false;
+                for (const cal of entries) {
+                    try {
+                        if (String(cal[dayField]) !== '1') continue;
+                        const sd = cal.start_date; const ed = cal.end_date;
+                        if (!sd || !ed) continue;
+                        if (String(sd) <= ymd && ymd <= String(ed)) { on = true; break; }
+                    } catch(_) {}
+                }
+                if (on) active.add(sid);
+            }
+            // Apply exceptions
+            const ex = calendarDates.filter(cd => String(cd.date) === ymd);
+            for (const e of ex) {
+                const sid = String(e.service_id || '');
+                const type = String(e.exception_type || '');
+                if (type === '1') active.add(sid);
+                else if (type === '2') active.delete(sid);
+            }
+            this._activeServiceByYmdCache.set(key, active);
+            return active;
+        } catch (_) { return new Set(); }
+    }
+
+    _getRouteWindowsForYmd(routeId, ymd) {
+        try {
+            const key = `${String(routeId)}|${String(ymd)}`;
+            if (this._windowsByRouteYmdCache.has(key)) return this._windowsByRouteYmdCache.get(key);
+            const gtfs = this.app.modules.gtfs;
+            const tripsAll = (gtfs.getTrips() || []).filter(t => String(t.route_id||'') === String(routeId));
+            const activeServices = this._getActiveServicesForYmd(ymd);
+            const activeTrips = tripsAll.filter(t => activeServices.has(String(t.service_id || '')));
+            const frequencies = gtfs.getFrequencies ? (gtfs.getFrequencies() || []) : [];
+            const stopTimes = gtfs.getStopTimes ? (gtfs.getStopTimes() || []) : [];
+            const byTripStopTimes = new Map();
+            // Only build stop_times index for relevant trips
+            for (const st of stopTimes) {
+                const tid = String(st.trip_id || '');
+                // Early skip if not in active trips
+                // Build a set once
+            }
+            const activeTripIds = new Set(activeTrips.map(t => String(t.trip_id||'')));
+            for (const st of stopTimes) {
+                const tid = String(st.trip_id || '');
+                if (!activeTripIds.has(tid)) continue;
+                if (!byTripStopTimes.has(tid)) byTripStopTimes.set(tid, []);
+                byTripStopTimes.get(tid).push(st);
+            }
+            const byTripFreq = new Map();
+            for (const f of frequencies) {
+                const tid = String(f.trip_id || '');
+                if (!activeTripIds.has(tid)) continue;
+                if (!byTripFreq.has(tid)) byTripFreq.set(tid, []);
+                byTripFreq.get(tid).push(f);
+            }
+            const parse = (v) => this._parseTimeToSec(v);
+            const windows = [];
+            // Frequencies windows
+            for (const [tid, arr] of byTripFreq.entries()) {
+                for (const f of arr) {
+                    const s = parse(f.start_time);
+                    const e = parse(f.end_time);
+                    if (isFinite(s) && isFinite(e) && e > s) windows.push({ start: s, end: e });
+                }
+            }
+            // Stop times windows (min departure to max arrival per trip)
+            for (const [tid, arr] of byTripStopTimes.entries()) {
+                let minT = Infinity, maxT = -Infinity;
+                for (const st of arr) {
+                    const a = parse(st.arrival_time);
+                    const d = parse(st.departure_time);
+                    if (isFinite(a)) { if (a < minT) minT = a; if (a > maxT) maxT = a; }
+                    if (isFinite(d)) { if (d < minT) minT = d; if (d > maxT) maxT = d; }
+                }
+                if (isFinite(minT) && isFinite(maxT) && maxT > minT) {
+                    windows.push({ start: minT, end: maxT });
+                }
+            }
+            // Merge overlapping windows for efficiency
+            windows.sort((a,b) => a.start - b.start);
+            const merged = [];
+            for (const w of windows) {
+                if (!merged.length || w.start > merged[merged.length-1].end) {
+                    merged.push({ start: w.start, end: w.end });
+                } else {
+                    merged[merged.length-1].end = Math.max(merged[merged.length-1].end, w.end);
+                }
+            }
+            this._windowsByRouteYmdCache.set(key, merged);
+            return merged;
+        } catch (_) { return []; }
+    }
+
+    _isRouteOperatingAt(routeId, when) {
+        try {
+            const dt = when instanceof Date ? when : new Date();
+            const ymd = this._ymdOf(dt);
+            const sec = dt.getHours()*3600 + dt.getMinutes()*60 + dt.getSeconds();
+            // Check windows for today
+            const winToday = this._getRouteWindowsForYmd(routeId, ymd);
+            for (const w of winToday) { if (sec >= w.start && sec <= w.end) return true; }
+            // Check spillover from previous day (times > 24h)
+            const prev = new Date(dt.getTime() - 24*3600*1000);
+            const ymdPrev = this._ymdOf(prev);
+            const winPrev = this._getRouteWindowsForYmd(routeId, ymdPrev);
+            const secPlus = sec + 24*3600;
+            for (const w of winPrev) { if (secPlus >= w.start && secPlus <= w.end) return true; }
+            return false;
+        } catch (_) { return true; }
+    }
+
+    // Public wrapper for external modules (TypedPlanner) to query operation time accurately
+    isRouteOperatingAt(routeId, when) {
+        return this._isRouteOperatingAt(routeId, when);
     }
 
     _headwayByRoute() {
