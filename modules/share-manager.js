@@ -296,6 +296,17 @@ export class ShareManager {
     showShareDialog(plan) {
         if (!this.shareModal) return;
 
+        // Ensure departure time is captured from UI
+        try {
+            const typedPlanner = this.app.modules?.typedPlanner;
+            if (typedPlanner && typeof typedPlanner.getDepartureDateTime === 'function') {
+                const dt = typedPlanner.getDepartureDateTime();
+                if (plan && dt instanceof Date && !isNaN(dt.getTime())) {
+                    plan.departureTime = dt.getTime();
+                }
+            }
+        } catch(_) {}
+
         const shareURL = this.generateShareURL(plan);
         if (!shareURL) {
             this.showNotification('❌ Gagal membuat tautan', 'error');
@@ -329,35 +340,35 @@ export class ShareManager {
             else if (typeof plan.totalDuration === 'number') duration = Math.round(plan.totalDuration);
             const fareTotal = (plan?.fare && typeof plan.fare === 'object') ? (Number(plan.fare.total) || 0) : (Number(plan.fare) || 0);
 
-            // Robust transfers: prefer legs length, fallback to steps
+            // Robust transfers
             const legs = Array.isArray(plan.legs) ? plan.legs : [];
-            let transitLegsCount = 0;
-            if (legs.length > 0) {
-                // If mode property exists, count those marked as transit/ride; else use legs length
-                const hasMode = legs.some(l => typeof l.mode !== 'undefined' || typeof l.type !== 'undefined');
-                if (hasMode) {
-                    transitLegsCount = legs.filter(l => String(l.mode || '').toUpperCase() === 'TRANSIT' || String(l.type || '').toLowerCase() === 'ride').length;
-                    if (transitLegsCount === 0) transitLegsCount = legs.length; // fallback
-                } else {
-                    transitLegsCount = legs.length;
-                }
-            }
-            // Fallback from steps: count "Transit di ..."
+            let transitLegsCount = legs.length;
             if (transitLegsCount === 0) {
                 try {
                     const steps = Array.isArray(plan.steps) ? plan.steps : [];
                     const tSteps = steps.filter(s => /transit di/i.test(String(s.text || ''))).length;
-                    // transfers = tSteps; legsCount approx = transfers + 1 when there is any transit
                     if (tSteps > 0) transitLegsCount = tSteps + 1;
                 } catch(_) {}
             }
             const transfers = Math.max(0, transitLegsCount - 1);
 
-            // Build transit legs summary
-            const transitLegs = legs;
-            const routesSummary = transitLegs.length > 0
-                ? transitLegs.map(leg => `<span class="badge" style="background:#dc2626;color:white;margin:2px;">${(leg.routeShortName || leg.routeId || '').toString()}</span>`).join('')
-                : '<span style="color:#9ca3af;">Hanya jalan kaki</span>';
+            // Build transit legs summary with GTFS colors
+            let routesSummary = '<span style="color:#9ca3af;">Hanya jalan kaki</span>';
+            try {
+                const gtfs = this.app.modules?.gtfs;
+                const routes = gtfs?.getRoutes ? (gtfs.getRoutes() || []) : [];
+                const rmap = new Map(routes.map(r => [String(r.route_id || ''), r]));
+                if (legs.length > 0) {
+                    routesSummary = legs.map(leg => {
+                        const rid = String(leg.routeId || '');
+                        const r = rmap.get(rid);
+                        const bg = r?.route_color ? ('#' + r.route_color) : '#dc2626';
+                        const label = (leg.routeShortName || r?.route_short_name || rid || '').toString();
+                        const color = '#ffffff';
+                        return `<span class="badge" style="background:${bg};color:${color};margin:2px;">${label}</span>`;
+                    }).join('');
+                }
+            } catch(_) {}
 
             // Update summary card
             const summaryEl = document.getElementById('shareSummary');
