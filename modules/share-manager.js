@@ -348,9 +348,9 @@ export class ShareManager {
             
             const timeout1Promise = new Promise((resolve) => {
                 setTimeout(() => {
-                    console.warn('First compute timeout (2.5s)');
+                    console.warn('⏱️ First compute timeout (1.5s)');
                     resolve(null);
-                }, 2500);
+                }, 1500); // REDUCED from 2.5s to 1.5s
             });
             
             computed = await Promise.race([computeWithPrefs(), timeout1Promise]);
@@ -376,9 +376,9 @@ export class ShareManager {
                 
                 const timeout2Promise = new Promise((resolve) => {
                     setTimeout(() => {
-                        console.warn('Second compute timeout (2.5s)');
+                        console.warn('⏱️ Second compute timeout (1.5s)');
                         resolve(null);
-                    }, 2500);
+                    }, 1500); // REDUCED from 2.5s to 1.5s
                 });
                 
                 computed = await Promise.race([computeWithoutPrefs(), timeout2Promise]);

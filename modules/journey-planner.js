@@ -725,18 +725,35 @@ export class JourneyPlanner {
         tryRelax(startId, '', 0, 0, null, '');
 
         let iterations = 0;
-        const MAX_ITERATIONS = 100000; // Increased limit for complex multi-transfer routes
+        const MAX_ITERATIONS = 30000; // REDUCED from 100k to prevent memory exhaustion
+        const MAX_QUEUE_SIZE = 5000; // Hard limit on priority queue size
+        const MAX_VISITED_STATES = 10000; // Hard limit on bestCost map size
 
         const tStart = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-        const TIME_BUDGET_MS = 400; // hard cap per search to avoid UI freeze (reduced from 600ms)
+        const TIME_BUDGET_MS = 300; // REDUCED from 400ms for faster abort
+        
         while (pq.length && iterations < MAX_ITERATIONS) {
             iterations++;
-            // Check timeout every 500 iterations (not every loop to save perf)
-            if (iterations % 500 === 0) {
+            
+            // AGGRESSIVE memory guards - check every 200 iterations
+            if (iterations % 200 === 0) {
                 const nowMs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
                 if (nowMs - tStart > TIME_BUDGET_MS) {
-                    console.warn(`Journey Planner: time budget exceeded (${TIME_BUDGET_MS}ms), aborting search early`);
-                    return null; // Return null explicitly to trigger error handling
+                    console.warn(`⏱️ Journey Planner: time budget exceeded (${TIME_BUDGET_MS}ms), aborting`);
+                    bestCost.clear(); bestTransfers.clear(); parent.clear(); // FREE MEMORY
+                    return null;
+                }
+                
+                // Abort if queue or visited states grow too large
+                if (pq.length > MAX_QUEUE_SIZE) {
+                    console.warn(`💾 Journey Planner: queue size exceeded (${pq.length}), aborting to prevent OOM`);
+                    bestCost.clear(); bestTransfers.clear(); parent.clear();
+                    return null;
+                }
+                if (bestCost.size > MAX_VISITED_STATES) {
+                    console.warn(`💾 Journey Planner: visited states exceeded (${bestCost.size}), aborting to prevent OOM`);
+                    bestCost.clear(); bestTransfers.clear(); parent.clear();
+                    return null;
                 }
             }
             const cur = pop();
@@ -960,10 +977,16 @@ export class JourneyPlanner {
             }
         }
         
-        // If we hit max iterations, log warning
+        // If we hit max iterations or no solution found, clean up and log
         if (iterations >= MAX_ITERATIONS) {
-            console.warn(`Journey Planner: Hit max iterations (${MAX_ITERATIONS}) in ${mode} mode`);
+            console.warn(`🔄 Journey Planner: Hit max iterations (${MAX_ITERATIONS}) in ${mode} mode`);
         }
+        
+        // Clean up memory before returning null
+        bestCost.clear();
+        bestTransfers.clear();
+        parent.clear();
+        pq.length = 0; // Clear array
         
         return null;
     }
