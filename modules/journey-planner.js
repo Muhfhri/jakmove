@@ -23,6 +23,7 @@ export class JourneyPlanner {
         this._activeServiceByYmdCache = new Map(); // ymd -> Set(service_id)
         this._windowsByRouteYmdCache = new Map(); // `${routeId}|${ymd}` -> Array<{start:number,end:number}>
         this._preferredRoutes = new Set();
+        this._planning = false;
     }
 
     _isMapPanning() {
@@ -168,6 +169,7 @@ export class JourneyPlanner {
 
     replan() {
         try {
+            if (this._planning) return;
             if (!this.origin || !this.destination) return;
             if (this._replanTimer) clearTimeout(this._replanTimer);
             this._replanTimer = setTimeout(() => { try { this._plan(); } catch(_){} }, 80);
@@ -358,6 +360,7 @@ export class JourneyPlanner {
     }
 
     async _plan() {
+        if (this._planning) return;
         if (!this.origin || !this.destination) return;
         // Hard guard: never plan while map is panning to avoid debounce side-effects
         if (this._isMapPanning()) {
@@ -377,6 +380,7 @@ export class JourneyPlanner {
             }
             return;
         }
+        this._planning = true;
         const gtfs = this.app.modules.gtfs;
         const stops = gtfs.getStops() || [];
 		// Evaluate multiple nearby start/goal candidates to avoid far-away starts
@@ -418,7 +422,7 @@ export class JourneyPlanner {
         // Final attempt with more walking edges
 		if (!bestPlan) { try { this._addFallbackWalkEdges(2); } catch(_) {} bestPlan = chooseBestPlan(); }
         
-		if (!bestPlan) {
+        if (!bestPlan) {
             const mapMod = this.app.modules.map;
             this._setStatus('Tidak ditemukan jalur layanan. Geser titik awal/tujuan untuk mencoba lagi.');
             try {
@@ -431,7 +435,7 @@ export class JourneyPlanner {
                     mapMod.showHtmlPopupAt(midLon, midLat, html);
                 }
             } catch (_) {}
-            return; 
+            this._planning = false; return; 
         }
 
 		const start = bestPlan.start;
@@ -482,6 +486,7 @@ export class JourneyPlanner {
                 } catch (e) {}
             }
         } catch (e) {}
+        finally { this._planning = false; }
     }
 
     _addFallbackWalkEdges(level = 1) {
@@ -722,8 +727,15 @@ export class JourneyPlanner {
         let iterations = 0;
         const MAX_ITERATIONS = 100000; // Increased limit for complex multi-transfer routes
 
+        const tStart = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        const TIME_BUDGET_MS = 600; // hard cap per search to avoid UI freeze
         while (pq.length && iterations < MAX_ITERATIONS) {
             iterations++;
+            const nowMs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+            if (nowMs - tStart > TIME_BUDGET_MS) {
+                console.warn(`Journey Planner: time budget exceeded (${TIME_BUDGET_MS}ms), aborting search early`);
+                break;
+            }
             const cur = pop();
             if (cur.sid === goalId) {
                 return this._reconstruct(parent, key(cur.sid, cur.rid, cur.fareUsed || ''), startId);
@@ -2531,10 +2543,12 @@ export class JourneyPlanner {
     // Public: compute a plan between two stop_ids without rendering on the map
     computePlanByStopIds(startStopId, endStopId, mode = 'balanced') {
         try {
+            if (this._planning) return null;
             if (!startStopId || !endStopId) return null;
             if (!this._graphBuilt) {
                 try { this._buildGraph(); } catch (e) {}
             }
+            this._planning = true;
             const gtfs = this.app.modules.gtfs;
             const stops = gtfs.getStops() || [];
             const stopsById = new Map(stops.map(s => [String(s.stop_id || ''), s]));
@@ -2578,8 +2592,9 @@ export class JourneyPlanner {
             const duration = this._estimateJourneyDuration(startStop, goalStop, legs, 0, 0);
             const plan = { startStop, goalStop, legs, steps, fare, duration, mode: this._mode };
             this._mode = originalMode;
+            this._planning = false;
             return plan;
-        } catch (e) { return null; }
+        } catch (e) { this._planning = false; return null; }
     }
 
     // Public: render computed plan on map and show steps popup

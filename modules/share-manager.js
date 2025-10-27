@@ -292,6 +292,8 @@ export class ShareManager {
             }
 
             this.showNotification('✅ Rute berhasil dimuat dari tautan!', 'success');
+            // Reset preferences after successful render to avoid biasing next manual plans
+            try { if (typeof journey.setPreferredRoutes === 'function') journey.setPreferredRoutes([]); } catch(_) {}
         } catch (error) {
             console.error('Error rendering shared route:', error);
             this.showNotification('❌ Gagal memuat rute dari tautan', 'error');
