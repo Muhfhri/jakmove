@@ -2546,7 +2546,10 @@ export class JourneyPlanner {
     // Public: compute a plan between two stop_ids without rendering on the map
     computePlanByStopIds(startStopId, endStopId, mode = 'balanced') {
         try {
-            if (this._planning) return null;
+            if (this._planning) {
+                console.warn('computePlanByStopIds: already planning, rejecting new request');
+                return null;
+            }
             if (!startStopId || !endStopId) return null;
             if (!this._graphBuilt) {
                 try { this._buildGraph(); } catch (e) {}
@@ -2557,7 +2560,10 @@ export class JourneyPlanner {
             const stopsById = new Map(stops.map(s => [String(s.stop_id || ''), s]));
             const startStop = stopsById.get(String(startStopId));
             const goalStop = stopsById.get(String(endStopId));
-            if (!startStop || !goalStop) return null;
+            if (!startStop || !goalStop) {
+                this._planning = false;
+                return null;
+            }
 
             const originalMode = this._mode;
             this._mode = String(mode || originalMode || 'balanced');
@@ -2571,7 +2577,11 @@ export class JourneyPlanner {
                 this._mode = save;
             }
             if (!path || path.length === 0) { try { this._addFallbackWalkEdges(2); } catch (_) {} path = this._findPath(String(startStopId), String(endStopId)); }
-            if (!path || path.length === 0) { this._mode = originalMode; return null; }
+            if (!path || path.length === 0) { 
+                this._mode = originalMode; 
+                this._planning = false;
+                return null; 
+            }
 
             const legs = this._groupByRoute(path);
             // Build steps (no initial/final walking from free coords)

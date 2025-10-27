@@ -66,14 +66,16 @@ export class ShareManager {
      */
     encodePlan(plan) {
         try {
+            // Use timestamp directly to avoid timezone issues
+            const timestamp = plan.departureTime || Date.now();
+            
             const data = {
                 from: plan.startStop?.stop_id || '',
                 to: plan.goalStop?.stop_id || '',
                 fromName: plan.startStop?.stop_name || '',
                 toName: plan.goalStop?.stop_name || '',
                 mode: plan.mode || 'balanced',
-                date: plan.departureTime ? new Date(plan.departureTime).toISOString().split('T')[0] : '',
-                time: plan.departureTime ? new Date(plan.departureTime).toTimeString().split(' ')[0].substring(0,5) : '',
+                timestamp: timestamp, // Store as Unix timestamp for accuracy
                 legs: (plan.legs || []).map(leg => ({
                     m: leg.mode,
                     r: leg.routeId || '',
@@ -87,6 +89,8 @@ export class ShareManager {
                 duration: Math.round(plan.totalDuration || 0),
                 distance: Math.round(plan.totalDistance || 0)
             };
+
+            console.log('📤 Encoding plan with timestamp:', new Date(timestamp).toLocaleString('id-ID'));
 
             // Compress and encode
             const json = JSON.stringify(data);
@@ -107,6 +111,28 @@ export class ShareManager {
             const json = this.decompressString(compressed);
             const data = JSON.parse(json);
 
+            // Handle both old format (date+time) and new format (timestamp)
+            let departureTime;
+            if (data.timestamp) {
+                // New format: use timestamp directly
+                departureTime = Number(data.timestamp);
+            } else if (data.date && data.time) {
+                // Old format: try to parse, but be careful with timezone
+                try {
+                    // Parse in local timezone to match user's expectation
+                    const [year, month, day] = data.date.split('-').map(Number);
+                    const [hour, minute] = data.time.split(':').map(Number);
+                    departureTime = new Date(year, month - 1, day, hour, minute, 0).getTime();
+                } catch (e) {
+                    console.warn('Failed to parse old date/time format, using current time');
+                    departureTime = Date.now();
+                }
+            } else {
+                departureTime = Date.now();
+            }
+
+            console.log('📥 Decoded plan with departure time:', new Date(departureTime).toLocaleString('id-ID'));
+
             // Reconstruct plan object
             const plan = {
                 startStop: {
@@ -118,7 +144,7 @@ export class ShareManager {
                     stop_name: data.toName
                 },
                 mode: data.mode || 'balanced',
-                departureTime: data.date && data.time ? new Date(`${data.date}T${data.time}`).getTime() : Date.now(),
+                departureTime: departureTime,
                 legs: (data.legs || []).map(leg => ({
                     mode: leg.m,
                     routeId: leg.r,
@@ -194,6 +220,7 @@ export class ShareManager {
             const plan = this.decodePlan(routeParam);
             if (!plan) {
                 console.error('Failed to decode shared route');
+                this.clearShareRouteFromURL();
                 return;
             }
 
@@ -204,6 +231,21 @@ export class ShareManager {
 
         } catch (error) {
             console.error('Error loading shared route:', error);
+            this.clearShareRouteFromURL();
+        }
+    }
+
+    /**
+     * Clear the share route parameter from URL without reloading page
+     */
+    clearShareRouteFromURL() {
+        try {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('route');
+            window.history.replaceState({}, '', url.toString());
+            console.log('🧹 Cleared share route from URL');
+        } catch (e) {
+            console.error('Failed to clear URL:', e);
         }
     }
 
@@ -286,33 +328,68 @@ export class ShareManager {
                 }
             } catch(_) {}
 
-            // Compute with timeout guard
+            // Compute with timeout guard - try with preferred routes first, then without
             let computed = null;
-            const computePromise = new Promise((resolve) => {
+            
+            // First attempt: with preferred routes (faster, biased)
+            const computeWithPrefs = async () => {
                 try {
-                    const result = journey.computePlanByStopIds(String(fromId), String(toId), mode);
-                    resolve(result);
+                    return await new Promise((resolve) => {
+                        setTimeout(() => {
+                            const result = journey.computePlanByStopIds(String(fromId), String(toId), mode);
+                            resolve(result);
+                        }, 0);
+                    });
                 } catch (e) {
-                    console.error('Compute error:', e);
-                    resolve(null);
+                    console.error('Compute error with prefs:', e);
+                    return null;
                 }
-            });
-
-            const timeoutPromise = new Promise((resolve) => {
-                notificationTimeout = setTimeout(() => {
-                    console.warn('Compute timeout reached (3s) - aborting to prevent freeze');
+            };
+            
+            const timeout1Promise = new Promise((resolve) => {
+                setTimeout(() => {
+                    console.warn('First compute timeout (2.5s)');
                     resolve(null);
-                }, 3000);
+                }, 2500);
             });
-
-            computed = await Promise.race([computePromise, timeoutPromise]);
-            if (notificationTimeout) clearTimeout(notificationTimeout);
+            
+            computed = await Promise.race([computeWithPrefs(), timeout1Promise]);
+            
+            // Second attempt: without preferred routes if first failed
+            if (!computed) {
+                console.log('🔄 First attempt failed, trying without route preferences...');
+                try { if (typeof journey.setPreferredRoutes === 'function') journey.setPreferredRoutes([]); } catch(_) {}
+                
+                const computeWithoutPrefs = async () => {
+                    try {
+                        return await new Promise((resolve) => {
+                            setTimeout(() => {
+                                const result = journey.computePlanByStopIds(String(fromId), String(toId), mode);
+                                resolve(result);
+                            }, 0);
+                        });
+                    } catch (e) {
+                        console.error('Compute error without prefs:', e);
+                        return null;
+                    }
+                };
+                
+                const timeout2Promise = new Promise((resolve) => {
+                    setTimeout(() => {
+                        console.warn('Second compute timeout (2.5s)');
+                        resolve(null);
+                    }, 2500);
+                });
+                
+                computed = await Promise.race([computeWithoutPrefs(), timeout2Promise]);
+            }
 
             if (!computed) {
-                console.error('Compute failed or timed out');
-                this.showNotification('❌ Gagal menghitung rute (timeout atau tidak ada jalur)', 'error');
-                // Reset preferences
+                console.error('Compute failed after 2 attempts');
+                this.showNotification('❌ Gagal menghitung rute dari tautan. URL telah dibersihkan, silakan coba cari rute secara manual.', 'error');
+                // Reset preferences and clear URL
                 try { if (typeof journey.setPreferredRoutes === 'function') journey.setPreferredRoutes([]); } catch(_) {}
+                this.clearShareRouteFromURL();
                 return;
             }
 
@@ -337,6 +414,9 @@ export class ShareManager {
 
             this.showNotification('✅ Rute berhasil dimuat dari tautan!', 'success');
             
+            // Clear URL parameter after successful load
+            this.clearShareRouteFromURL();
+            
             // Reset preferences after successful render to avoid biasing next manual plans
             setTimeout(() => {
                 try { if (typeof journey.setPreferredRoutes === 'function') journey.setPreferredRoutes([]); } catch(_) {}
@@ -347,6 +427,7 @@ export class ShareManager {
             this.showNotification('❌ Gagal memuat rute dari tautan', 'error');
             if (notificationTimeout) clearTimeout(notificationTimeout);
             // Ensure cleanup
+            this.clearShareRouteFromURL();
             try { 
                 const journey = this.app.modules?.journey;
                 if (journey && typeof journey.setPreferredRoutes === 'function') {
