@@ -786,9 +786,9 @@ export class JourneyPlanner {
                         continue;
                     }
                     distComponent = stepDist * TRANSIT_WEIGHT;
-                    // Soft preference for shared preferred routes (tie-breaker bias)
-                    if (this._preferredRoutes && this._preferredRoutes.has(String(edgeRid))) {
-                        edgePenalty -= Math.round(BIG * 0.05);
+                    // STRONG preference for shared preferred routes (for route consistency when decoding shared plans)
+                    if (this._preferredRoutes && this._preferredRoutes.size > 0 && this._preferredRoutes.has(String(edgeRid))) {
+                        edgePenalty -= Math.round(BIG * 0.40); // 40% reduction (was 5%) - strong bias for shared routes
                     }
                     if (!cur.rid) {
                         nextRid = edgeRid; // boarding, no transfer penalty
@@ -897,9 +897,9 @@ export class JourneyPlanner {
                         if (isJAKRoute(String(r))) {
                             cost2 += JAK_PENALTY;
                         }
-                        // Preferred route bias
-                        if (this._preferredRoutes && this._preferredRoutes.has(String(r))) {
-                            cost2 -= Math.round(BIG * 0.05);
+                        // STRONG preferred route bias (for shared route consistency)
+                        if (this._preferredRoutes && this._preferredRoutes.size > 0 && this._preferredRoutes.has(String(r))) {
+                            cost2 -= Math.round(BIG * 0.40); // 40% reduction - strong bias
                         }
                         if (mode === 'cheapest') {
                             const grp = serviceGroupForRoute(String(r));
@@ -938,9 +938,9 @@ export class JourneyPlanner {
                         if (isJAKRoute(String(r))) {
                             cost2 += JAK_PENALTY;
                         }
-                        // Preferred route bias
-                        if (this._preferredRoutes && this._preferredRoutes.has(String(r))) {
-                            cost2 -= Math.round(BIG * 0.05);
+                        // STRONG preferred route bias (for shared route consistency)
+                        if (this._preferredRoutes && this._preferredRoutes.size > 0 && this._preferredRoutes.has(String(r))) {
+                            cost2 -= Math.round(BIG * 0.40); // 40% reduction - strong bias
                         }
                         if (mode === 'cheapest') {
                             const grp = serviceGroupForRoute(String(r));
@@ -1224,6 +1224,11 @@ export class JourneyPlanner {
     setPreferredRoutes(routeIds) {
         try {
             this._preferredRoutes = new Set((routeIds || []).map(r => String(r)));
+            if (this._preferredRoutes.size > 0) {
+                console.log('🎯 Setting preferred routes for consistency:', Array.from(this._preferredRoutes).join(', '));
+            } else {
+                console.log('🧹 Clearing preferred routes');
+            }
         } catch (_) { this._preferredRoutes = new Set(); }
     }
 
@@ -2604,6 +2609,15 @@ export class JourneyPlanner {
             const fare = this._estimateFare(legs);
             const duration = this._estimateJourneyDuration(startStop, goalStop, legs, 0, 0);
             const plan = { startStop, goalStop, legs, steps, fare, duration, mode: this._mode };
+            
+            // Log computed route for debugging consistency
+            const routeSequence = legs.map(l => l.routeId).join(' → ');
+            console.log(`🚌 Computed route: ${routeSequence}`);
+            if (this._preferredRoutes && this._preferredRoutes.size > 0) {
+                const preferred = Array.from(this._preferredRoutes).join(', ');
+                console.log(`   (Preferred routes were: ${preferred})`);
+            }
+            
             this._mode = originalMode;
             this._planning = false;
             return plan;
