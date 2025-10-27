@@ -211,11 +211,15 @@ export class ShareManager {
      * Render shared route on map and in planner
      */
     async renderSharedRoute(plan) {
+        let notificationTimeout = null;
         try {
             console.log('🗺️ Rendering shared route:', plan);
 
+            // Show loading notification
+            this.showNotification('⏳ Memuat rute dari tautan...', 'info');
+
             // Ensure planner & GTFS ready
-            const ready = await this._waitForPlannerReady(7000);
+            const ready = await this._waitForPlannerReady(8000);
             if (!ready) {
                 this.showNotification('❌ Aplikasi belum siap memuat rute', 'error');
                 return;
@@ -226,19 +230,43 @@ export class ShareManager {
             const gtfs = this.app.modules.gtfs;
             if (!typedPlanner || !journey || !gtfs) {
                 console.error('TypedPlanner/JourneyPlanner/GTFS not available');
+                this.showNotification('❌ Modul perencanaan tidak tersedia', 'error');
                 return;
             }
 
-            // Determine from/to ids
+            // Validate stop IDs exist in GTFS
             let fromId = plan.startStop?.stop_id || plan.from;
             let toId = plan.goalStop?.stop_id || plan.to;
             const fromName = plan.startStop?.stop_name || plan.fromName || '';
             const toName = plan.goalStop?.stop_name || plan.toName || '';
             const mode = plan.mode || 'balanced';
 
-            // If missing IDs, try resolve via names
-            if (!fromId && fromName) fromId = this.findStopIdByName(fromName);
-            if (!toId && toName) toId = this.findStopIdByName(toName);
+            // Strict validation: resolve IDs via names if missing or invalid
+            const allStops = gtfs.getStops ? (gtfs.getStops() || []) : [];
+            const stopIdsSet = new Set(allStops.map(s => String(s.stop_id)));
+
+            if (!fromId || !stopIdsSet.has(String(fromId))) {
+                console.warn(`Invalid fromId: ${fromId}, attempting resolve by name: ${fromName}`);
+                fromId = this.findStopIdByName(fromName);
+            }
+            if (!toId || !stopIdsSet.has(String(toId))) {
+                console.warn(`Invalid toId: ${toId}, attempting resolve by name: ${toName}`);
+                toId = this.findStopIdByName(toName);
+            }
+
+            // Final validation
+            if (!fromId || !toId) {
+                console.error('Could not resolve stop IDs:', { fromId, toId, fromName, toName });
+                this.showNotification(`❌ Gagal memuat rute: halte tidak ditemukan (${fromName || 'asal'} → ${toName || 'tujuan'})`, 'error');
+                return;
+            }
+
+            // Verify stops are actually in graph
+            if (!stopIdsSet.has(String(fromId)) || !stopIdsSet.has(String(toId))) {
+                console.error('Resolved stop IDs not in GTFS:', { fromId, toId });
+                this.showNotification('❌ Halte tidak valid dalam sistem', 'error');
+                return;
+            }
 
             // Set date/time if available
             if (plan.departureTime && typeof journey.setDepartureDateTime === 'function') {
@@ -258,23 +286,33 @@ export class ShareManager {
                 }
             } catch(_) {}
 
-            // Try compute
+            // Compute with timeout guard
             let computed = null;
-            if (fromId && toId) {
-                computed = journey.computePlanByStopIds(String(fromId), String(toId), mode);
-            }
-
-            // Fallback: try resolving IDs via names even if IDs exist but failed
-            if (!computed) {
-                if (fromName && !fromId) fromId = this.findStopIdByName(fromName);
-                if (toName && !toId) toId = this.findStopIdByName(toName);
-                if (fromId && toId) {
-                    computed = journey.computePlanByStopIds(String(fromId), String(toId), mode);
+            const computePromise = new Promise((resolve) => {
+                try {
+                    const result = journey.computePlanByStopIds(String(fromId), String(toId), mode);
+                    resolve(result);
+                } catch (e) {
+                    console.error('Compute error:', e);
+                    resolve(null);
                 }
-            }
+            });
+
+            const timeoutPromise = new Promise((resolve) => {
+                notificationTimeout = setTimeout(() => {
+                    console.warn('Compute timeout reached (3s) - aborting to prevent freeze');
+                    resolve(null);
+                }, 3000);
+            });
+
+            computed = await Promise.race([computePromise, timeoutPromise]);
+            if (notificationTimeout) clearTimeout(notificationTimeout);
 
             if (!computed) {
-                this.showNotification('❌ Gagal memuat rute dari tautan (tidak menemukan halte)', 'error');
+                console.error('Compute failed or timed out');
+                this.showNotification('❌ Gagal menghitung rute (timeout atau tidak ada jalur)', 'error');
+                // Reset preferences
+                try { if (typeof journey.setPreferredRoutes === 'function') journey.setPreferredRoutes([]); } catch(_) {}
                 return;
             }
 
@@ -286,17 +324,35 @@ export class ShareManager {
                 typedPlanner.resultsDiv.innerHTML = `<div class="row g-3">${typedPlanner.renderPlanCard(computed, true)}</div>`;
             }
 
-            // Draw on map
-            if (typeof journey.showPlanOnMap === 'function') {
-                journey.showPlanOnMap(computed);
-            }
+            // Draw on map (with small delay to ensure DOM ready)
+            setTimeout(() => {
+                try {
+                    if (typeof journey.showPlanOnMap === 'function') {
+                        journey.showPlanOnMap(computed);
+                    }
+                } catch (e) {
+                    console.error('Error drawing map:', e);
+                }
+            }, 100);
 
             this.showNotification('✅ Rute berhasil dimuat dari tautan!', 'success');
+            
             // Reset preferences after successful render to avoid biasing next manual plans
-            try { if (typeof journey.setPreferredRoutes === 'function') journey.setPreferredRoutes([]); } catch(_) {}
+            setTimeout(() => {
+                try { if (typeof journey.setPreferredRoutes === 'function') journey.setPreferredRoutes([]); } catch(_) {}
+            }, 500);
+            
         } catch (error) {
             console.error('Error rendering shared route:', error);
             this.showNotification('❌ Gagal memuat rute dari tautan', 'error');
+            if (notificationTimeout) clearTimeout(notificationTimeout);
+            // Ensure cleanup
+            try { 
+                const journey = this.app.modules?.journey;
+                if (journey && typeof journey.setPreferredRoutes === 'function') {
+                    journey.setPreferredRoutes([]);
+                }
+            } catch(_) {}
         }
     }
 

@@ -728,13 +728,16 @@ export class JourneyPlanner {
         const MAX_ITERATIONS = 100000; // Increased limit for complex multi-transfer routes
 
         const tStart = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-        const TIME_BUDGET_MS = 600; // hard cap per search to avoid UI freeze
+        const TIME_BUDGET_MS = 400; // hard cap per search to avoid UI freeze (reduced from 600ms)
         while (pq.length && iterations < MAX_ITERATIONS) {
             iterations++;
-            const nowMs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-            if (nowMs - tStart > TIME_BUDGET_MS) {
-                console.warn(`Journey Planner: time budget exceeded (${TIME_BUDGET_MS}ms), aborting search early`);
-                break;
+            // Check timeout every 500 iterations (not every loop to save perf)
+            if (iterations % 500 === 0) {
+                const nowMs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+                if (nowMs - tStart > TIME_BUDGET_MS) {
+                    console.warn(`Journey Planner: time budget exceeded (${TIME_BUDGET_MS}ms), aborting search early`);
+                    return null; // Return null explicitly to trigger error handling
+                }
             }
             const cur = pop();
             if (cur.sid === goalId) {
