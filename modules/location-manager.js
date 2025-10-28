@@ -947,21 +947,21 @@ export class LocationManager {
                             font-size:1.1em;
                             font-weight:700;
                             margin-bottom:8px;
-                            color:#10b981;
-                            background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+                            color:#065f46;
+                            background: linear-gradient(135deg, #6ee7b7 0%, #34d399 100%);
                             padding:8px 12px;
                             border-radius:12px;
-                            border: 1px solid #10b981;
-                            box-shadow: 0 2px 4px rgba(16,185,129,0.2);
+                            border: 2px solid #059669;
+                            box-shadow: 0 4px 12px rgba(5,150,105,0.4);
                         '>
                             🎉 ${titleLabel}
                         </div>
                         <div style='font-size:1.4em;font-weight:bold;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:8px;line-height:1.2;'>${buildHeaderIcon(displayStop.stop_id)} 
-                            <span style='color:#047857;'>${displayStop.stop_name}</span> ${accessIcon}
+                            <span style='color:#065f46;'>${displayStop.stop_name}</span> ${accessIcon}
                         </div>
                         ${arrivalPlatformInfo}
                         <div style='display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:6px;'>
-                            <span style='font-weight:600;color:#10b981;font-size:1.0em;background:#dcfce7;padding:4px 8px;border-radius:12px;'>${formatDistance(jarakToCurrentStop)}</span>
+                            <span style='font-weight:600;color:#065f46;font-size:1.0em;background:#a7f3d0;padding:4px 8px;border-radius:12px;'>${formatDistance(jarakToCurrentStop)}</span>
                         </div>
                         ${nextStopServicesHtml ? `<div style='margin-top:8px;'>${nextStopServicesHtml}</div>` : ''}
                         ${intermodalInfo ? `<div style='margin-top:8px;'>${intermodalInfo}</div>` : ''}
@@ -1181,22 +1181,8 @@ export class LocationManager {
             const layerId = 'destination-marker-layer';
             const pulseLayerId = 'destination-marker-pulse';
             
-            // Add CSS animation if not already added
-            if (!document.getElementById('destination-marker-style')) {
-                const style = document.createElement('style');
-                style.id = 'destination-marker-style';
-                style.textContent = `
-                    @keyframes pulse-destination {
-                        0%, 100% {
-                            opacity: 0.6;
-                        }
-                        50% {
-                            opacity: 0.3;
-                        }
-                    }
-                `;
-                document.head.appendChild(style);
-            }
+            // CSS animation no longer needed - using manual animation below
+            // Removed to prevent opacity blinking
             
             // Create GeoJSON feature for destination
             const destinationFeature = {
@@ -1227,7 +1213,7 @@ export class LocationManager {
                 });
             }
             
-            // Add pulse layer (larger circle with animation)
+            // Add pulse layer (larger circle with animation) - NO opacity change to keep solid
             if (!map.getLayer(pulseLayerId)) {
                 map.addLayer({
                     id: pulseLayerId,
@@ -1236,12 +1222,12 @@ export class LocationManager {
                     paint: {
                         'circle-radius': 20,
                         'circle-color': '#f59e0b',
-                        'circle-opacity': 0.3,
+                        'circle-opacity': 0.4, // Fixed opacity - no blinking
                         'circle-stroke-width': 0
                     }
                 });
                 
-                // Animate pulse effect
+                // Animate pulse effect - only radius, not opacity
                 let radius = 20;
                 let growing = true;
                 this.destinationPulseAnimation = setInterval(() => {
@@ -1259,8 +1245,8 @@ export class LocationManager {
                     }
                     
                     try {
+                        // Only change radius, keep opacity constant
                         map.setPaintProperty(pulseLayerId, 'circle-radius', radius);
-                        map.setPaintProperty(pulseLayerId, 'circle-opacity', 0.6 - (radius - 20) / 40);
                     } catch (e) {
                         clearInterval(this.destinationPulseAnimation);
                     }
@@ -1428,38 +1414,59 @@ export class LocationManager {
             const destinationStopIndex = stopTimes.findIndex(st => String(st.stop_id) === String(this.destinationStopId));
             
             if (currentStopIndex === -1 || destinationStopIndex === -1) return null;
-            if (destinationStopIndex <= currentStopIndex) return null; // Destination sudah lewat
             
-            // Hitung jumlah halte tersisa
+            // Check if user is approaching or at destination
             const stopsRemaining = destinationStopIndex - currentStopIndex;
+            const isApproachingDestination = stopsRemaining <= 2 && stopsRemaining > 0;
+            
+            // Only consider "at destination" if we're at the same stop AND within 50 meters
+            let isAtDestination = false;
+            if (stopsRemaining === 0) {
+                const distanceToDest = this.haversine(
+                    userLat, userLon,
+                    parseFloat(this.destinationStop.stop_lat), parseFloat(this.destinationStop.stop_lon)
+                );
+                isAtDestination = distanceToDest < 50; // Only mark arrived if within 50m
+            }
+            
+            // If already passed destination, return null
+            if (stopsRemaining < 0) return null;
             
             // Hitung estimasi jarak
             let estimatedDistance = 0;
             
-            // Jarak dari posisi user ke next stop
-            const distanceToNextStop = this.haversine(
-                userLat, userLon,
-                parseFloat(nextStop.stop_lat), parseFloat(nextStop.stop_lon)
-            );
-            estimatedDistance += distanceToNextStop;
-            
-            // Jarak antar halte (estimasi 800m per halte)
-            const avgDistancePerStop = 800;
-            estimatedDistance += (stopsRemaining - 1) * avgDistancePerStop;
-            
-            // Jarak dari halte sebelum tujuan ke tujuan
-            if (destinationStopIndex > 0) {
-                const stops = gtfs.getStops();
-                const prevDestStop = stopTimes[destinationStopIndex - 1];
-                const prevStop = stops.find(s => String(s.stop_id) === String(prevDestStop.stop_id));
+            if (isAtDestination) {
+                // If nextStop is the destination, just calculate direct distance
+                estimatedDistance = this.haversine(
+                    userLat, userLon,
+                    parseFloat(this.destinationStop.stop_lat), parseFloat(this.destinationStop.stop_lon)
+                );
+            } else {
+                // Jarak dari posisi user ke next stop
+                const distanceToNextStop = this.haversine(
+                    userLat, userLon,
+                    parseFloat(nextStop.stop_lat), parseFloat(nextStop.stop_lon)
+                );
+                estimatedDistance += distanceToNextStop;
                 
-                if (prevStop && this.destinationStop) {
-                    const distanceToDest = this.haversine(
-                        parseFloat(prevStop.stop_lat), parseFloat(prevStop.stop_lon),
-                        parseFloat(this.destinationStop.stop_lat), parseFloat(this.destinationStop.stop_lon)
-                    );
-                    // Replace rata-rata dengan jarak sebenarnya
-                    estimatedDistance = estimatedDistance - avgDistancePerStop + distanceToDest;
+                // Jarak antar halte (estimasi 800m per halte)
+                const avgDistancePerStop = 800;
+                estimatedDistance += (stopsRemaining - 1) * avgDistancePerStop;
+                
+                // Jarak dari halte sebelum tujuan ke tujuan
+                if (destinationStopIndex > 0 && stopsRemaining > 0) {
+                    const stops = gtfs.getStops();
+                    const prevDestStop = stopTimes[destinationStopIndex - 1];
+                    const prevStop = stops.find(s => String(s.stop_id) === String(prevDestStop.stop_id));
+                    
+                    if (prevStop && this.destinationStop) {
+                        const distanceToDest = this.haversine(
+                            parseFloat(prevStop.stop_lat), parseFloat(prevStop.stop_lon),
+                            parseFloat(this.destinationStop.stop_lat), parseFloat(this.destinationStop.stop_lon)
+                        );
+                        // Replace rata-rata dengan jarak sebenarnya
+                        estimatedDistance = estimatedDistance - avgDistancePerStop + distanceToDest;
+                    }
                 }
             }
             
@@ -1471,7 +1478,9 @@ export class LocationManager {
                 stopsRemaining,
                 estimatedDistance,
                 estimatedTimeMinutes,
-                destinationStop: this.destinationStop
+                destinationStop: this.destinationStop,
+                isApproachingDestination,
+                isAtDestination
             };
         } catch (e) {
             console.error('[Location] Error calculating destination info:', e);
@@ -1493,69 +1502,173 @@ export class LocationManager {
                 `~${destInfo.estimatedTimeMinutes} menit` :
                 `~${Math.floor(destInfo.estimatedTimeMinutes/60)}j ${destInfo.estimatedTimeMinutes%60}m`;
             
+            // Special styling for approaching destination or at destination
+            let bgGradient, borderColor, boxShadow, headerText, headerIcon, headerColor;
+            
+            if (destInfo.isAtDestination) {
+                // Arrived at destination - green theme (vibrant colors)
+                bgGradient = 'linear-gradient(135deg, #6ee7b7 0%, #34d399 100%)';
+                borderColor = '#059669';
+                boxShadow = '0 8px 24px rgba(5,150,105,0.5)';
+                headerText = '🎉 Tiba di Tujuan Anda!';
+                headerIcon = 'fa-solid fa-flag-checkered';
+                headerColor = '#065f46';
+            } else if (destInfo.isApproachingDestination) {
+                // Approaching destination (1-2 stops) - orange/warning theme
+                bgGradient = 'linear-gradient(135deg, #fff7ed 0%, #fed7aa 100%)';
+                borderColor = '#f97316';
+                boxShadow = '0 6px 20px rgba(249,115,22,0.4)';
+                headerText = '⚠️ Persiapkan Diri!';
+                headerIcon = 'fa-solid fa-bell';
+                headerColor = '#c2410c';
+            } else {
+                // Normal - yellow theme
+                bgGradient = 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)';
+                borderColor = '#f59e0b';
+                boxShadow = '0 4px 12px rgba(245,158,11,0.3)';
+                headerText = 'Menuju Tujuan';
+                headerIcon = 'fa-solid fa-location-dot';
+                headerColor = '#d97706';
+            }
+            
             return `
                 <div style="
                     margin:8px 0;
-                    padding:10px;
-                    background:linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-                    border:2px solid #f59e0b;
+                    padding:12px;
+                    background:${bgGradient};
+                    border:2px solid ${borderColor};
                     border-radius:12px;
-                    box-shadow:0 4px 12px rgba(245,158,11,0.3);
+                    box-shadow:${boxShadow};
+                    animation: ${destInfo.isApproachingDestination || destInfo.isAtDestination ? 'pulse-destination 2s infinite' : 'none'};
                 ">
+                    ${destInfo.isAtDestination || destInfo.isApproachingDestination ? `
+                        <div style="
+                            text-align:center;
+                            font-size:1.05em;
+                            font-weight:800;
+                            color:${headerColor};
+                            margin-bottom:8px;
+                            padding:6px;
+                            background:rgba(255,255,255,0.6);
+                            border-radius:8px;
+                        ">
+                            ${headerText}
+                        </div>
+                    ` : ''}
                     <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
-                        <i class="fa-solid fa-location-dot" style="color:#d97706;font-size:1.1em;"></i>
-                        <div style="font-size:0.85em;font-weight:700;color:#92400e;">Menuju Tujuan</div>
+                        <i class="${headerIcon}" style="color:${headerColor};font-size:1.1em;"></i>
+                        <div style="font-size:0.85em;font-weight:700;color:${headerColor};">
+                            ${destInfo.isAtDestination ? 'Halte Tujuan' : 'Tujuan Anda'}
+                        </div>
                     </div>
-                    <div style="font-size:0.95em;font-weight:600;color:#78350f;margin-bottom:6px;">
+                    <div style="font-size:0.95em;font-weight:600;color:#78350f;margin-bottom:8px;">
                         ${destInfo.destinationStop.stop_name}
                     </div>
-                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    ${destInfo.isApproachingDestination ? `
                         <div style="
-                            background:white;
-                            border:1px solid #fbbf24;
+                            background:rgba(249,115,22,0.2);
+                            border:1px solid ${borderColor};
                             border-radius:8px;
-                            padding:4px 8px;
-                            font-size:0.75em;
+                            padding:8px;
+                            margin-bottom:8px;
+                            font-size:0.8em;
+                            color:#9a3412;
                             font-weight:600;
-                            color:#92400e;
-                            display:flex;
-                            align-items:center;
-                            gap:4px;
+                            text-align:center;
                         ">
-                            <i class="fa-solid fa-bus-simple" style="font-size:0.9em;"></i>
-                            <span>${destInfo.stopsRemaining} halte tersisa</span>
+                            <i class="fa-solid fa-info-circle"></i> 
+                            ${destInfo.stopsRemaining === 1 
+                                ? `Persiapkan diri! Tujuan ${distanceText} lagi`
+                                : `Persiapkan diri untuk turun dalam ${destInfo.stopsRemaining} halte`
+                            }
                         </div>
-                        <div style="
-                            background:white;
-                            border:1px solid #fbbf24;
-                            border-radius:8px;
-                            padding:4px 8px;
-                            font-size:0.75em;
-                            font-weight:600;
-                            color:#92400e;
-                            display:flex;
-                            align-items:center;
-                            gap:4px;
-                        ">
-                            <i class="fa-solid fa-route" style="font-size:0.9em;"></i>
-                            <span>${distanceText}</span>
+                    ` : ''}
+                    ${!destInfo.isAtDestination ? `
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                            <div style="
+                                background:white;
+                                border:1px solid ${borderColor};
+                                border-radius:8px;
+                                padding:4px 8px;
+                                font-size:0.75em;
+                                font-weight:600;
+                                color:#92400e;
+                                display:flex;
+                                align-items:center;
+                                gap:4px;
+                            ">
+                                <i class="fa-solid fa-bus-simple" style="font-size:0.9em;"></i>
+                                <span>${destInfo.stopsRemaining} halte tersisa</span>
+                            </div>
+                            <div style="
+                                background:white;
+                                border:1px solid ${borderColor};
+                                border-radius:8px;
+                                padding:4px 8px;
+                                font-size:0.75em;
+                                font-weight:600;
+                                color:#92400e;
+                                display:flex;
+                                align-items:center;
+                                gap:4px;
+                            ">
+                                <i class="fa-solid fa-route" style="font-size:0.9em;"></i>
+                                <span>${distanceText}</span>
+                            </div>
+                            <div style="
+                                background:white;
+                                border:1px solid ${borderColor};
+                                border-radius:8px;
+                                padding:4px 8px;
+                                font-size:0.75em;
+                                font-weight:600;
+                                color:#92400e;
+                                display:flex;
+                                align-items:center;
+                                gap:4px;
+                            ">
+                                <i class="fa-solid fa-clock" style="font-size:0.9em;"></i>
+                                <span>${timeText}</span>
+                            </div>
                         </div>
-                        <div style="
-                            background:white;
-                            border:1px solid #fbbf24;
-                            border-radius:8px;
-                            padding:4px 8px;
-                            font-size:0.75em;
-                            font-weight:600;
-                            color:#92400e;
-                            display:flex;
-                            align-items:center;
-                            gap:4px;
-                        ">
-                            <i class="fa-solid fa-clock" style="font-size:0.9em;"></i>
-                            <span>${timeText}</span>
-                        </div>
-                    </div>
+                    ` : `
+                        ${destInfo.estimatedDistance < 50 ? `
+                            <div style="
+                                text-align:center;
+                                font-size:0.85em;
+                                color:#065f46;
+                                margin-top:8px;
+                                font-weight:700;
+                            ">
+                                <i class="fa-solid fa-check-circle"></i> Anda sudah tiba!<br>
+                                <span style="font-size:0.9em;color:#047857;margin-top:4px;display:inline-block;font-weight:600;">
+                                    Jarak: ${distanceText}
+                                </span>
+                            </div>
+                        ` : `
+                            <div style="
+                                text-align:center;
+                                font-size:0.85em;
+                                color:#065f46;
+                                margin-top:8px;
+                                font-weight:700;
+                            ">
+                                <i class="fa-solid fa-flag-checkered"></i> Tujuan Anda<br>
+                                <span style="
+                                    font-size:1.1em;
+                                    color:#065f46;
+                                    margin-top:6px;
+                                    display:inline-block;
+                                    font-weight:800;
+                                    background:#a7f3d0;
+                                    padding:6px 12px;
+                                    border-radius:8px;
+                                ">
+                                    ${distanceText} lagi
+                                </span>
+                            </div>
+                        `}
+                    `}
                 </div>
             `;
         } catch (e) {
@@ -1642,16 +1755,29 @@ export class LocationManager {
             const windSpeed = weatherData.data.wind.speed;
             const humidity = weatherData.data.main.humidity;
             
-            // Weather icons from weather.js
+            // Weather icons using Font Awesome for better clarity
             const weatherIcons = {
-                '01d': '☀️', '01n': '🌙', '02d': '⛅', '02n': '☁️',
-                '03d': '☁️', '03n': '☁️', '04d': '☁️', '04n': '☁️',
-                '09d': '🌧️', '09n': '🌧️', '10d': '🌦️', '10n': '🌧️',
-                '11d': '⛈️', '11n': '⛈️', '13d': '🌨️', '13n': '🌨️',
-                '50d': '🌫️', '50n': '🌫️'
+                '01d': '<i class="fa-solid fa-sun" style="color:#fbbf24;"></i>', // Clear day
+                '01n': '<i class="fa-solid fa-moon" style="color:#94a3b8;"></i>', // Clear night
+                '02d': '<i class="fa-solid fa-cloud-sun" style="color:#fbbf24;"></i>', // Few clouds day
+                '02n': '<i class="fa-solid fa-cloud-moon" style="color:#94a3b8;"></i>', // Few clouds night
+                '03d': '<i class="fa-solid fa-cloud" style="color:#94a3b8;"></i>', // Scattered clouds
+                '03n': '<i class="fa-solid fa-cloud" style="color:#94a3b8;"></i>',
+                '04d': '<i class="fa-solid fa-cloud" style="color:#64748b;"></i>', // Broken clouds
+                '04n': '<i class="fa-solid fa-cloud" style="color:#64748b;"></i>',
+                '09d': '<i class="fa-solid fa-cloud-showers-heavy" style="color:#3b82f6;"></i>', // Shower rain
+                '09n': '<i class="fa-solid fa-cloud-showers-heavy" style="color:#3b82f6;"></i>',
+                '10d': '<i class="fa-solid fa-cloud-sun-rain" style="color:#3b82f6;"></i>', // Rain day
+                '10n': '<i class="fa-solid fa-cloud-rain" style="color:#3b82f6;"></i>', // Rain night
+                '11d': '<i class="fa-solid fa-cloud-bolt" style="color:#8b5cf6;"></i>', // Thunderstorm
+                '11n': '<i class="fa-solid fa-cloud-bolt" style="color:#8b5cf6;"></i>',
+                '13d': '<i class="fa-solid fa-snowflake" style="color:#60a5fa;"></i>', // Snow
+                '13n': '<i class="fa-solid fa-snowflake" style="color:#60a5fa;"></i>',
+                '50d': '<i class="fa-solid fa-smog" style="color:#9ca3af;"></i>', // Mist
+                '50n': '<i class="fa-solid fa-smog" style="color:#9ca3af;"></i>'
             };
             
-            const icon = weatherIcons[weather.icon] || '🌤️';
+            const icon = weatherIcons[weather.icon] || '<i class="fa-solid fa-cloud-sun" style="color:#fbbf24;"></i>';
             
             // Weather alert logic
             let alertClass = '';

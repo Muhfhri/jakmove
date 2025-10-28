@@ -12,7 +12,6 @@ export class TypedPlanner {
         this.currentMode = 'balanced';
         this._stopsIndex = []; // {id, name}
         this._cachedPlans = new Map(); // Cache computed plans to avoid recomputation inconsistencies
-        this._sharedPlanMap = new Map(); // In-memory store for shareable plans (cross-platform safe)
     }
 
     init() {
@@ -430,26 +429,6 @@ export class TypedPlanner {
                     }
                 });
             });
-
-            // Wire share buttons (cross-platform safe via in-memory plan map)
-            this.resultsDiv.querySelectorAll('[data-share]')?.forEach(btn => {
-                btn.addEventListener('click', () => {
-                    try {
-                        const planId = btn.getAttribute('data-plan-id');
-                        if (!planId) return;
-                        const plan = this._sharedPlanMap.get(planId);
-                        if (!plan) return;
-                        const shareManager = this.app.modules.share;
-                        if (shareManager && typeof shareManager.showShareDialog === 'function') {
-                            shareManager.showShareDialog(plan);
-                        } else {
-                            console.error('ShareManager not available');
-                        }
-                    } catch (e) {
-                        console.error('Error sharing plan:', e);
-                    }
-                });
-            });
         } catch (e) {
             console.error('Error in plan():', e);
             this.resultsDiv.innerHTML = `<div class="row g-3">${this.renderError('Terjadi kesalahan saat merencanakan rute.')}</div>`;
@@ -463,7 +442,7 @@ export class TypedPlanner {
         const enhanced = results.map(plan => {
             const duration = plan.duration?.totalSec || 0;
             const fare = plan.fare?.total || 0;
-            const transfers = Math.max(0, (plan.legs || []).length - 1);
+            const transfers = (plan.legs || []).filter(leg => leg.mode === 'TRANSIT').length - 1;
             const walkingDistance = (plan.legs || []).filter(leg => leg.mode === 'WALK')
                 .reduce((sum, leg) => sum + (leg.distance || 0), 0);
             
@@ -988,10 +967,6 @@ export class TypedPlanner {
             const accuracyColor = accuracy >= 90 ? '#10b981' : accuracy >= 80 ? '#f59e0b' : '#ef4444';
             const accuracyIcon = accuracy >= 90 ? 'mdi:check-circle' : accuracy >= 80 ? 'mdi:alert-circle' : 'mdi:information';
             
-            // Create a lightweight share ID and store plan in memory (avoid huge HTML data attributes)
-            const planId = `jp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-            try { this._sharedPlanMap.set(planId, plan); } catch(_) {}
-            
             return `
                 <div class="col-12 col-lg-4">
                     <div class="planner-result-card h-100">
@@ -1040,10 +1015,6 @@ export class TypedPlanner {
                                 <button type="button" class="planner-result-map-btn" data-show-map data-mode="${mode}" data-from="${this.escape(fromId)}" data-to="${this.escape(toId)}">
                                     <iconify-icon icon="mdi:map"></iconify-icon>
                                     <span>Tampilkan di Peta</span>
-                                </button>
-                                <button type="button" class="planner-result-share-btn" data-share data-plan-id="${planId}">
-                                    <iconify-icon icon="mdi:share-variant"></iconify-icon>
-                                    <span>Bagikan Rute</span>
                                 </button>
                             </div>
                         </div>

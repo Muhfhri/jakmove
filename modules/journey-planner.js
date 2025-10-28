@@ -22,8 +22,6 @@ export class JourneyPlanner {
         this._when = new Date();
         this._activeServiceByYmdCache = new Map(); // ymd -> Set(service_id)
         this._windowsByRouteYmdCache = new Map(); // `${routeId}|${ymd}` -> Array<{start:number,end:number}>
-        this._preferredRoutes = new Set();
-        this._planning = false;
     }
 
     _isMapPanning() {
@@ -76,15 +74,6 @@ export class JourneyPlanner {
         try { const saved = localStorage.getItem('jp_mode'); if (saved) this.setOptimizationMode(saved); } catch(e) {}
         
         console.log(`✅ JourneyPlanner init completed in ${(performance.now() - startTime).toFixed(2)}ms`);
-    }
-
-    // Public: set departure/check time for time-aware planning
-    setDepartureDateTime(dateObj) {
-        try {
-            const d = (dateObj instanceof Date) ? dateObj : new Date(dateObj);
-            if (isNaN(d.getTime())) return;
-            this._when = d;
-        } catch (_) {}
     }
     
     _loadGraphFromCache() {
@@ -169,7 +158,6 @@ export class JourneyPlanner {
 
     replan() {
         try {
-            if (this._planning) return;
             if (!this.origin || !this.destination) return;
             if (this._replanTimer) clearTimeout(this._replanTimer);
             this._replanTimer = setTimeout(() => { try { this._plan(); } catch(_){} }, 80);
@@ -360,7 +348,6 @@ export class JourneyPlanner {
     }
 
     async _plan() {
-        if (this._planning) return;
         if (!this.origin || !this.destination) return;
         // Hard guard: never plan while map is panning to avoid debounce side-effects
         if (this._isMapPanning()) {
@@ -380,7 +367,6 @@ export class JourneyPlanner {
             }
             return;
         }
-        this._planning = true;
         const gtfs = this.app.modules.gtfs;
         const stops = gtfs.getStops() || [];
 		// Evaluate multiple nearby start/goal candidates to avoid far-away starts
@@ -422,7 +408,7 @@ export class JourneyPlanner {
         // Final attempt with more walking edges
 		if (!bestPlan) { try { this._addFallbackWalkEdges(2); } catch(_) {} bestPlan = chooseBestPlan(); }
         
-        if (!bestPlan) {
+		if (!bestPlan) {
             const mapMod = this.app.modules.map;
             this._setStatus('Tidak ditemukan jalur layanan. Geser titik awal/tujuan untuk mencoba lagi.');
             try {
@@ -435,7 +421,7 @@ export class JourneyPlanner {
                     mapMod.showHtmlPopupAt(midLon, midLat, html);
                 }
             } catch (_) {}
-            this._planning = false; return; 
+            return; 
         }
 
 		const start = bestPlan.start;
@@ -486,7 +472,6 @@ export class JourneyPlanner {
                 } catch (e) {}
             }
         } catch (e) {}
-        finally { this._planning = false; }
     }
 
     _addFallbackWalkEdges(level = 1) {
@@ -725,37 +710,10 @@ export class JourneyPlanner {
         tryRelax(startId, '', 0, 0, null, '');
 
         let iterations = 0;
-        const MAX_ITERATIONS = 30000; // REDUCED from 100k to prevent memory exhaustion
-        const MAX_QUEUE_SIZE = 5000; // Hard limit on priority queue size
-        const MAX_VISITED_STATES = 10000; // Hard limit on bestCost map size
+        const MAX_ITERATIONS = 100000; // Increased limit for complex multi-transfer routes
 
-        const tStart = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-        const TIME_BUDGET_MS = 300; // REDUCED from 400ms for faster abort
-        
         while (pq.length && iterations < MAX_ITERATIONS) {
             iterations++;
-            
-            // AGGRESSIVE memory guards - check every 200 iterations
-            if (iterations % 200 === 0) {
-                const nowMs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-                if (nowMs - tStart > TIME_BUDGET_MS) {
-                    console.warn(`⏱️ Journey Planner: time budget exceeded (${TIME_BUDGET_MS}ms), aborting`);
-                    bestCost.clear(); bestTransfers.clear(); parent.clear(); // FREE MEMORY
-                    return null;
-                }
-                
-                // Abort if queue or visited states grow too large
-                if (pq.length > MAX_QUEUE_SIZE) {
-                    console.warn(`💾 Journey Planner: queue size exceeded (${pq.length}), aborting to prevent OOM`);
-                    bestCost.clear(); bestTransfers.clear(); parent.clear();
-                    return null;
-                }
-                if (bestCost.size > MAX_VISITED_STATES) {
-                    console.warn(`💾 Journey Planner: visited states exceeded (${bestCost.size}), aborting to prevent OOM`);
-                    bestCost.clear(); bestTransfers.clear(); parent.clear();
-                    return null;
-                }
-            }
             const cur = pop();
             if (cur.sid === goalId) {
                 return this._reconstruct(parent, key(cur.sid, cur.rid, cur.fareUsed || ''), startId);
@@ -803,10 +761,6 @@ export class JourneyPlanner {
                         continue;
                     }
                     distComponent = stepDist * TRANSIT_WEIGHT;
-                    // STRONG preference for shared preferred routes (for route consistency when decoding shared plans)
-                    if (this._preferredRoutes && this._preferredRoutes.size > 0 && this._preferredRoutes.has(String(edgeRid))) {
-                        edgePenalty -= Math.round(BIG * 0.40); // 40% reduction (was 5%) - strong bias for shared routes
-                    }
                     if (!cur.rid) {
                         nextRid = edgeRid; // boarding, no transfer penalty
                         // JAK route penalty: discourage JAK routes unless they're clearly best
@@ -914,10 +868,6 @@ export class JourneyPlanner {
                         if (isJAKRoute(String(r))) {
                             cost2 += JAK_PENALTY;
                         }
-                        // STRONG preferred route bias (for shared route consistency)
-                        if (this._preferredRoutes && this._preferredRoutes.size > 0 && this._preferredRoutes.has(String(r))) {
-                            cost2 -= Math.round(BIG * 0.40); // 40% reduction - strong bias
-                        }
                         if (mode === 'cheapest') {
                             const grp = serviceGroupForRoute(String(r));
                             nextFareUsed = grp;
@@ -955,10 +905,6 @@ export class JourneyPlanner {
                         if (isJAKRoute(String(r))) {
                             cost2 += JAK_PENALTY;
                         }
-                        // STRONG preferred route bias (for shared route consistency)
-                        if (this._preferredRoutes && this._preferredRoutes.size > 0 && this._preferredRoutes.has(String(r))) {
-                            cost2 -= Math.round(BIG * 0.40); // 40% reduction - strong bias
-                        }
                         if (mode === 'cheapest') {
                             const grp = serviceGroupForRoute(String(r));
                             nextFareUsed = grp;
@@ -977,16 +923,10 @@ export class JourneyPlanner {
             }
         }
         
-        // If we hit max iterations or no solution found, clean up and log
+        // If we hit max iterations, log warning
         if (iterations >= MAX_ITERATIONS) {
-            console.warn(`🔄 Journey Planner: Hit max iterations (${MAX_ITERATIONS}) in ${mode} mode`);
+            console.warn(`Journey Planner: Hit max iterations (${MAX_ITERATIONS}) in ${mode} mode`);
         }
-        
-        // Clean up memory before returning null
-        bestCost.clear();
-        bestTransfers.clear();
-        parent.clear();
-        pq.length = 0; // Clear array
         
         return null;
     }
@@ -1243,18 +1183,6 @@ export class JourneyPlanner {
         } catch (_) { this._when = new Date(); }
     }
 
-    // Public: set preferred routeIds to bias path selection (used for shared plan consistency)
-    setPreferredRoutes(routeIds) {
-        try {
-            this._preferredRoutes = new Set((routeIds || []).map(r => String(r)));
-            if (this._preferredRoutes.size > 0) {
-                console.log('🎯 Setting preferred routes for consistency:', Array.from(this._preferredRoutes).join(', '));
-            } else {
-                console.log('🧹 Clearing preferred routes');
-            }
-        } catch (_) { this._preferredRoutes = new Set(); }
-    }
-
     _ymdOf(date) {
         const y = date.getFullYear();
         const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -1507,9 +1435,9 @@ export class JourneyPlanner {
         // End walk
         const endWalk = Math.round((distEnd || 0) / WALK_MPS);
         totalSec += endWalk; parts.push({ type: 'walk', sec: endWalk, label: `Jalan ke tujuan` });
-        // ETA clock time based on selected departure time (this._when)
-        const base = (this._when instanceof Date && !isNaN(this._when.getTime())) ? this._when : new Date();
-        const eta = new Date(base.getTime() + totalSec * 1000);
+        // ETA clock time
+        const now = new Date();
+        const eta = new Date(now.getTime() + totalSec * 1000);
         return { totalSec, parts, etaISO: eta.toISOString(), etaLabel: eta.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) };
     }
 
@@ -2574,24 +2502,16 @@ export class JourneyPlanner {
     // Public: compute a plan between two stop_ids without rendering on the map
     computePlanByStopIds(startStopId, endStopId, mode = 'balanced') {
         try {
-            if (this._planning) {
-                console.warn('computePlanByStopIds: already planning, rejecting new request');
-                return null;
-            }
             if (!startStopId || !endStopId) return null;
             if (!this._graphBuilt) {
                 try { this._buildGraph(); } catch (e) {}
             }
-            this._planning = true;
             const gtfs = this.app.modules.gtfs;
             const stops = gtfs.getStops() || [];
             const stopsById = new Map(stops.map(s => [String(s.stop_id || ''), s]));
             const startStop = stopsById.get(String(startStopId));
             const goalStop = stopsById.get(String(endStopId));
-            if (!startStop || !goalStop) {
-                this._planning = false;
-                return null;
-            }
+            if (!startStop || !goalStop) return null;
 
             const originalMode = this._mode;
             this._mode = String(mode || originalMode || 'balanced');
@@ -2605,11 +2525,7 @@ export class JourneyPlanner {
                 this._mode = save;
             }
             if (!path || path.length === 0) { try { this._addFallbackWalkEdges(2); } catch (_) {} path = this._findPath(String(startStopId), String(endStopId)); }
-            if (!path || path.length === 0) { 
-                this._mode = originalMode; 
-                this._planning = false;
-                return null; 
-            }
+            if (!path || path.length === 0) { this._mode = originalMode; return null; }
 
             const legs = this._groupByRoute(path);
             // Build steps (no initial/final walking from free coords)
@@ -2632,19 +2548,9 @@ export class JourneyPlanner {
             const fare = this._estimateFare(legs);
             const duration = this._estimateJourneyDuration(startStop, goalStop, legs, 0, 0);
             const plan = { startStop, goalStop, legs, steps, fare, duration, mode: this._mode };
-            
-            // Log computed route for debugging consistency
-            const routeSequence = legs.map(l => l.routeId).join(' → ');
-            console.log(`🚌 Computed route: ${routeSequence}`);
-            if (this._preferredRoutes && this._preferredRoutes.size > 0) {
-                const preferred = Array.from(this._preferredRoutes).join(', ');
-                console.log(`   (Preferred routes were: ${preferred})`);
-            }
-            
             this._mode = originalMode;
-            this._planning = false;
             return plan;
-        } catch (e) { this._planning = false; return null; }
+        } catch (e) { return null; }
     }
 
     // Public: render computed plan on map and show steps popup
