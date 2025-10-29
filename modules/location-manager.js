@@ -1442,30 +1442,30 @@ export class LocationManager {
                     parseFloat(this.destinationStop.stop_lat), parseFloat(this.destinationStop.stop_lon)
                 );
             } else {
-                // Jarak dari posisi user ke next stop
-                const distanceToNextStop = this.haversine(
-                    userLat, userLon,
-                    parseFloat(nextStop.stop_lat), parseFloat(nextStop.stop_lon)
-                );
-                estimatedDistance += distanceToNextStop;
-                
-                // Jarak antar halte (estimasi 800m per halte)
-                const avgDistancePerStop = 800;
-                estimatedDistance += (stopsRemaining - 1) * avgDistancePerStop;
-                
-                // Jarak dari halte sebelum tujuan ke tujuan
+            // Jarak dari posisi user ke next stop
+            const distanceToNextStop = this.haversine(
+                userLat, userLon,
+                parseFloat(nextStop.stop_lat), parseFloat(nextStop.stop_lon)
+            );
+            estimatedDistance += distanceToNextStop;
+            
+            // Jarak antar halte (estimasi 800m per halte)
+            const avgDistancePerStop = 800;
+            estimatedDistance += (stopsRemaining - 1) * avgDistancePerStop;
+            
+            // Jarak dari halte sebelum tujuan ke tujuan
                 if (destinationStopIndex > 0 && stopsRemaining > 0) {
-                    const stops = gtfs.getStops();
-                    const prevDestStop = stopTimes[destinationStopIndex - 1];
-                    const prevStop = stops.find(s => String(s.stop_id) === String(prevDestStop.stop_id));
-                    
-                    if (prevStop && this.destinationStop) {
-                        const distanceToDest = this.haversine(
-                            parseFloat(prevStop.stop_lat), parseFloat(prevStop.stop_lon),
-                            parseFloat(this.destinationStop.stop_lat), parseFloat(this.destinationStop.stop_lon)
-                        );
-                        // Replace rata-rata dengan jarak sebenarnya
-                        estimatedDistance = estimatedDistance - avgDistancePerStop + distanceToDest;
+                const stops = gtfs.getStops();
+                const prevDestStop = stopTimes[destinationStopIndex - 1];
+                const prevStop = stops.find(s => String(s.stop_id) === String(prevDestStop.stop_id));
+                
+                if (prevStop && this.destinationStop) {
+                    const distanceToDest = this.haversine(
+                        parseFloat(prevStop.stop_lat), parseFloat(prevStop.stop_lon),
+                        parseFloat(this.destinationStop.stop_lat), parseFloat(this.destinationStop.stop_lon)
+                    );
+                    // Replace rata-rata dengan jarak sebenarnya
+                    estimatedDistance = estimatedDistance - avgDistancePerStop + distanceToDest;
                     }
                 }
             }
@@ -1559,7 +1559,7 @@ export class LocationManager {
                         <i class="${headerIcon}" style="color:${headerColor};font-size:1.1em;"></i>
                         <div style="font-size:0.85em;font-weight:700;color:${headerColor};">
                             ${destInfo.isAtDestination ? 'Halte Tujuan' : 'Tujuan Anda'}
-                        </div>
+                    </div>
                     </div>
                     <div style="font-size:0.95em;font-weight:600;color:#78350f;margin-bottom:8px;">
                         ${destInfo.destinationStop.stop_name}
@@ -1584,53 +1584,53 @@ export class LocationManager {
                         </div>
                     ` : ''}
                     ${!destInfo.isAtDestination ? `
-                        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                            <div style="
-                                background:white;
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                        <div style="
+                            background:white;
                                 border:1px solid ${borderColor};
-                                border-radius:8px;
-                                padding:4px 8px;
-                                font-size:0.75em;
-                                font-weight:600;
-                                color:#92400e;
-                                display:flex;
-                                align-items:center;
-                                gap:4px;
-                            ">
-                                <i class="fa-solid fa-bus-simple" style="font-size:0.9em;"></i>
-                                <span>${destInfo.stopsRemaining} halte tersisa</span>
-                            </div>
-                            <div style="
-                                background:white;
-                                border:1px solid ${borderColor};
-                                border-radius:8px;
-                                padding:4px 8px;
-                                font-size:0.75em;
-                                font-weight:600;
-                                color:#92400e;
-                                display:flex;
-                                align-items:center;
-                                gap:4px;
-                            ">
-                                <i class="fa-solid fa-route" style="font-size:0.9em;"></i>
-                                <span>${distanceText}</span>
-                            </div>
-                            <div style="
-                                background:white;
-                                border:1px solid ${borderColor};
-                                border-radius:8px;
-                                padding:4px 8px;
-                                font-size:0.75em;
-                                font-weight:600;
-                                color:#92400e;
-                                display:flex;
-                                align-items:center;
-                                gap:4px;
-                            ">
-                                <i class="fa-solid fa-clock" style="font-size:0.9em;"></i>
-                                <span>${timeText}</span>
-                            </div>
+                            border-radius:8px;
+                            padding:4px 8px;
+                            font-size:0.75em;
+                            font-weight:600;
+                            color:#92400e;
+                            display:flex;
+                            align-items:center;
+                            gap:4px;
+                        ">
+                            <i class="fa-solid fa-bus-simple" style="font-size:0.9em;"></i>
+                            <span>${destInfo.stopsRemaining} halte tersisa</span>
                         </div>
+                        <div style="
+                            background:white;
+                                border:1px solid ${borderColor};
+                            border-radius:8px;
+                            padding:4px 8px;
+                            font-size:0.75em;
+                            font-weight:600;
+                            color:#92400e;
+                            display:flex;
+                            align-items:center;
+                            gap:4px;
+                        ">
+                            <i class="fa-solid fa-route" style="font-size:0.9em;"></i>
+                            <span>${distanceText}</span>
+                        </div>
+                        <div style="
+                            background:white;
+                                border:1px solid ${borderColor};
+                            border-radius:8px;
+                            padding:4px 8px;
+                            font-size:0.75em;
+                            font-weight:600;
+                            color:#92400e;
+                            display:flex;
+                            align-items:center;
+                            gap:4px;
+                        ">
+                            <i class="fa-solid fa-clock" style="font-size:0.9em;"></i>
+                            <span>${timeText}</span>
+                        </div>
+                    </div>
                     ` : `
                         ${destInfo.estimatedDistance < 50 ? `
                             <div style="

@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kuis TransJakarta & KRL - JakMove</title>
+    <meta name="description" content="Uji pengetahuan Anda tentang TransJakarta dan KRL Jabodetabek">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="apple-touch-icon" sizes="180x180" href="image/jakmoveicon.png">
+    
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/css/all.min.css">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/dark-mode.css">
+    
+    <style>
+        body {
+            background: radial-gradient(1200px 600px at 10% 0%, #f0f7ff 0%, #ffffff 60%) no-repeat;
+        }
+
+        .navbar-modern {
+            background: rgba(255,255,255,0.85);
+            backdrop-filter: saturate(180%) blur(10px);
+            box-shadow: 0 8px 24px rgba(15,23,42,0.08);
+        }
+
+        .navbar-modern .nav-link {
+            font-weight: 600;
+            color: #334155 !important;
+        }
+
+        .navbar-modern .nav-link.active {
+            color: #0f172a !important;
+        }
+
+        .quiz-container {
+            max-width: 900px;
+            margin: 2rem auto;
+            padding: 1rem;
+        }
+        
+        .quiz-card {
+            background: white;
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            margin-bottom: 1.5rem;
+        }
+        
+        .mode-selector {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .mode-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 20px;
+            padding: 2rem 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            color: white;
+            border: 3px solid transparent;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .mode-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            transform: scale(0);
+            transition: transform 0.5s ease;
+        }
+        
+        .mode-card:hover::before {
+            transform: scale(1);
+        }
+        
+        .mode-card:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+            border-color: rgba(255,255,255,0.3);
+        }
+        
+        .mode-card.active {
+            border-color: #fbbf24;
+            box-shadow: 0 10px 30px rgba(251,191,36,0.5);
+            transform: translateY(-5px);
+        }
+        
+        .mode-card i {
+            font-size: 3.5rem;
+            margin-bottom: 1rem;
+            position: relative;
+            z-index: 1;
+            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));
+        }
+        
+        .mode-card h4 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .mode-card p {
+            font-size: 0.85rem;
+            opacity: 0.9;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .route-item {
+            background: #f8fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .route-item:hover {
+            background: #e0e7ff;
+            border-color: #818cf8;
+            transform: translateX(5px);
+        }
+        
+        .route-item.selected {
+            background: #dbeafe;
+            border-color: #3b82f6;
+            border-width: 3px;
+        }
+        
+        .route-checkbox {
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        
+        .route-badge {
+            background: #dc2626;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-weight: 800;
+            font-size: 1.1rem;
+            min-width: 60px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        
+        .route-name {
+            flex: 1;
+            font-weight: 600;
+            color: #374151;
+        }
+        
+        .mode-btn {
+            text-align: left;
+            padding: 1.5rem;
+            border-radius: 16px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .mode-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        }
+        
+        .mode-btn strong {
+            display: block;
+            font-size: 1.2rem;
+        }
+        
+        .mode-btn small {
+            opacity: 0.9;
+            font-size: 0.85rem;
+        }
+        
+        .nav-pills .nav-link {
+            border-radius: 10px;
+            transition: all 0.2s;
+        }
+        
+        .nav-pills .nav-link:not(.active):hover {
+            background: #e0e7ff;
+            color: #3b82f6;
+        }
+        
+        .quiz-question {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 2rem;
+            color: #1f2937;
+        }
+        
+        .quiz-options {
+            display: grid;
+            gap: 1rem;
+        }
+        
+        .quiz-option {
+            background: #f8fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 1.25rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: 600;
+            color: #374151;
+        }
+        
+        .quiz-option:hover {
+            background: #e0e7ff;
+            border-color: #818cf8;
+            transform: translateX(5px);
+        }
+        
+        .quiz-option.correct {
+            background: #d1fae5;
+            border-color: #10b981;
+            color: #065f46;
+        }
+        
+        .quiz-option.wrong {
+            background: #fee2e2;
+            border-color: #ef4444;
+            color: #991b1b;
+        }
+        
+        .quiz-option.disabled {
+            pointer-events: none;
+            opacity: 0.6;
+        }
+        
+        .score-display {
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+            color: white;
+            border-radius: 16px;
+            padding: 1.5rem;
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: 800;
+            margin-bottom: 2rem;
+        }
+        
+        .timer-display {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            border-radius: 12px;
+            padding: 1rem;
+            text-align: center;
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+        
+        .progress-bar-quiz {
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 2rem;
+        }
+        
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+            transition: width 0.3s ease;
+        }
+        
+        .category-badge {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+        
+        .badge-brt {
+            background: #dc2626;
+            color: white;
+        }
+        
+        .badge-non-brt {
+            background: #2563eb;
+            color: white;
+        }
+        
+        .badge-pengumpan {
+            background: #16a34a;
+            color: white;
+        }
+        
+        .badge-wisata {
+            background: #8b5cf6;
+            color: white;
+        }
+        
+        .badge-jaklingko {
+            background: #f59e0b;
+            color: white;
+        }
+        
+        .badge-krl {
+            background: #dc2626;
+            color: white;
+        }
+        
+        .result-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 20px;
+            padding: 3rem;
+            text-align: center;
+        }
+        
+        .result-score {
+            font-size: 4rem;
+            font-weight: 800;
+            margin: 1rem 0;
+        }
+        
+        .result-message {
+            font-size: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .route-chip {
+            display: inline-block;
+            min-width: 28px;
+            padding: 2px 10px;
+            margin-right: 8px;
+            border-radius: 9999px;
+            color: #fff;
+            font-weight: 800;
+            letter-spacing: 0.3px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.15);
+        }
+
+        .review-item {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            border-left: 5px solid #e2e8f0;
+        }
+
+        .review-item.correct {
+            border-left-color: #22c55e;
+            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+        }
+
+        .review-item.wrong {
+            border-left-color: #ef4444;
+            background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+        }
+
+        .review-question {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #1e293b;
+        }
+
+        .review-answer {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem;
+            margin: 0.5rem 0;
+            border-radius: 8px;
+            font-size: 0.95rem;
+        }
+
+        .review-answer.user-answer {
+            background: #e0e7ff;
+            border: 2px solid #6366f1;
+        }
+
+        .review-answer.user-answer.wrong {
+            background: #fee2e2;
+            border: 2px solid #ef4444;
+        }
+
+        .review-answer.correct-answer {
+            background: #dcfce7;
+            border: 2px solid #22c55e;
+        }
+
+        .review-answer i {
+            margin-right: 0.5rem;
+            font-size: 1.2rem;
+        }
+
+        .history-item {
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .history-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 6px;
+            background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+            transition: width 0.3s ease;
+        }
+
+        .history-item:hover {
+            border-color: #3b82f6;
+            box-shadow: 0 8px 24px rgba(59, 130, 246, 0.15);
+            transform: translateX(5px);
+        }
+
+        .history-item:hover::before {
+            width: 10px;
+        }
+
+        .history-item.excellent::before {
+            background: linear-gradient(180deg, #22c55e 0%, #16a34a 100%);
+        }
+
+        .history-item.good::before {
+            background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+        }
+
+        .history-item.fair::before {
+            background: linear-gradient(180deg, #f59e0b 0%, #d97706 100%);
+        }
+
+        .history-item.poor::before {
+            background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
+        }
+
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+
+        .history-mode {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #1e293b;
+        }
+
+        .history-score {
+            font-size: 1.3rem;
+            font-weight: 800;
+            padding: 0.25rem 0.75rem;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+            color: #1e40af;
+        }
+
+        .history-score.excellent {
+            background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+            color: #065f46;
+        }
+
+        .history-score.good {
+            background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+            color: #047857;
+        }
+
+        .history-score.fair {
+            background: linear-gradient(135deg, #fed7aa 0%, #fdba74 100%);
+            color: #92400e;
+        }
+
+        .history-score.poor {
+            background: linear-gradient(135deg, #fecaca 0%, #fca5a5 100%);
+            color: #991b1b;
+        }
+
+        .history-meta {
+            display: flex;
+            gap: 1.5rem;
+            flex-wrap: wrap;
+            font-size: 0.9rem;
+            color: #64748b;
+        }
+
+        .history-meta-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .history-meta-item i {
+            color: #94a3b8;
+        }
+
+        .history-empty {
+            text-align: center;
+            padding: 3rem;
+            color: #94a3b8;
+        }
+
+        .history-empty i {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+        
+        [data-theme="dark"] .quiz-card {
+            background: #1e293b;
+        }
+        
+        [data-theme="dark"] .history-item {
+            background: #1e293b;
+            border-color: #334155;
+        }
+
+        [data-theme="dark"] .history-mode {
+            color: #f1f5f9;
+        }
+
+        [data-theme="dark"] .history-meta {
+            color: #94a3b8;
+        }
+        
+        [data-theme="dark"] .quiz-question {
+            color: #f1f5f9;
+        }
+        
+        [data-theme="dark"] .quiz-option {
+            background: #334155;
+            border-color: #475569;
+            color: #e2e8f0;
+        }
+        
+        [data-theme="dark"] .quiz-option:hover {
+            background: #3730a3;
+            border-color: #818cf8;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-modern">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="index.html">
+                <img src="css/image/jakmove.png" alt="JakMove" height="40" class="logo-img">
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="index.html">
+                            <i class="fa-solid fa-map"></i> Peta
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="quiz.html">
+                            <i class="fa-solid fa-brain"></i> Kuis
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" id="historyNavBtn">
+                            <i class="fa-solid fa-clock-rotate-left"></i> Riwayat
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Quiz Container -->
+    <div class="quiz-container">
+        <!-- Header -->
+        <div id="quizHeader" class="quiz-card">
+            <h1 class="text-center mb-3">
+                <i class="fa-solid fa-graduation-cap"></i> Kuis TransJakarta & KRL
+            </h1>
+            <p class="text-center text-muted">
+                Uji pengetahuan Anda tentang transportasi umum Jakarta!
+            </p>
+        </div>
+
+        <!-- Mode Selection -->
+        <div id="modeSelection" class="quiz-card">
+            <h2 class="mb-4">
+                <i class="fa-solid fa-gamepad"></i> Pilih Mode Kuis
+            </h2>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label for="questionCountMain" class="form-label">
+                        <i class="fa-solid fa-list-ol"></i> <strong>Jumlah Soal:</strong>
+                    </label>
+                    <select id="questionCountMain" class="form-select">
+                        <option value="5">5 soal</option>
+                        <option value="10" selected>10 soal</option>
+                        <option value="15">15 soal</option>
+                        <option value="20">20 soal</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label for="quizTimeLimit" class="form-label">
+                        <i class="fa-solid fa-clock"></i> <strong>Batas Waktu:</strong>
+                    </label>
+                    <select id="quizTimeLimit" class="form-select">
+                        <option value="0">Tanpa Batas</option>
+                        <option value="60">1 menit</option>
+                        <option value="120">2 menit</option>
+                        <option value="180" selected>3 menit</option>
+                        <option value="300">5 menit</option>
+                        <option value="600">10 menit</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="d-grid gap-3">
+                <button class="btn btn-lg btn-primary mode-btn" data-mode="tj-custom">
+                    <i class="fa-solid fa-bus me-2"></i>
+                    <strong>TransJakarta - Pilih Rute</strong>
+                    <small class="d-block mt-1">BRT, Non-BRT, Transjabodetabek, Royal Trans, Bus Wisata</small>
+                </button>
+                <button class="btn btn-lg btn-danger mode-btn" data-mode="krl">
+                    <i class="fa-solid fa-train me-2"></i>
+                    <strong>KRL Jabodetabek</strong>
+                    <small class="d-block mt-1">Stasiun & Line (termasuk transit)</small>
+                </button>
+            </div>
+        </div>
+
+        <!-- Route Selection with Categories and Checkboxes -->
+        <div id="routeSelection" class="quiz-card" style="display: none;">
+            <div class="d-flex align-items-center mb-4">
+                <button id="backToMode" class="btn btn-outline-secondary me-3">
+                    <i class="fa-solid fa-arrow-left"></i>
+                </button>
+                <h2 class="mb-0">Pilih Rute TransJakarta</h2>
+            </div>
+            
+            <div class="alert alert-info">
+                <i class="fa-solid fa-info-circle"></i> 
+                <strong>Pilih minimal 1 rute</strong> - Centang rute yang ingin kamu uji!
+            </div>
+
+            <div class="mb-3 d-flex gap-2">
+                <input type="text" id="routeSearch" class="form-control form-control-lg" placeholder="Cari rute... (contoh: 1, 5C, JAK10)">
+                <button id="selectAllBtn" class="btn btn-outline-primary">
+                    <i class="fa-solid fa-check-double"></i> Pilih Semua
+                </button>
+                <button id="clearAllBtn" class="btn btn-outline-secondary">
+                    <i class="fa-solid fa-times"></i> Hapus
+                </button>
+            </div>
+
+            <div class="mb-3">
+                <span class="badge bg-primary" id="selectedCount">0 rute dipilih</span>
+            </div>
+
+            <!-- Category Tabs -->
+            <ul class="nav nav-pills mb-3" id="categoryTabs" style="flex-wrap: wrap;">
+                <li class="nav-item">
+                    <a class="nav-link active" data-category="all" href="#">Semua</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" data-category="brt" href="#">BRT</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" data-category="rusun" href="#">Rusun</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" data-category="integrasi" href="#">Integrasi</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" data-category="royal" href="#">Royal Trans</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" data-category="transjabodetabek" href="#">Transjabodetabek</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" data-category="wisata" href="#">Bus Wisata</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" data-category="mikrotrans" href="#">Mikrotrans</a>
+                </li>
+            </ul>
+
+            <div id="routeList" style="max-height: 400px; overflow-y: auto;">
+                <!-- Routes with checkboxes will be populated here -->
+            </div>
+
+            <div class="mt-3">
+                <button id="startQuizBtn" class="btn btn-success btn-lg w-100" disabled>
+                    <i class="fa-solid fa-play"></i> Mulai Kuis
+                </button>
+            </div>
+        </div>
+
+        <!-- Quiz Area -->
+        <div id="quizArea" style="display: none;">
+            <!-- Score Display -->
+            <div class="score-display">
+                <i class="fa-solid fa-star"></i> Skor: <span id="scoreValue">0</span>/<span id="totalQuestions">10</span>
+            </div>
+
+            <!-- Timer -->
+            <div class="timer-display">
+                <i class="fa-solid fa-clock"></i> Waktu: <span id="timerValue">00:00</span>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="progress-bar-quiz">
+                <div class="progress-bar-fill" id="progressBar" style="width: 0%"></div>
+            </div>
+
+            <!-- Question Card -->
+            <div class="quiz-card">
+                <div id="categoryBadge" class="category-badge"></div>
+                <div class="quiz-question" id="questionText"></div>
+                <div class="quiz-options" id="optionsContainer"></div>
+                <button id="nextButton" class="btn btn-primary btn-lg w-100 mt-3" style="display: none;">
+                    Soal Berikutnya <i class="fa-solid fa-arrow-right"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Result Area -->
+        <div id="resultArea" style="display: none;">
+            <div class="result-card">
+                <h1><i class="fa-solid fa-trophy"></i></h1>
+                <h2>Kuis Selesai!</h2>
+                <div class="result-score" id="finalScore">0/10</div>
+                <div class="result-message" id="resultMessage"></div>
+                <div class="d-flex gap-3 justify-content-center flex-wrap">
+                    <button id="reviewButton" class="btn btn-info btn-lg">
+                        <i class="fa-solid fa-list-check"></i> Lihat Review
+                    </button>
+                    <button id="restartButton" class="btn btn-light btn-lg">
+                        <i class="fa-solid fa-rotate-right"></i> Main Lagi
+                    </button>
+                    <button id="changeModeButton" class="btn btn-outline-light btn-lg">
+                        <i class="fa-solid fa-grid"></i> Ganti Mode
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Review Area -->
+        <div id="reviewArea" style="display: none;">
+            <div class="quiz-card">
+                <div class="d-flex align-items-center mb-4">
+                    <button id="backToResultBtn" class="btn btn-outline-secondary me-3">
+                        <i class="fa-solid fa-arrow-left"></i>
+                    </button>
+                    <h2 class="mb-0">Review Jawaban</h2>
+                </div>
+                <div id="reviewContent">
+                    <!-- Review items will be populated here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- History Area -->
+        <div id="historyArea" style="display: none;">
+            <div class="quiz-card">
+                <div class="d-flex align-items-center justify-content-between mb-4">
+                    <div class="d-flex align-items-center">
+                        <button id="backToModeFromHistory" class="btn btn-outline-secondary me-3">
+                            <i class="fa-solid fa-arrow-left"></i>
+                        </button>
+                        <h2 class="mb-0">
+                            <i class="fa-solid fa-clock-rotate-left"></i> Riwayat Kuis
+                        </h2>
+                    </div>
+                    <button id="clearHistoryBtn" class="btn btn-outline-danger">
+                        <i class="fa-solid fa-trash"></i> Hapus Semua
+                    </button>
+                </div>
+                
+                <div class="alert alert-info">
+                    <i class="fa-solid fa-info-circle"></i> 
+                    Riwayat kuis disimpan secara lokal di perangkat Anda. Klik pada item untuk melihat detail review.
+                </div>
+
+                <div id="historyList">
+                    <!-- History items will be populated here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- History Detail Area -->
+        <div id="historyDetailArea" style="display: none;">
+            <div class="quiz-card">
+                <div class="d-flex align-items-center mb-4">
+                    <button id="backToHistoryList" class="btn btn-outline-secondary me-3">
+                        <i class="fa-solid fa-arrow-left"></i>
+                    </button>
+                    <h2 class="mb-0">Detail Riwayat Kuis</h2>
+                </div>
+                
+                <div id="historyDetailHeader" class="mb-4">
+                    <!-- History header info will be populated here -->
+                </div>
+
+                <div id="historyDetailContent">
+                    <!-- History detail review items will be populated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Quiz Manager -->
+    <script type="module">
+        import { QuizManager } from './js/quiz-manager.js';
+        
+        // Initialize quiz manager
+        const quizManager = new QuizManager();
+        quizManager.init();
+        
+        // Make it globally accessible for debugging
+        window.quizManager = quizManager;
+    </script>
+</body>
+</html>
+
