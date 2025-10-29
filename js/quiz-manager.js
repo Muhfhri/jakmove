@@ -217,9 +217,15 @@ export class QuizManager {
             }
         });
 
-        // Next button
+        // Next button - handle both confirm and next question
         document.getElementById('nextButton').addEventListener('click', () => {
-            this.nextQuestion();
+            if (this.waitingConfirmation) {
+                // User is confirming their answer
+                this.confirmAnswer();
+            } else {
+                // Move to next question
+                this.nextQuestion();
+            }
         });
 
         // Restart button
@@ -475,7 +481,12 @@ export class QuizManager {
                     const stop = this.gtfsData.stops.find(s => s.stop_id === st.stop_id);
                     return stop;
                 })
-                .filter(stop => stop);
+                .filter(stop => {
+                    if (!stop) return false;
+                    // Filter out stops with "Akses" in the name (e.g., "Blok M Akses A")
+                    const stopName = stop.stop_name.toLowerCase();
+                    return !stopName.includes('akses');
+                });
 
             routeStopsMap.set(route.route_id, { route, stops: stopsList });
         });
@@ -561,7 +572,11 @@ export class QuizManager {
                     const iconicName = iconicList[Math.floor(Math.random() * iconicList.length)];
                     const candidates = this.findStopsByNameFuzzy(iconicName);
                     if (candidates && candidates.length) {
-                        targetStop = candidates[Math.floor(Math.random() * candidates.length)];
+                        // Filter out "Akses" stops from candidates
+                        const filteredCandidates = candidates.filter(c => !c.stop_name.toLowerCase().includes('akses'));
+                        if (filteredCandidates.length > 0) {
+                            targetStop = filteredCandidates[Math.floor(Math.random() * filteredCandidates.length)];
+                        }
                     }
                 }
 
@@ -570,12 +585,19 @@ export class QuizManager {
                 
                 if (useCorrect) {
                     if (!targetStop) {
-                        targetStop = stops[Math.floor(Math.random() * stops.length)];
+                        // Filter out "Akses" stops
+                        const filteredStops = stops.filter(s => !s.stop_name.toLowerCase().includes('akses'));
+                        if (filteredStops.length > 0) {
+                            targetStop = filteredStops[Math.floor(Math.random() * filteredStops.length)];
+                        }
                     }
                 } else {
                     // Find a stop NOT on this route
                     const allStops = Array.from(stopRoutesMap.values());
-                    const wrongStops = allStops.filter(s => !stops.some(st => st.stop_id === s.stop.stop_id));
+                    const wrongStops = allStops.filter(s => 
+                        !stops.some(st => st.stop_id === s.stop.stop_id) &&
+                        !s.stop.stop_name.toLowerCase().includes('akses')
+                    );
                     if (wrongStops.length > 0) {
                         if (!targetStop) {
                             targetStop = wrongStops[Math.floor(Math.random() * wrongStops.length)].stop;
@@ -583,8 +605,10 @@ export class QuizManager {
                     }
                 }
                 
-                if (targetStop) {
+                if (targetStop && !targetStop.stop_name.toLowerCase().includes('akses')) {
+                    // Check if route stops at this stop - use exact stop_id only
                     const correct = stops.some(s => s.stop_id === targetStop.stop_id);
+                    
                     question = {
                         question: `Apakah ${display.label} berhenti di halte "${targetStop.stop_name}"?`,
                         options: ['Ya', 'Tidak'].sort(() => 0.5 - Math.random()),
@@ -599,7 +623,12 @@ export class QuizManager {
                 // Question: Which route passes through this stop?
                 // Skip if only 1 route (not enough wrong answers)
                 if (routeArray.length >= 2) {
-                    const randomStop = Array.from(stopRoutesMap.values())[Math.floor(Math.random() * stopRoutesMap.size)];
+                    // Filter out "Akses" stops
+                    const validStops = Array.from(stopRoutesMap.values()).filter(s => 
+                        !s.stop.stop_name.toLowerCase().includes('akses')
+                    );
+                    if (validStops.length === 0) continue;
+                    const randomStop = validStops[Math.floor(Math.random() * validStops.length)];
                     const correctRouteObj = randomStop.routes[0];
                     const display = this.formatRouteDisplay(correctRouteObj);
                     const correctRoute = display.shortName;
@@ -621,9 +650,9 @@ export class QuizManager {
                                 question: `Rute manakah yang melewati halte "${randomStop.stop.stop_name}"?`,
                                 options: [correctRoute, ...wrongRoutes.slice(0, 3)].sort(() => 0.5 - Math.random()),
                                 correct: correctRoute,
-                                category: display.label,
-                                routeShortName: display.shortName,
-                                routeColor: display.color,
+                                category: 'Transit', // Generic category to hide route badge
+                                routeShortName: null, // Hide badge to avoid giving hints
+                                routeColor: null,
                                 routeInfo: `Halte ${randomStop.stop.stop_name}`
                             };
                         }
@@ -639,26 +668,28 @@ export class QuizManager {
                     // Use the actual route_long_name as correct answer
                     const correctAnswer = route.route_long_name;
                     
-                    // Generate wrong answers from other stops on THIS route
-                    const wrongCombos = [];
-                    const allStopNames = stops.map(s => s.stop_name);
+                    // Get wrong answers from OTHER routes' route_long_name (from GTFS)
+                    const otherRoutes = routeArray
+                        .filter(r => r.route.route_id !== route.route_id && r.route.route_long_name)
+                        .map(r => r.route.route_long_name);
                     
-                    // Create fake destinations from stops in the route
-                    for (let j = 0; j < 5; j++) {
-                        const stop1 = allStopNames[Math.floor(Math.random() * allStopNames.length)];
-                        const stop2 = allStopNames[Math.floor(Math.random() * allStopNames.length)];
-                        if (stop1 !== stop2) {
-                            const fakeDestination = `${stop1} - ${stop2}`;
-                            if (fakeDestination !== correctAnswer && !wrongCombos.includes(fakeDestination)) {
-                                wrongCombos.push(fakeDestination);
-                            }
-                        }
+                    // If not enough other routes, fallback to all GTFS routes
+                    let wrongAnswers = otherRoutes;
+                    if (wrongAnswers.length < 3) {
+                        wrongAnswers = (this.gtfsData?.routes || [])
+                            .filter(r => r.route_id !== route.route_id && r.route_long_name && r.route_long_name !== correctAnswer)
+                            .map(r => r.route_long_name);
                     }
                     
-                    if (wrongCombos.length >= 3) {
+                    // Remove duplicates and shuffle
+                    wrongAnswers = Array.from(new Set(wrongAnswers))
+                        .sort(() => 0.5 - Math.random())
+                        .slice(0, 3);
+                    
+                    if (wrongAnswers.length >= 3) {
                         question = {
                             question: `${display.label} melayani jurusan kemana?`,
-                            options: [correctAnswer, ...wrongCombos.slice(0, 3)].sort(() => 0.5 - Math.random()),
+                            options: [correctAnswer, ...wrongAnswers].sort(() => 0.5 - Math.random()),
                             correct: correctAnswer,
                             category: display.label,
                             routeShortName: display.shortName,
@@ -674,29 +705,36 @@ export class QuizManager {
                 const display = this.formatRouteDisplay(route);
                 
                 if (stops.length >= 4) {
-                    // Find stops NOT on this route
+                    // Find stops NOT on this route (and not "Akses")
                     const allStops = Array.from(stopRoutesMap.values());
                     const stopsNotOnRoute = allStops.filter(s => 
-                        !stops.some(st => st.stop_id === s.stop.stop_id)
+                        !stops.some(st => st.stop_id === s.stop.stop_id) &&
+                        !s.stop.stop_name.toLowerCase().includes('akses')
                     );
                     
                     if (stopsNotOnRoute.length > 0) {
                         const correctStop = stopsNotOnRoute[Math.floor(Math.random() * stopsNotOnRoute.length)].stop.stop_name;
                         
-                        // Wrong answers are stops that ARE on the route
-                        const wrongStops = stops
+                        // Wrong answers are stops that ARE on the route (and not "Akses")
+                        // Use Set to ensure unique stop names
+                        const uniqueStopNames = Array.from(new Set(
+                            stops
+                                .filter(s => !s.stop_name.toLowerCase().includes('akses'))
+                                .map(s => s.stop_name)
+                        ));
+                        
+                        const wrongStops = uniqueStopNames
                             .sort(() => 0.5 - Math.random())
-                            .slice(0, 3)
-                            .map(s => s.stop_name);
+                            .slice(0, 3);
                         
                         if (wrongStops.length >= 3) {
                             question = {
                                 question: `Halte mana yang TIDAK dilalui oleh ${display.label}?`,
-                                options: [correctStop, ...wrongStops].sort(() => 0.5 - Math.random()),
+                                options: Array.from(new Set([correctStop, ...wrongStops])).sort(() => 0.5 - Math.random()),
                                 correct: correctStop,
                                 category: display.label,
-                                routeShortName: display.shortName,
-                                routeColor: display.color,
+                                routeShortName: null, // Hide badge to avoid giving hints
+                                routeColor: null,
                                 routeInfo: `${display.shortName}`
                             };
                         }
@@ -711,9 +749,10 @@ export class QuizManager {
                 if (availableRoute2.length > 0 && route1.stops.length >= 3) {
                     const route2 = availableRoute2[Math.floor(Math.random() * availableRoute2.length)];
                     
-                    // Find common stops
+                    // Find common stops (excluding "Akses")
                     const commonStops = route1.stops.filter(s1 => 
-                        route2.stops.some(s2 => s2.stop_id === s1.stop_id)
+                        route2.stops.some(s2 => s2.stop_id === s1.stop_id) &&
+                        !s1.stop_name.toLowerCase().includes('akses')
                     );
                     
                     if (commonStops.length > 0) {
@@ -744,10 +783,15 @@ export class QuizManager {
                     if (!chosen || !chosen.stops?.length) continue;
                     const baseRoute = chosen.route;
                     const display = this.formatRouteDisplay(baseRoute);
-                    const stop = chosen.stops[Math.floor(Math.random() * chosen.stops.length)];
+                    // Filter out "Akses" stops
+                    const filteredStops = chosen.stops.filter(s => !s.stop_name.toLowerCase().includes('akses'));
+                    if (filteredStops.length === 0) continue;
+                    const stop = filteredStops[Math.floor(Math.random() * filteredStops.length)];
 
                     // Find ALL routes (global) that serve this stop
+                    // ONLY use exact stop_id to avoid false matches
                     const stopId = stop.stop_id;
+                    
                     const stimes = (this.gtfsData?.stopTimes || []).filter(st => st.stop_id === stopId);
                     const tripIds = new Set(stimes.map(st => st.trip_id));
                     const tripsById = new Map((this.gtfsData?.trips || []).map(t => [t.trip_id, t]));
@@ -763,6 +807,9 @@ export class QuizManager {
                     const servingShorts = servingRoutes
                         .map(r => String(r.route_short_name || r.route_id))
                         .filter(Boolean);
+                    
+                    console.log(`Stop "${stop.stop_name}" (${stopId}) served by routes:`, servingShorts);
+                    
                     if (servingShorts.length < 2) continue; // need at least 2 to make options meaningful
 
                     const correctTokens = Array.from(new Set(servingShorts)).sort((a,b)=>a.localeCompare(b, 'id', {numeric:true}));
@@ -889,7 +936,8 @@ export class QuizManager {
                 while (questions.length < targetCount && attempts < 200) {
                     attempts++;
                     const candidate = allStopsGlobal[Math.floor(Math.random() * allStopsGlobal.length)];
-                    if (!candidate || stopIds.has(candidate.stop_id)) continue;
+                    // Skip if candidate is null, already in route, or has "Akses" in name
+                    if (!candidate || stopIds.has(candidate.stop_id) || candidate.stop_name.toLowerCase().includes('akses')) continue;
 
                     if (addQuestion({
                         question: `Apakah rute ${routeName} berhenti di halte "${candidate.stop_name}"?`,
@@ -1068,6 +1116,9 @@ export class QuizManager {
 
         const question = this.questions[this.currentQuestionIndex];
         this.answered = false;
+        this.selectedOption = null; // Reset selected option
+        this.correctAnswer = null;
+        this.waitingConfirmation = false;
 
         // Update progress
         document.getElementById('totalQuestions').textContent = this.questions.length;
@@ -1107,8 +1158,10 @@ export class QuizManager {
     }
 
     normalizeAnswer(answer) {
+        if (!answer) return '';
+        
         // Normalize for comparison: lowercase, split by separators, sort, rejoin
-        const normalized = answer.toLowerCase()
+        const normalized = String(answer).toLowerCase()
             .replace(/\s+/g, ' ')
             .trim();
         
@@ -1120,14 +1173,18 @@ export class QuizManager {
                 .split(',')
                 .map(s => s.trim())
                 .filter(s => s)
-                .sort();
+                .sort((a, b) => a.localeCompare(b, undefined, {numeric: true}));
             return parts.join(',');
         }
+        
         // Also support space-separated multi tokens like "5 5C 7U 4 4D"
+        // This handles route badge answers
         if (normalized.includes(' ')) {
             const tokens = normalized.split(/\s+/).filter(Boolean);
             if (tokens.length >= 2) {
-                return tokens.sort().join(',');
+                // Sort with numeric awareness (so "1" comes before "1a")
+                const sorted = tokens.sort((a, b) => a.localeCompare(b, undefined, {numeric: true}));
+                return sorted.join(',');
             }
         }
         
@@ -1136,12 +1193,50 @@ export class QuizManager {
 
     selectAnswer(selected, correct) {
         if (this.answered) return;
+        
+        // Mark as selected (highlight the selected option)
+        this.selectedOption = selected;
+        this.correctAnswer = correct;
+        this.waitingConfirmation = true;
+        
+        const options = document.querySelectorAll('.quiz-option');
+        options.forEach(option => {
+            option.classList.remove('selected');
+            const optionValue = option.getAttribute('data-value') || option.textContent;
+            if (optionValue === selected) {
+                option.classList.add('selected');
+            }
+        });
+
+        // Show confirm button
+        const nextBtn = document.getElementById('nextButton');
+        nextBtn.textContent = 'Konfirmasi Jawaban';
+        nextBtn.style.display = 'block';
+    }
+
+    confirmAnswer() {
+        if (this.answered) return;
+        if (!this.selectedOption) return;
+        if (!this.waitingConfirmation) return;
+        
         this.answered = true;
+        this.waitingConfirmation = false;
+        const selected = this.selectedOption;
+        const correct = this.correctAnswer;
 
         // Normalize both answers for comparison
         const normalizedSelected = this.normalizeAnswer(selected);
         const normalizedCorrect = this.normalizeAnswer(correct);
         const isCorrect = normalizedSelected === normalizedCorrect;
+
+        // Debug logging
+        console.log('Answer Check:', {
+            selected,
+            correct,
+            normalizedSelected,
+            normalizedCorrect,
+            isCorrect
+        });
 
         // Store user answer for review
         const currentQuestion = this.questions[this.currentQuestionIndex];
@@ -1151,22 +1246,28 @@ export class QuizManager {
             correctAnswer: correct,
             isCorrect: isCorrect,
             category: currentQuestion.category,
-            routeInfo: currentQuestion.routeInfo
+            routeInfo: currentQuestion.routeInfo,
+            format: currentQuestion.format
         });
 
         const options = document.querySelectorAll('.quiz-option');
         options.forEach(option => {
             option.classList.add('disabled');
+            option.classList.remove('selected');
             
             // Check if this option is the correct answer (normalized comparison)
-            const optionRaw = option.getAttribute('data-value') || option.textContent;
-            const normalizedOption = this.normalizeAnswer(optionRaw);
+            const optionValue = option.getAttribute('data-value');
+            if (!optionValue) return;
+            
+            const normalizedOption = this.normalizeAnswer(optionValue);
+            
+            // Highlight correct answer
             if (normalizedOption === normalizedCorrect) {
                 option.classList.add('correct');
             }
             
-            // Check if this option was selected and is wrong
-            if ((option.getAttribute('data-value') || option.textContent) === selected && !isCorrect) {
+            // Highlight wrong answer if user selected it
+            if (optionValue === selected && !isCorrect) {
                 option.classList.add('wrong');
             }
         });
@@ -1177,8 +1278,9 @@ export class QuizManager {
             document.getElementById('scoreValue').textContent = this.score;
         }
 
-        // Show next button
-        document.getElementById('nextButton').style.display = 'block';
+        // Change button text to next
+        const nextBtn = document.getElementById('nextButton');
+        nextBtn.textContent = 'Soal Berikutnya ➜';
     }
 
     nextQuestion() {
