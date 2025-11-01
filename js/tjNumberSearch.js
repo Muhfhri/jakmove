@@ -107,13 +107,17 @@ const busRangeData = [
   },
   // SKYWELL
   { 
-    prefix: 'DMR', start: 250215, end: 250270, operator: 'DAMRI', tipe: 'Skywell NJL6126BEV2', warna: 'Putih-Biru Tua', bahanBakar: 'Listrik', karoseri: 'CBU', pool: 'Cakung', catatan: 'BRT', isSkywell: true, isLowdeck: true  
+    prefix: 'DMR', start: 250225, end: 250274, operator: 'DAMRI', tipe: 'Skywell NJL6126BEV2', warna: 'Putih-Biru Tua', bahanBakar: 'Listrik', karoseri: 'CBU', pool: 'Cakung', catatan: 'BRT', isSkywell: true, isLowdeck: true  
   },
   { 
     prefix: 'DMR', start: 240155, end: 240214, operator: 'DAMRI', tipe: 'Skywell NJL6126BEV', warna: 'Putih-Biru Tua', bahanBakar: 'Listrik', karoseri: 'CBU', pool: 'Cakung', catatan: 'BRT', isSkywell: true, isLowdeck: true 
   },
   { 
     prefix: 'DMR', start: 230099, end: 230124, operator: 'DAMRI', tipe: 'Skywell NJL6129BEV', warna: 'Putih Orange', bahanBakar: 'Listrik', karoseri: 'CBU', catatan: 'Non BRT', isSkywellNonBRT: true, isLowdeck: true 
+  },
+  // BYD VKTR BRT
+  { 
+    prefix: 'DMR', start: 250275, end: 250354, operator: 'DAMRI', tipe: 'VKTR Tidar HF-12', warna: 'Putih - Biru Tua', bahanBakar: 'Listrik', karoseri: 'Laksana', catatan: 'BRT', isSingle: true 
   },
   // HINO RK8 R260
   { 
@@ -600,6 +604,7 @@ function renderBusSearchResults(results) {
 // Mapping gambar bus per tipe utama
 const busImages = {
   'VKTR BYD D9': 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/72/Transjakarta_SJM-240012.jpg/1280px-Transjakarta_SJM-240012.jpg',
+  'VKTR Tidar HF-12': 'https://github.com/Muhfhri/jakmove/blob/main/image/dmrvktr.jpg?raw=true',
   'Volvo B11R': 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Transjakarta_Steady_Safe_Cityline_2_Laksana.jpg/1280px-Transjakarta_Steady_Safe_Cityline_2_Laksana.jpg',
   'Mercedes-Benz OH 1626 A/T': 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Transjakarta_Mercedes_Benz_OH_1626_Ng_MYS-19220_at_Cibubur_junction.jpg/1280px-Transjakarta_Mercedes_Benz_OH_1626_Ng_MYS-19220_at_Cibubur_junction.jpg',
   'Mercedes Benz OH 1626 M/T': 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Transjakarta_Mercedes_Benz_OH_1626_Ng_MYS-19220_at_Cibubur_junction.jpg/1280px-Transjakarta_Mercedes_Benz_OH_1626_Ng_MYS-19220_at_Cibubur_junction.jpg',
@@ -611,7 +616,7 @@ const busImages = {
   'Zhongtong Bus LCK6126EVGRA1': 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ee/Transjakarta_Perum_DAMRI_Zhongtong_Bus.jpg/1280px-Transjakarta_Perum_DAMRI_Zhongtong_Bus.jpg',
   'Zhongtong Bus LCK6126EVGRA2': 'https://img.okezone.com/content/2025/06/20/1/3148864/bus_listrik_damri-peyD_large.jpg',
   'Skywell NJL6126BEV': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/48/Transjakarta_-_DMR-240156.jpg/1280px-Transjakarta_-_DMR-240156.jpg',
-  'Skywell NJL6126BEV2': '../image/skywellbatch2.png',
+  'Skywell NJL6126BEV2': 'https://github.com/Muhfhri/jakmove/blob/main/image/skywellbatch2.png?raw=true',
   'Skywell NJL6129BEV': 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/45/Transjakarta_Metrotrans_Skywell_Electric_Bus.jpg/1280px-Transjakarta_Metrotrans_Skywell_Electric_Bus.jpg',
   'SAG Golden Dragon Pivot E12 Non BRT': 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e2/Bus_Metrotrans_di_rute_4B.jpg/1280px-Bus_Metrotrans_di_rute_4B.jpg',
   'Mercedes-Benz OH 1626 21xxx': 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/90/Transjakarta_-_MYS-21263_Daimler_OH_1626.jpg/1280px-Transjakarta_-_MYS-21263_Daimler_OH_1626.jpg',
