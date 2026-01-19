@@ -120,7 +120,6 @@ B41,Tije,B41,Vida Bekasi - Cawang Sentral via Jatiasih,Transjabodetabek,3,,FFFF6
 BW1,Tije,BW1,Sejarah Jakarta,Bus Wisata,3,,FFB6DB,000000,
 BW2,Tije,BW2,Monas Explorer,Bus Wisata,3,,FFB6DB,000000,
 BW4,Tije,BW4,Pencakar Langit,Bus Wisata,3,,FFB6DB,000000,
-BW9,Tije,BW9,Kota Tua - PIK,Bus Wisata,3,,FFB6DB,000000,
 D11,Tije,D11,Depok - Cawang Sentral via Cibubur,Transjabodetabek,3,,FFFF6D,000000,
 D21,Tije,D21,Universitas Indonesia - Lebak Bulus,Transjabodetabek,3,,FFFF6D,000000,
 D31,Tije,D31,Cinere - Kuningan,Royaltrans,3,,9C4782,FFFFFF,
@@ -242,3 +241,4 @@ P11,Tije,P11,Bogor - Blok M,Transjabodetabek,3,,FFFF6D,000000,
 3B,Tije,3B,Rusun Flamboyan - Cengkareng,Rusun,3,,FDECB4,000000,
 B25,Tije,B25,Bekasi - Dukuh Atas,Transjabodetabek,3,,FFFF6D,000000,
 1W,Tije,1W,Blok M - Ancol,Angkutan Umum Integrasi,3,,D65E62,000000,
+
