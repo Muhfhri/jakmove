@@ -1,6 +1,6 @@
 # JakMove - Smart Transit Experience
 
-[![GitHub](https://img.shields.io/badge/GitHub-Repository-blue?logo=github)](https://github.com/yourusername/jakmove)
+[![GitHub](https://img.shields.io/badge/GitHub-Repository-blue?logo=github)](https://github.com/muhfhri/jakmove)
 [![License](https://img.shields.io/badge/License-Open%20Source-green)](#)
 [![Version](https://img.shields.io/badge/Version-2.0.0-orange)](#)
 
@@ -147,7 +147,7 @@ Aplikasi dapat diakses langsung melalui browser tanpa instalasi:
 ### Local Development
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/jakmove.git
+git clone https://github.com/muhfhri/jakmove.git
 
 # Masuk ke direktori
 cd jakmove
