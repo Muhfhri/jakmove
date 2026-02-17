@@ -112,7 +112,7 @@ route_id,trip_id,direction_id,stop_headsign,start_time,end_time
 2H,2H-L03,0,Rusun Jati Rawasari,05:00:00,22:00:00
 2H,2H-L03,0,Senen,05:00:00,22:00:00
 2P,2P-L04,0,Senen,05:00:00,22:00:00
-2P,2P-L04,0,Transport Hub Dukuh Atas,05:00:00,22:00:00
+2P,2P-L04,0,Stasiun Gondangdia,05:00:00,22:00:00
 2Q,2Q-R01,0,Balai Kota,05:00:00,22:00:00
 2Q,2Q-R02,1,Gondangdia,05:00:00,22:00:00
 3A,3A-L03,0,Kalideres,05:00:00,22:00:00
@@ -230,16 +230,16 @@ route_id,trip_id,direction_id,stop_headsign,start_time,end_time
 9H,9H-L09,0,Term. Pasar Minggu,05:00:00,22:00:00
 9N,9N-L02,0,Pinang Ranti,05:00:00,22:00:00
 9N,9N-L02,0,Simpang Cawang,05:00:00,22:00:00
-B11,B11-L07,0,Cawang,05:00:00,22:00:00
-B11,B11-L07,0,Summarecon Bekasi,05:00:00,22:00:00
+B11,B11-L10,0,Cawang,05:00:00,22:00:00
+B11,B11-L10,0,Summarecon Bekasi,05:00:00,22:00:00
 B13,B13-R01,0,Blok M,05:00:00,20:00:00
 B13,B13-R02,1,Bekasi Barat,05:00:00,20:00:00
 B14,B14-R01,0,Kuningan,05:00:00,20:00:00
 B14,B14-R02,1,Bekasi Barat,05:00:00,20:00:00
 B21,B21-L06,0,Bekasi Timur,05:00:00,22:00:00
 B21,B21-L06,0,Cawang,05:00:00,22:00:00
-B25,B25-R01,0,Galunggung,05:00:00,22:00:00
-B25,B25-R02,1,Bekasi,05:00:00,22:00:00
+B25,B25-R03,0,Galunggung,05:00:00,22:00:00
+B25,B25-R04,1,Bekasi,05:00:00,22:00:00
 B41,B41-L03,0,Cawang Sentral,05:00:00,22:00:00
 B41,B41-L03,1,Vida Bekasi,05:00:00,22:00:00
 BW1,BW1-L02,0,Sejarah Jakarta,10:00:00,17:00:00
@@ -477,3 +477,5 @@ JAK.58,JAK.58-R06,1,Cilincing,05:00:00,22:00:00
 JAK.58,JAK.58-R05,0,Rusun Padat Karya,05:00:00,22:00:00
 JAK.59,JAK.59-R03,0,Rawamangun,05:00:00,22:00:00
 JAK.59,JAK.59-R04,1,Rawa Sengon,05:00:00,22:00:00
+B51,B51-R02,1,Cikarang,05:00:00,22:00:00
+B51,B51-R01,0,Cawang,05:00:00,22:00:00
