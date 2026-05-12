@@ -641,8 +641,8 @@ export class MapManager {
         if (!this.map) return Promise.resolve();
         if (this._stopIconsPromise) return this._stopIconsPromise;
         const entries = [
-            { name: 'tj-stop-brt', url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/26/JakIcon_BusBRT.svg/1200px-JakIcon_BusBRT.svg.png' },
-            { name: 'tj-stop-feeder', url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8b/JakIcon_Bus_Light.svg/2048px-JakIcon_Bus_Light.svg.png' }
+            { name: 'tj-stop-brt', url: 'https://raw.githubusercontent.com/Muhfhri/jakmove/refs/heads/main/image/brt.png' },
+            { name: 'tj-stop-feeder', url: 'https://raw.githubusercontent.com/Muhfhri/jakmove/refs/heads/main/image/nonbrt.png' }
         ];
         const loadOne = (name, url) => {
             return new Promise((resolve) => {
@@ -696,12 +696,12 @@ export class MapManager {
                             ],
                             'icon-size': [
                                 'case',
-                                ['==', ['get', 'stopType'], 'Pengumpan'], 0.008,
-                                0.012
+                                ['==', ['get', 'stopType'], 'Pengumpan'], 0.048,
+                                0.07
                             ],
                             'icon-rotate': [
                                 'case',
-                                ['==', ['get', 'stopType'], 'Pengumpan'], 180,
+                                ['==', ['get', 'stopType'], 'Pengumpan'], 0,
                                 0
                             ],
                             'icon-allow-overlap': true,

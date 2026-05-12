@@ -755,8 +755,8 @@ export class LocationManager {
             };
             
             // Helper: stop-type icon for BRT/Pengumpan/Platform
-            const brtIconUrl = 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/26/JakIcon_BusBRT.svg/1200px-JakIcon_BusBRT.svg.png';
-            const feederIconUrl = 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8b/JakIcon_Bus_Light.svg/2048px-JakIcon_Bus_Light.svg.png';
+            const brtIconUrl = 'https://raw.githubusercontent.com/Muhfhri/jakmove/refs/heads/main/image/brt.png';
+            const feederIconUrl = 'https://raw.githubusercontent.com/Muhfhri/jakmove/refs/heads/main/image/nonbrt.png';
             const buildStopTypeIcon = (stopId) => {
                 const sid = String(stopId || '');
                 if (sid.startsWith('B')) {
